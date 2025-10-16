@@ -993,6 +993,15 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         return;
     }
     
+    // CRÍTICO: Verificar se o indicador já calculou barras suficientes
+    int calculated = BarsCalculated(g_handles.gg_trendbar);
+    if(calculated < 50)
+    {
+        WriteLog(2, StringFormat("GG TrendBar ainda inicializando: %d barras calculadas (min: 50)", calculated));
+        signal.isValid = false;
+        return;
+    }
+    
     // Ler buffers do indicador GG TrendBar
     // Buffer 0=M1, 1=M5, 2=M15, 3=M30, 4=H1, 5=H4, 6=D1, 7=W1, 8=MN1
     // Valores: 1 = Bullish, 0 = Neutral, -1 = Bearish
@@ -1003,7 +1012,7 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
     signal.isValid = true;
     
     // DEBUG: Log detalhado da leitura dos buffers
-    string bufferDebug = "GG Buffers: ";
+    string bufferDebug = StringFormat("GG Buffers (calc=%d): ", calculated);
     
     // Ler cada buffer individualmente
     for(int i = 0; i < 9; i++)
@@ -1292,6 +1301,9 @@ int OnInit()
     WriteLog(1, StringFormat("  - Risco: %.1f%%", AccountRiskPercent));
     WriteLog(1, StringFormat("  - Max trades: %d", MaxSimultaneousTrades));
     WriteLog(1, StringFormat("  - Magic Number: %d", EA_MAGIC_NUMBER));
+    WriteLog(1, "");
+    WriteLog(1, "⏳ IMPORTANTE: GG TrendBar precisa de 50+ barras para inicializar");
+    WriteLog(1, "   Durante este período, o indicador não participará da pontuação");
     WriteLog(1, "");
     WriteLog(1, "Sistema pronto para análise de setups!");
     WriteLog(1, "Aguardando próximo candle para análise...");

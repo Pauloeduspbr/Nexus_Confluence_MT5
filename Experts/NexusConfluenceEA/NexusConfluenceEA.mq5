@@ -201,10 +201,11 @@ string g_currencyStrengthShortName;
 string g_rsiomaShortName;
 string g_waeShortName;
 
-const string HINT_TRENDMAGIC = "trendmagic|trend magic";
-const string HINT_CURRENCY_STRENGTH = "currency strength";
-const string HINT_RSIOMA = "rsioma|rsi oma";
-const string HINT_WAE = "waddah|wae";
+// Padrões de nomes dos indicadores conforme definidos em seus códigos fonte
+const string HINT_TRENDMAGIC = "trendmagic mt5";
+const string HINT_CURRENCY_STRENGTH = "currency strength:";
+const string HINT_RSIOMA = "rsioma v2";
+const string HINT_WAE = "wae [";
 
 //+------------------------------------------------------------------+
 //| Função de log                                                    |
@@ -479,8 +480,13 @@ bool LocateIndicatorByHandle(const long chart_id, const int handle, int &windowI
     if(handle == INVALID_HANDLE)
         return false;
 
-    // ChartIndicatorGet retorna o SHORT NAME do indicador como string, não o handle!
-    // Vamos buscar pelo short name conhecido do indicador
+    // Padrões de nomes reais dos indicadores conforme definido em seus códigos fonte:
+    // - TrendMagic: "TrendMagic MT5 (50,5)" 
+    // - Currency Strength: "Currency Strength: USD vs JPY"
+    // - RSIOMA: "RSIOMA v2 (14,9)"
+    // - WAE: "WAE [Fast:20 | Slow:40 | Sens:150]"
+    // - GG TrendBar: "GG TrendBar"
+    
     int totalWindows = (int)ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL);
     for(int w = 0; w < totalWindows; ++w)
     {
@@ -489,40 +495,40 @@ bool LocateIndicatorByHandle(const long chart_id, const int handle, int &windowI
         {
             string name = ChartIndicatorName(chart_id, w, i);
             
-            // Para GG TrendBar, verificar se o nome contém "GG TrendBar"
-            if(handle == g_handles.gg_trendbar && StringFind(name, "GG TrendBar") >= 0)
+            // GG TrendBar: nome fixo "GG TrendBar"
+            if(handle == g_handles.gg_trendbar && name == "GG TrendBar")
             {
                 windowIndex = w;
                 indicatorName = name;
                 WriteLog(3, StringFormat("GG TrendBar localizado: '%s' na janela %d", name, w));
                 return true;
             }
-            // Para TrendMagic, verificar se contém "TrendMagic" ou "Trend Magic"
-            else if(handle == g_handles.tm_m15 && (StringFind(name, "TrendMagic") >= 0 || StringFind(name, "Trend Magic") >= 0))
+            // TrendMagic: começa com "TrendMagic MT5"
+            else if(handle == g_handles.tm_m15 && StringFind(name, "TrendMagic MT5") == 0)
             {
                 windowIndex = w;
                 indicatorName = name;
                 WriteLog(3, StringFormat("TrendMagic localizado: '%s' na janela %d", name, w));
                 return true;
             }
-            // Para Currency Strength
-            else if(handle == g_handles.cs_m15 && StringFind(name, "Currency") >= 0)
+            // Currency Strength: começa com "Currency Strength:"
+            else if(handle == g_handles.cs_m15 && StringFind(name, "Currency Strength:") == 0)
             {
                 windowIndex = w;
                 indicatorName = name;
                 WriteLog(3, StringFormat("CurrencyStrength localizado: '%s' na janela %d", name, w));
                 return true;
             }
-            // Para RSI OMA
-            else if((handle == g_handles.rsi_m15) && (StringFind(name, "RSI") >= 0 || StringFind(name, "rsi") >= 0))
+            // RSIOMA: começa com "RSIOMA v2"
+            else if(handle == g_handles.rsi_m15 && StringFind(name, "RSIOMA v2") == 0)
             {
                 windowIndex = w;
                 indicatorName = name;
-                WriteLog(3, StringFormat("RSI OMA localizado: '%s' na janela %d", name, w));
+                WriteLog(3, StringFormat("RSIOMA localizado: '%s' na janela %d", name, w));
                 return true;
             }
-            // Para WAE
-            else if(handle == g_handles.wae_m15 && (StringFind(name, "WAE") >= 0 || StringFind(name, "Waddah") >= 0))
+            // WAE: começa com "WAE ["
+            else if(handle == g_handles.wae_m15 && StringFind(name, "WAE [") == 0)
             {
                 windowIndex = w;
                 indicatorName = name;

@@ -394,40 +394,59 @@ void ReleaseIndicatorHandles()
 bool AttachGGTrendBarToChart()
 {
     if(g_handles.gg_trendbar == INVALID_HANDLE)
+    {
+        WriteLog(0, "ERRO: Handle GG TrendBar inválido ao tentar anexar");
         return false;
+    }
 
     long chart_id = ChartID();
     
-    // Em backtest, ChartIndicatorAdd pode não funcionar visualmente
-    // Mas o handle já está criado e funcionando para leitura de dados
-    bool isTesting = MQLInfoInteger(MQL_TESTER);
-    
-    if(!isTesting)
+    // Remover indicador existente se presente
+    int existingWindow = -1;
+    string existingName = "";
+    if(LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, existingWindow, existingName))
     {
-        int existingWindow = -1;
-        string existingName = "";
-        if(LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, existingWindow, existingName))
-            ChartIndicatorDelete(chart_id, existingWindow, existingName);
-        else
-            ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
-
-        if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
-            return false;
-
-        int total = ChartIndicatorsTotal(chart_id, 0);
-        string names;
-        for(int i = 0; i < total; i++)
-        {
-            string indicator_name = ChartIndicatorName(chart_id, 0, i);
-            if(i > 0) names += ", ";
-            names += indicator_name;
-        }
-        WriteLog(1, "Indicadores anexados janela 0: " + (names == "" ? "(nenhum)" : names));
+        WriteLog(2, StringFormat("Removendo GG TrendBar existente da janela %d", existingWindow));
+        ChartIndicatorDelete(chart_id, existingWindow, existingName);
     }
     else
     {
-        WriteLog(1, "Modo backtest: GG TrendBar handle criado, anexação visual desabilitada");
+        // Tentar remover por nome padrão
+        ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
     }
+
+    // Anexar o indicador à janela principal (0)
+    WriteLog(2, "Anexando GG TrendBar à janela 0...");
+    if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
+    {
+        WriteLog(0, "ERRO: ChartIndicatorAdd falhou ao anexar GG TrendBar");
+        WriteLog(0, StringFormat("Código erro: %d", GetLastError()));
+        g_GGTrendBarAttached = false;
+        return false;
+    }
+
+    // Verificar se foi anexado com sucesso
+    int total = ChartIndicatorsTotal(chart_id, 0);
+    string names = "";
+    bool ggFound = false;
+    
+    for(int i = 0; i < total; i++)
+    {
+        string indicator_name = ChartIndicatorName(chart_id, 0, i);
+        if(i > 0) names += ", ";
+        names += indicator_name;
+        
+        if(StringFind(indicator_name, "GG") >= 0 || StringFind(indicator_name, "TrendBar") >= 0)
+            ggFound = true;
+    }
+    
+    WriteLog(1, StringFormat("✓ GG TrendBar anexado! Total indicadores janela 0: %d", total));
+    WriteLog(2, "Indicadores presentes: " + (names == "" ? "(nenhum)" : names));
+    
+    if(ggFound)
+        WriteLog(1, "✓ GG TrendBar confirmado visualmente no gráfico");
+    else
+        WriteLog(1, "⚠ GG TrendBar anexado mas nome não identificado automaticamente");
     
     g_GGTrendBarAttached = true;
     return true;
@@ -690,12 +709,6 @@ void EnsureGGTrendBarAttached()
     if(g_handles.gg_trendbar == INVALID_HANDLE)
         return;
 
-    bool isTesting = MQLInfoInteger(MQL_TESTER);
-    
-    // Em modo backtest, pular verificação visual (não funciona)
-    if(isTesting)
-        return;
-
     long chart_id = ChartID();
     int currentWindow = -1;
     string indicatorName = "";
@@ -705,6 +718,7 @@ void EnsureGGTrendBarAttached()
     if(ggFound && currentWindow == 0)
     {
         g_GGTrendBarAttached = true;
+        WriteLog(3, "GG TrendBar confirmado na janela 0");
     }
     else if(ggFound && currentWindow != 0)
     {
@@ -712,14 +726,16 @@ void EnsureGGTrendBarAttached()
         ChartIndicatorDelete(chart_id, currentWindow, indicatorName);
         g_GGTrendBarAttached = false;
         if(AttachGGTrendBarToChart())
-            WriteLog(1, "GG TrendBar reposicionado para janela 0.");
+            WriteLog(1, "✓ GG TrendBar reposicionado para janela 0");
     }
     else
     {
         g_GGTrendBarAttached = false;
-        WriteLog(2, "GG TrendBar ausente. Anexando...");
+        WriteLog(2, "GG TrendBar ausente no gráfico. Reanexando...");
         if(AttachGGTrendBarToChart())
-            WriteLog(2, "GG TrendBar anexado.");
+            WriteLog(1, "✓ GG TrendBar reanexado com sucesso");
+        else
+            WriteLog(0, "✗ Falha ao anexar GG TrendBar");
     }
 
     // Verifica indicadores auxiliares
@@ -1351,17 +1367,12 @@ void OnTick()
 {
     if(!g_InitializationComplete) return;
     
-    bool isTesting = MQLInfoInteger(MQL_TESTER);
-    
-    // Verificar indicadores apenas em modo real (não em backtest)
-    if(!isTesting)
+    // Verificar se indicadores continuam anexados (a cada 5 minutos)
+    static datetime lastPanelCheck = 0;
+    if(TimeCurrent() - lastPanelCheck >= 300) // 5 minutos
     {
-        static datetime lastPanelCheck = 0;
-        if(TimeCurrent() - lastPanelCheck >= 300) // 5 minutos
-        {
-            EnsureGGTrendBarAttached();
-            lastPanelCheck = TimeCurrent();
-        }
+        EnsureGGTrendBarAttached();
+        lastPanelCheck = TimeCurrent();
     }
 
     static datetime lastTest = 0;
@@ -1382,14 +1393,14 @@ void OnTick()
         if(IsSetupValid(scoreBuy))
         {
             WriteLog(0, StringFormat("*** SETUP BUY VÁLIDO: %s ***", scoreBuy.reasoning));
-            if(SendAlerts && !isTesting)
+            if(SendAlerts)
                 SendNotification(StringFormat("Nexus: Setup BUY %s - %s", _Symbol, EnumToString(scoreBuy.classification)));
         }
         
         if(IsSetupValid(scoreSell))
         {
             WriteLog(0, StringFormat("*** SETUP SELL VÁLIDO: %s ***", scoreSell.reasoning));
-            if(SendAlerts && !isTesting)
+            if(SendAlerts)
                 SendNotification(StringFormat("Nexus: Setup SELL %s - %s", _Symbol, EnumToString(scoreSell.classification)));
         }
     }

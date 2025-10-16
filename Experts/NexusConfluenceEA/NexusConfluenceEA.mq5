@@ -821,7 +821,8 @@ void CalculateSetupScore(string symbol, ASSET_CLASS assetType, TRADE_DIRECTION d
     // 5. GG TrendBar
     GGTrendBarSignal gg;
     GetGGTrendBarSignal(symbol, direction, gg);
-    if(gg.isValid && gg.isAligned)
+    bool ggPass = (gg.isValid && gg.isAligned && MathAbs(gg.alignmentPercent) >= GG_MinAlignmentPercent);
+    if(ggPass)
         score.ggTrendBarPoints = 1;
     
     score.totalPoints = score.traderMagicPoints + score.currencyStrengthPoints + 

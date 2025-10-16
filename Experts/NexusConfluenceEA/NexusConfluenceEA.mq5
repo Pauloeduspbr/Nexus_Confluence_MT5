@@ -479,17 +479,54 @@ bool LocateIndicatorByHandle(const long chart_id, const int handle, int &windowI
     if(handle == INVALID_HANDLE)
         return false;
 
+    // ChartIndicatorGet retorna o SHORT NAME do indicador como string, não o handle!
+    // Vamos buscar pelo short name conhecido do indicador
     int totalWindows = (int)ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL);
     for(int w = 0; w < totalWindows; ++w)
     {
         int indicatorCount = ChartIndicatorsTotal(chart_id, w);
         for(int i = 0; i < indicatorCount; ++i)
         {
-            long chartHandle = ChartIndicatorGet(chart_id, w, i);
-            if((int)chartHandle == handle)
+            string name = ChartIndicatorName(chart_id, w, i);
+            
+            // Para GG TrendBar, verificar se o nome contém "GG TrendBar"
+            if(handle == g_handles.gg_trendbar && StringFind(name, "GG TrendBar") >= 0)
             {
                 windowIndex = w;
-                indicatorName = ChartIndicatorName(chart_id, w, i);
+                indicatorName = name;
+                WriteLog(3, StringFormat("GG TrendBar localizado: '%s' na janela %d", name, w));
+                return true;
+            }
+            // Para TrendMagic, verificar se contém "TrendMagic" ou "Trend Magic"
+            else if(handle == g_handles.tm_m15 && (StringFind(name, "TrendMagic") >= 0 || StringFind(name, "Trend Magic") >= 0))
+            {
+                windowIndex = w;
+                indicatorName = name;
+                WriteLog(3, StringFormat("TrendMagic localizado: '%s' na janela %d", name, w));
+                return true;
+            }
+            // Para Currency Strength
+            else if(handle == g_handles.cs_m15 && StringFind(name, "Currency") >= 0)
+            {
+                windowIndex = w;
+                indicatorName = name;
+                WriteLog(3, StringFormat("CurrencyStrength localizado: '%s' na janela %d", name, w));
+                return true;
+            }
+            // Para RSI OMA
+            else if((handle == g_handles.rsi_m15) && (StringFind(name, "RSI") >= 0 || StringFind(name, "rsi") >= 0))
+            {
+                windowIndex = w;
+                indicatorName = name;
+                WriteLog(3, StringFormat("RSI OMA localizado: '%s' na janela %d", name, w));
+                return true;
+            }
+            // Para WAE
+            else if(handle == g_handles.wae_m15 && (StringFind(name, "WAE") >= 0 || StringFind(name, "Waddah") >= 0))
+            {
+                windowIndex = w;
+                indicatorName = name;
+                WriteLog(3, StringFormat("WAE localizado: '%s' na janela %d", name, w));
                 return true;
             }
         }
@@ -603,15 +640,15 @@ void EnsureVisualIndicatorAttached(int handle, int preferredWindow, const string
 
         if(preferredWindow >= 0 && currentWindow != preferredWindow)
         {
-            WriteLog(1, StringFormat("Indicador %s está na janela %d (esperado %d). Reposicionando...", displayName, currentWindow, preferredWindow));
+            WriteLog(2, StringFormat("Indicador %s na janela %d (esperado %d). Reposicionando...", displayName, currentWindow, preferredWindow));
             AttachVisualIndicator(handle, preferredWindow, fallbackHints, displayName, storedWindow, storedName);
         }
         return;
     }
 
-    WriteLog(0, StringFormat("Indicador %s ausente. Reanexando...", displayName));
+    WriteLog(2, StringFormat("Indicador %s ausente. Reanexando...", displayName));
     if(AttachVisualIndicator(handle, preferredWindow, fallbackHints, displayName, storedWindow, storedName))
-        WriteLog(1, StringFormat("Indicador %s reanexado na janela %d", storedName, storedWindow));
+        WriteLog(2, StringFormat("Indicador %s reanexado na janela %d", storedName, storedWindow));
     else
         WriteLog(0, StringFormat("Falha ao reanexar indicador %s", displayName));
 }
@@ -639,18 +676,29 @@ void EnsureGGTrendBarAttached()
     int currentWindow = -1;
     string indicatorName = "";
 
-    if(!LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, currentWindow, indicatorName) || currentWindow != 0)
+    bool ggFound = LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, currentWindow, indicatorName);
+    
+    if(ggFound && currentWindow == 0)
     {
+        // GG TrendBar está na janela correta
+        g_GGTrendBarAttached = true;
+    }
+    else if(ggFound && currentWindow != 0)
+    {
+        // Está anexado mas na janela errada - remover e recolocar
+        WriteLog(1, StringFormat("GG TrendBar na janela %d (esperado 0). Reposicionando...", currentWindow));
+        ChartIndicatorDelete(chart_id, currentWindow, indicatorName);
         g_GGTrendBarAttached = false;
-        WriteLog(0, "GG TrendBar não encontrado na janela principal. Reanexando...");
         if(AttachGGTrendBarToChart())
-            WriteLog(1, "GG TrendBar reanexado automaticamente.");
-        else
-            WriteLog(0, "Falha ao reanexar o GG TrendBar.");
+            WriteLog(1, "GG TrendBar reposicionado para janela 0.");
     }
     else
     {
-        g_GGTrendBarAttached = true;
+        // Não encontrado - anexar
+        g_GGTrendBarAttached = false;
+        WriteLog(2, "GG TrendBar ausente. Anexando...");
+        if(AttachGGTrendBarToChart())
+            WriteLog(2, "GG TrendBar anexado.");
     }
 
     // Verifica indicadores auxiliares
@@ -1257,8 +1305,9 @@ void OnTick()
 {
     if(!g_InitializationComplete) return;
     
+    // Verificar indicadores a cada 5 MINUTOS, não a cada 30 segundos!
     static datetime lastPanelCheck = 0;
-    if(TimeCurrent() - lastPanelCheck >= 30)
+    if(TimeCurrent() - lastPanelCheck >= 300) // 5 minutos = 300 segundos
     {
         EnsureGGTrendBarAttached();
         lastPanelCheck = TimeCurrent();

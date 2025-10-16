@@ -9,6 +9,8 @@ applyTo: '**'
 Desenvolver um Expert Advisor profissional em MQL5 que execute automaticamente o Sistema de Trading Universal v4.0, com capacidade de adaptação automática para múltiplas classes de ativos e gestão de risco baseada em estrutura de preços.
 
 ---
+### pre processing
+leia o arquivo pdf mql5.pdf na raiz do repositorio antes de qualque alteração ou implementação no ea entenda toda a linguagem mql5 e suas particularidades 
 
 ## 🏗️ ARQUITETURA DO SISTEMA
 

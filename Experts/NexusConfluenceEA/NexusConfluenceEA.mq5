@@ -411,21 +411,30 @@ bool AttachGGTrendBarToChart()
 }
 
 //+------------------------------------------------------------------+
-//| Obter short name seguro do indicador                              |
+//| Localizar indicador no gráfico pelo handle                        |
 //+------------------------------------------------------------------+
-string GetIndicatorShortName(const int handle, const string fallback)
+bool LocateIndicatorOnChart(const long chart_id, const int indicatorHandle, int &windowIndex, string &indicatorName)
 {
-    if(handle == INVALID_HANDLE)
-        return fallback;
+    windowIndex = -1;
+    indicatorName = "";
 
-    string name = "";
-    if(IndicatorGetString(handle, INDICATOR_SHORTNAME, name))
+    int totalWindows = (int)ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL);
+    for(int w = 0; w < totalWindows; ++w)
     {
-        if(StringLen(name) > 0)
-            return name;
+        int indicatorCount = ChartIndicatorsTotal(chart_id, w);
+        for(int i = 0; i < indicatorCount; ++i)
+        {
+            long chartHandle = ChartIndicatorGet(chart_id, w, i);
+            if((int)chartHandle == indicatorHandle)
+            {
+                windowIndex = w;
+                indicatorName = ChartIndicatorName(chart_id, w, i);
+                return true;
+            }
+        }
     }
 
-    return fallback;
+    return false;
 }
 
 //+------------------------------------------------------------------+
@@ -437,20 +446,41 @@ bool AttachVisualIndicator(int handle, int targetWindow, int &storedWindow, stri
         return false;
 
     long chart_id = ChartID();
-    storedName = GetIndicatorShortName(handle, fallbackName);
+    int existingWindow = -1;
+    string existingName = "";
 
-    int existingWindow = ChartWindowFind(chart_id, storedName);
-    if(existingWindow != -1)
-        ChartIndicatorDelete(chart_id, existingWindow, storedName);
+    if(LocateIndicatorOnChart(chart_id, handle, existingWindow, existingName))
+    {
+        ChartIndicatorDelete(chart_id, existingWindow, existingName);
+    }
+    else
+    {
+        string candidateName = storedName;
+        if(StringLen(candidateName) == 0)
+            candidateName = fallbackName;
+
+        int windowFromName = ChartWindowFind(chart_id, candidateName);
+        if(windowFromName != -1)
+            ChartIndicatorDelete(chart_id, windowFromName, candidateName);
+    }
 
     if(!ChartIndicatorAdd(chart_id, targetWindow, handle))
         return false;
 
-    storedWindow = ChartWindowFind(chart_id, storedName);
-    if(storedWindow == -1)
-        storedWindow = targetWindow;
+    if(LocateIndicatorOnChart(chart_id, handle, storedWindow, storedName))
+    {
+        WriteLog(1, StringFormat("Indicador %s anexado na janela %d", storedName, storedWindow));
+    }
+    else
+    {
+        storedName = (StringLen(storedName) > 0) ? storedName : fallbackName;
+        storedWindow = ChartWindowFind(chart_id, storedName);
+        if(storedWindow == -1)
+            storedWindow = targetWindow;
 
-    WriteLog(1, StringFormat("Indicador %s anexado na janela %d", storedName, storedWindow));
+        WriteLog(1, StringFormat("Indicador %s anexado (nome padrão aplicado) na janela %d", storedName, storedWindow));
+    }
+
     return true;
 }
 
@@ -475,22 +505,22 @@ void EnsureVisualIndicatorAttached(int handle, int preferredWindow, int &storedW
         return;
 
     long chart_id = ChartID();
+    int currentWindow = -1;
+    string currentName = "";
 
-    if(StringLen(storedName) == 0)
-        storedName = GetIndicatorShortName(handle, fallbackName);
-
-    int currentWindow = ChartWindowFind(chart_id, storedName);
-    if(currentWindow != -1)
+    if(LocateIndicatorOnChart(chart_id, handle, currentWindow, currentName))
     {
         storedWindow = currentWindow;
+        storedName = currentName;
         return;
     }
 
-    WriteLog(0, StringFormat("Indicador %s ausente. Reanexando...", storedName));
+    string nameForLog = (StringLen(storedName) > 0) ? storedName : fallbackName;
+    WriteLog(0, StringFormat("Indicador %s ausente. Reanexando...", nameForLog));
     if(AttachVisualIndicator(handle, preferredWindow, storedWindow, storedName, fallbackName))
         WriteLog(1, StringFormat("Indicador %s reanexado", storedName));
     else
-        WriteLog(0, StringFormat("Falha ao reanexar %s", storedName));
+        WriteLog(0, StringFormat("Falha ao reanexar %s", nameForLog));
 }
 
 //+------------------------------------------------------------------+

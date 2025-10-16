@@ -531,11 +531,6 @@ void EnsureGGTrendBarAttached()
     EnsureVisualIndicatorAttached(g_handles.cs_m15, -1, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
     EnsureVisualIndicatorAttached(g_handles.rsi_m15, -1, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
     EnsureVisualIndicatorAttached(g_handles.wae_m15, -1, g_waeWindow, g_waeShortName, "WAE M15");
-
-    ensureAux(g_handles.tm_m15, g_trendMagicWindow, g_trendMagicShortName, "TrendMagic M15");
-    ensureAux(g_handles.cs_m15, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
-    ensureAux(g_handles.rsi_m15, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
-    ensureAux(g_handles.wae_m15, g_waeWindow, g_waeShortName, "WAE M15");
 }
 
 //+------------------------------------------------------------------+

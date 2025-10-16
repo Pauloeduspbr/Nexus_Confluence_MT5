@@ -1028,11 +1028,13 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
     
     // Ler buffers do indicador GG TrendBar
     // Buffer 0=M1, 1=M5, 2=M15, 3=M30, 4=H1, 5=H4, 6=D1, 7=W1, 8=MN1
-    // Valores do indicador: +1.0 = Bullish (Verde), -1.0 = Bearish (Vermelho), 0.0 = Neutral (Amarelo)
+    // Valores do indicador: +1.0 = Bullish, -1.0 = Bearish, 0.0 = Neutral
+    // EMPTY_VALUE (DBL_MAX) = Indicador ainda não calculou este timeframe
     
     double values[9];
     signal.bullishCount = 0;
     signal.bearishCount = 0;
+    int neutralCount = 0;  // NOVO: Contador de neutros
     signal.isValid = true;
     
     string tfNames[9] = {"M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"};
@@ -1056,14 +1058,17 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         {
             values[i] = buffer[0];  // Barra atual
             
-            // Verificar se valor é válido (EMPTY_VALUE é inválido, mas 0.0 é válido = NEUTRAL)
+            // CORRIGIDO: Verificar se valor é válido (EMPTY_VALUE = sem dados)
+            // Valores válidos do indicador: +1.0 (bull), -1.0 (bear), 0.0 (neutral)
             if(buffer[0] != EMPTY_VALUE)
             {
-                // Contar tendências (0.0 = neutral, não conta nem como bull nem bear)
+                // Contar tendências INCLUINDO neutros
                 if(values[i] == 1.0)
                     signal.bullishCount++;
                 else if(values[i] == -1.0)
                     signal.bearishCount++;
+                else if(values[i] == 0.0)
+                    neutralCount++;  // Contar neutros
                 
                 // Log detalhado - mostrar 3 barras
                 string colorSymbol = (values[i] == 1.0) ? "+" : (values[i] == -1.0) ? "-" : "0";
@@ -1071,9 +1076,11 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
             }
             else
             {
-                WriteLog(1, StringFormat("⚠ Buffer %d (%s): Valor inválido (EMPTY_VALUE ou 0.0)", i, tfNames[i]));
-                values[i] = 0.0;
-                bufferDebug += StringFormat("[?%s:EMPTY] ", tfNames[i]);
+                // EMPTY_VALUE significa que indicador não tem dados para este TF ainda
+                WriteLog(1, StringFormat("⚠ Buffer %d (%s): Sem dados (EMPTY_VALUE)", i, tfNames[i]));
+                values[i] = 0.0;  // Tratar como neutral temporariamente
+                neutralCount++;
+                bufferDebug += StringFormat("[?%s:NODATA] ", tfNames[i]);
             }
         }
         else
@@ -1100,17 +1107,23 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         else relevantNeutral++;
     }
     
-    // Calcular porcentagem de alinhamento (todos os 9 timeframes)
-    int totalDefinido = signal.bullishCount + signal.bearishCount;
+    // CORRIGIDO: Calcular porcentagem de alinhamento
+    // Percentual baseado em quantos TFs têm tendência definida (bull ou bear)
+    int totalDefinido = signal.bullishCount + signal.bearishCount;  // Ignora neutros
+    
     if(totalDefinido > 0)
     {
+        // Alinhamento positivo = % de bullish, negativo = % de bearish
         if(signal.bullishCount > signal.bearishCount)
             signal.alignmentPercent = (double)signal.bullishCount / 9.0 * 100.0;
-        else
+        else if(signal.bearishCount > signal.bullishCount)
             signal.alignmentPercent = -(double)signal.bearishCount / 9.0 * 100.0;
+        else
+            signal.alignmentPercent = 0.0;  // Empate = neutral
     }
     else
     {
+        // Todos neutros ou sem dados
         signal.alignmentPercent = 0.0;
     }
     
@@ -1133,9 +1146,9 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         signal.strongTrend = false;
     }
     
-    // Análise detalhada
-    signal.analysis = StringFormat("Total: Bull=%d Bear=%d | Principal: M15=%+.0f M30=%+.0f H1=%+.0f H4=%+.0f (B:%d/Be:%d/N:%d) | Align:%.0f%%", 
-        signal.bullishCount, signal.bearishCount,
+    // Análise detalhada incluindo neutros
+    signal.analysis = StringFormat("Total: Bull=%d Bear=%d Neut=%d | Principal: M15=%+.0f M30=%+.0f H1=%+.0f H4=%+.0f (B:%d/Be:%d/N:%d) | Align:%.0f%%", 
+        signal.bullishCount, signal.bearishCount, neutralCount,
         values[2], values[3], values[4], values[5],
         relevantBullish, relevantBearish, relevantNeutral,
         signal.alignmentPercent);

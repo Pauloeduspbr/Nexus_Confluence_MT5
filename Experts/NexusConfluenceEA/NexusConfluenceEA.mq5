@@ -396,7 +396,12 @@ bool AttachGGTrendBarToChart()
         return false;
 
     long chart_id = ChartID();
-    ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
+    int existingWindow = -1;
+    string existingName = "";
+    if(LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, existingWindow, existingName))
+        ChartIndicatorDelete(chart_id, existingWindow, existingName);
+    else
+        ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
 
     if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
         return false;
@@ -464,6 +469,36 @@ bool LocateIndicatorByHints(const long chart_id, const string hints, int &window
 }
 
 //+------------------------------------------------------------------+
+//| Localizar indicador no gráfico pelo handle                       |
+//+------------------------------------------------------------------+
+bool LocateIndicatorByHandle(const long chart_id, const int handle, int &windowIndex, string &indicatorName)
+{
+    windowIndex = -1;
+    indicatorName = "";
+
+    if(handle == INVALID_HANDLE)
+        return false;
+
+    int totalWindows = (int)ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL);
+    for(int w = 0; w < totalWindows; ++w)
+    {
+        int indicatorCount = ChartIndicatorsTotal(chart_id, w);
+        for(int i = 0; i < indicatorCount; ++i)
+        {
+            long chartHandle = ChartIndicatorGet(chart_id, w, i);
+            if((int)chartHandle == handle)
+            {
+                windowIndex = w;
+                indicatorName = ChartIndicatorName(chart_id, w, i);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+//+------------------------------------------------------------------+
 //| Anexar indicador visual a uma janela específica                  |
 //+------------------------------------------------------------------+
 bool AttachVisualIndicator(int handle, int targetWindow, const string fallbackHints, const string displayName, int &storedWindow, string &storedName)
@@ -475,7 +510,22 @@ bool AttachVisualIndicator(int handle, int targetWindow, const string fallbackHi
 
     int existingWindow = -1;
     string existingName = "";
-    if(LocateIndicatorByHints(chart_id, fallbackHints, existingWindow, existingName))
+    if(LocateIndicatorByHandle(chart_id, handle, existingWindow, existingName))
+    {
+        if(existingWindow == targetWindow)
+        {
+            storedWindow = existingWindow;
+            storedName = existingName;
+            WriteLog(2, StringFormat("Indicador %s já presente na janela %d", displayName, existingWindow));
+            return true;
+        }
+        ChartIndicatorDelete(chart_id, existingWindow, existingName);
+    }
+    else if(storedWindow >= 0 && StringLen(storedName) > 0)
+    {
+        ChartIndicatorDelete(chart_id, storedWindow, storedName);
+    }
+    else if(LocateIndicatorByHints(chart_id, fallbackHints, existingWindow, existingName))
     {
         ChartIndicatorDelete(chart_id, existingWindow, existingName);
     }
@@ -483,7 +533,7 @@ bool AttachVisualIndicator(int handle, int targetWindow, const string fallbackHi
     if(!ChartIndicatorAdd(chart_id, targetWindow, handle))
         return false;
 
-    if(LocateIndicatorByHints(chart_id, fallbackHints, storedWindow, storedName))
+    if(LocateIndicatorByHandle(chart_id, handle, storedWindow, storedName))
     {
         WriteLog(1, StringFormat("Indicador %s anexado na janela %d", storedName, storedWindow));
     }
@@ -500,14 +550,24 @@ bool AttachVisualIndicator(int handle, int targetWindow, const string fallbackHi
 //+------------------------------------------------------------------+
 //| Remover indicador visual                                          |
 //+------------------------------------------------------------------+
-void DetachVisualIndicator(int &storedWindow, string &storedName, const string fallbackHints)
+void DetachVisualIndicator(int handle, int &storedWindow, string &storedName, const string fallbackHints)
 {
     long chart_id = ChartID();
     bool removed = false;
 
+    if(handle != INVALID_HANDLE)
+    {
+        int locatedWindow = -1;
+        string locatedName = "";
+        if(LocateIndicatorByHandle(chart_id, handle, locatedWindow, locatedName))
+        {
+            removed = ChartIndicatorDelete(chart_id, locatedWindow, locatedName);
+        }
+    }
+
     if(storedWindow != -1 && StringLen(storedName) > 0)
     {
-        removed = ChartIndicatorDelete(chart_id, storedWindow, storedName);
+        removed = ChartIndicatorDelete(chart_id, storedWindow, storedName) || removed;
     }
 
     if(!removed)
@@ -536,7 +596,7 @@ void EnsureVisualIndicatorAttached(int handle, int preferredWindow, const string
     int currentWindow = -1;
     string currentName = "";
 
-    if(LocateIndicatorByHints(chart_id, fallbackHints, currentWindow, currentName))
+    if(LocateIndicatorByHandle(chart_id, handle, currentWindow, currentName))
     {
         storedWindow = currentWindow;
         storedName = currentName;
@@ -572,21 +632,14 @@ void AttachVisualIndicators()
 //+------------------------------------------------------------------+
 void EnsureGGTrendBarAttached()
 {
+    if(g_handles.gg_trendbar == INVALID_HANDLE)
+        return;
+
     long chart_id = ChartID();
-    int total = ChartIndicatorsTotal(chart_id, 0);
-    bool found = false;
+    int currentWindow = -1;
+    string indicatorName = "";
 
-    for(int i = 0; i < total; i++)
-    {
-        string indicator_name = ChartIndicatorName(chart_id, 0, i);
-        if(indicator_name == GG_TRENDBAR_SHORTNAME)
-        {
-            found = true;
-            break;
-        }
-    }
-
-    if(!found)
+    if(!LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, currentWindow, indicatorName) || currentWindow != 0)
     {
         g_GGTrendBarAttached = false;
         WriteLog(0, "GG TrendBar não encontrado na janela principal. Reanexando...");
@@ -594,6 +647,10 @@ void EnsureGGTrendBarAttached()
             WriteLog(1, "GG TrendBar reanexado automaticamente.");
         else
             WriteLog(0, "Falha ao reanexar o GG TrendBar.");
+    }
+    else
+    {
+        g_GGTrendBarAttached = true;
     }
 
     // Verifica indicadores auxiliares
@@ -1171,16 +1228,21 @@ void OnDeinit(const int reason)
 {
     WriteLog(1, "=== FINALIZANDO NEXUS CONFLUENCE EA ===");
 
-    if(g_GGTrendBarAttached)
+    if(g_handles.gg_trendbar != INVALID_HANDLE)
     {
-        ChartIndicatorDelete(ChartID(), 0, GG_TRENDBAR_SHORTNAME);
+        int ggWindow = -1;
+        string ggName = "";
+        if(!LocateIndicatorByHandle(ChartID(), g_handles.gg_trendbar, ggWindow, ggName))
+            ChartIndicatorDelete(ChartID(), 0, GG_TRENDBAR_SHORTNAME);
+        else
+            ChartIndicatorDelete(ChartID(), ggWindow, ggName);
         g_GGTrendBarAttached = false;
     }
 
-    DetachVisualIndicator(g_trendMagicWindow, g_trendMagicShortName, HINT_TRENDMAGIC);
-    DetachVisualIndicator(g_currencyStrengthWindow, g_currencyStrengthShortName, HINT_CURRENCY_STRENGTH);
-    DetachVisualIndicator(g_rsiomaWindow, g_rsiomaShortName, HINT_RSIOMA);
-    DetachVisualIndicator(g_waeWindow, g_waeShortName, HINT_WAE);
+    DetachVisualIndicator(g_handles.tm_m15, g_trendMagicWindow, g_trendMagicShortName, HINT_TRENDMAGIC);
+    DetachVisualIndicator(g_handles.cs_m15, g_currencyStrengthWindow, g_currencyStrengthShortName, HINT_CURRENCY_STRENGTH);
+    DetachVisualIndicator(g_handles.rsi_m15, g_rsiomaWindow, g_rsiomaShortName, HINT_RSIOMA);
+    DetachVisualIndicator(g_handles.wae_m15, g_waeWindow, g_waeShortName, HINT_WAE);
 
     ReleaseIndicatorHandles();
     

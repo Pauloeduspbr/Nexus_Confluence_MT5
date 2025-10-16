@@ -426,7 +426,8 @@ bool LocateIndicatorByHints(const long chart_id, const string hints, int &window
     if(StringLen(hints) == 0)
         return false;
 
-    string lowerHints = StringToLower(hints);
+    string lowerHints = hints;
+    StringToLower(lowerHints);
     string tokens[];
     int tokenCount = StringSplit(lowerHints, (ushort)'|', tokens);
     if(tokenCount <= 0)

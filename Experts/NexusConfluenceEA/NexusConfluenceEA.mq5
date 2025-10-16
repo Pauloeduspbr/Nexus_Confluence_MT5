@@ -426,8 +426,9 @@ bool LocateIndicatorByHints(const long chart_id, const string hints, int &window
     if(StringLen(hints) == 0)
         return false;
 
+    string lowerHints = StringToLower(hints);
     string tokens[];
-    int tokenCount = StringSplit(StringToLower(hints), '|', tokens);
+    int tokenCount = StringSplit(lowerHints, (ushort)'|', tokens);
     if(tokenCount <= 0)
         return false;
 
@@ -595,10 +596,10 @@ void EnsureGGTrendBarAttached()
     }
 
     // Verifica indicadores auxiliares
-    EnsureVisualIndicatorAttached(g_handles.tm_m15, 0, g_trendMagicWindow, g_trendMagicShortName, "TrendMagic M15");
-    EnsureVisualIndicatorAttached(g_handles.cs_m15, -1, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
-    EnsureVisualIndicatorAttached(g_handles.rsi_m15, -1, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
-    EnsureVisualIndicatorAttached(g_handles.wae_m15, -1, g_waeWindow, g_waeShortName, "WAE M15");
+    EnsureVisualIndicatorAttached(g_handles.tm_m15, 0, HINT_TRENDMAGIC, "TrendMagic M15", g_trendMagicWindow, g_trendMagicShortName);
+    EnsureVisualIndicatorAttached(g_handles.cs_m15, 1, HINT_CURRENCY_STRENGTH, "Currency Strength M15", g_currencyStrengthWindow, g_currencyStrengthShortName);
+    EnsureVisualIndicatorAttached(g_handles.rsi_m15, 2, HINT_RSIOMA, "RSIOMA M15", g_rsiomaWindow, g_rsiomaShortName);
+    EnsureVisualIndicatorAttached(g_handles.wae_m15, 3, HINT_WAE, "WAE M15", g_waeWindow, g_waeShortName);
 }
 
 //+------------------------------------------------------------------+
@@ -1175,10 +1176,10 @@ void OnDeinit(const int reason)
         g_GGTrendBarAttached = false;
     }
 
-    DetachVisualIndicator(g_trendMagicWindow, g_trendMagicShortName);
-    DetachVisualIndicator(g_currencyStrengthWindow, g_currencyStrengthShortName);
-    DetachVisualIndicator(g_rsiomaWindow, g_rsiomaShortName);
-    DetachVisualIndicator(g_waeWindow, g_waeShortName);
+    DetachVisualIndicator(g_trendMagicWindow, g_trendMagicShortName, HINT_TRENDMAGIC);
+    DetachVisualIndicator(g_currencyStrengthWindow, g_currencyStrengthShortName, HINT_CURRENCY_STRENGTH);
+    DetachVisualIndicator(g_rsiomaWindow, g_rsiomaShortName, HINT_RSIOMA);
+    DetachVisualIndicator(g_waeWindow, g_waeShortName, HINT_WAE);
 
     ReleaseIndicatorHandles();
     

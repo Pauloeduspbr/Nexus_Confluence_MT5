@@ -418,11 +418,14 @@ string GetIndicatorShortName(const int handle, const string fallback)
     if(handle == INVALID_HANDLE)
         return fallback;
 
-    string name = IndicatorGetString(handle, INDICATOR_SHORTNAME);
-    if(StringLen(name) == 0)
-        return fallback;
+    string name = "";
+    if(IndicatorGetString(handle, INDICATOR_SHORTNAME, name))
+    {
+        if(StringLen(name) > 0)
+            return name;
+    }
 
-    return name;
+    return fallback;
 }
 
 //+------------------------------------------------------------------+

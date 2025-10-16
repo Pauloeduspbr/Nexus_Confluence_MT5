@@ -169,7 +169,7 @@ input int GG_ADX_Period = 14;
 input ENUM_APPLIED_PRICE GG_ADX_Price = PRICE_CLOSE;
 input double GG_Step_Psar = 0.02;
 input double GG_Max_Psar = 0.2;
-input double GG_MinAlignmentPercent = 60.0;
+input double GG_MinAlignmentPercent = 50.0;  // Reduzido: 60% → 50% para facilitar entrada
 
 input group "=== INDICADORES - NOMES DOS ARQUIVOS ==="
 input string TrendMagicIndicator = "TrendMagic_MT5";
@@ -477,7 +477,8 @@ bool LocateIndicatorByHints(const long chart_id, const string hints, int &window
         for(int i = 0; i < indicatorCount; ++i)
         {
             string name = ChartIndicatorName(chart_id, w, i);
-            string nameLower = StringToLower(name);
+            string nameLower = name;
+            StringToLower(nameLower);
 
             for(int t = 0; t < tokenCount; ++t)
             {
@@ -996,7 +997,7 @@ void GetWAESignal(string symbol, ENUM_TIMEFRAMES timeframe, TRADE_DIRECTION dire
 }
 
 //+------------------------------------------------------------------+
-//| Obter sinal GG TrendBar - VERSÃO CORRIGIDA COM BUFFERS          |
+//| Obter sinal GG TrendBar - VERSÃO CORRIGIDA                      |
 //+------------------------------------------------------------------+
 void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSignal &signal)
 {
@@ -1009,67 +1010,80 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         return;
     }
     
-    // CRÍTICO: Verificar se o indicador já calculou barras suficientes
+    // Verificar se o indicador já calculou barras suficientes
     int calculated = BarsCalculated(g_handles.gg_trendbar);
     if(calculated < 50)
     {
-        WriteLog(2, StringFormat("GG TrendBar ainda inicializando: %d barras calculadas (min: 50)", calculated));
+        WriteLog(2, StringFormat("GG TrendBar inicializando: %d barras (min: 50)", calculated));
         signal.isValid = false;
         return;
     }
     
+    // CRÍTICO: Esperar 1 segundo para o indicador processar
+    Sleep(100);
+    
     // Ler buffers do indicador GG TrendBar
     // Buffer 0=M1, 1=M5, 2=M15, 3=M30, 4=H1, 5=H4, 6=D1, 7=W1, 8=MN1
-    // Valores: 1 = Bullish, 0 = Neutral, -1 = Bearish
+    // Valores do indicador: +1.0 = Bullish (Verde), -1.0 = Bearish (Vermelho), 0.0 = Neutral (Amarelo)
     
-    double values[9];  // Array para armazenar todos os timeframes
+    double values[9];
     signal.bullishCount = 0;
     signal.bearishCount = 0;
     signal.isValid = true;
     
-    // DEBUG: Log detalhado da leitura dos buffers
-    string bufferDebug = StringFormat("GG Buffers (calc=%d): ", calculated);
+    string tfNames[9] = {"M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"};
+    string bufferDebug = "GG: ";
     
-    // Ler cada buffer individualmente
+    // Ler cada buffer (0-8 contêm os valores -1/0/+1) com múltiplas barras para debug
     for(int i = 0; i < 9; i++)
     {
-        double buffer[1];
-        if(CopyBuffer(g_handles.gg_trendbar, i, 0, 1, buffer) > 0)
+        double buffer[3];  // Ler 3 barras para verificar
+        ArraySetAsSeries(buffer, true);
+        
+        int copied = CopyBuffer(g_handles.gg_trendbar, i, 0, 3, buffer);
+        
+        if(copied >= 1)
         {
-            values[i] = buffer[0];
+            values[i] = buffer[0];  // Barra atual
             
+            // Contar tendências
             if(values[i] == 1.0)
                 signal.bullishCount++;
             else if(values[i] == -1.0)
                 signal.bearishCount++;
-                
-            bufferDebug += StringFormat("[%d]=%.0f ", i, values[i]);
+            
+            // Log detalhado - mostrar 3 barras
+            string colorSymbol = (values[i] == 1.0) ? "+" : (values[i] == -1.0) ? "-" : "0";
+            bufferDebug += StringFormat("[%s%s:%.0f|%.0f|%.0f] ", colorSymbol, tfNames[i], buffer[0], buffer[1], buffer[2]);
         }
         else
         {
-            values[i] = 0.0; // Neutro se não conseguir ler
-            bufferDebug += StringFormat("[%d]=ERR ", i);
-            WriteLog(0, StringFormat("ERRO: Não foi possível ler buffer %d do GG TrendBar", i));
+            values[i] = 0.0;
+            int error = GetLastError();
+            WriteLog(0, StringFormat("ERRO ao ler buffer %d (TF %s) - Copiou %d barras - Erro: %d", i, tfNames[i], copied, error));
+            signal.isValid = false;
+            return;
         }
     }
     
-    WriteLog(2, bufferDebug);
+    WriteLog(1, bufferDebug);
     
-    // Focar nos timeframes principais para o sinal: M15(2), M30(3), H1(4), H4(5)
+    // Focar nos timeframes operacionais principais: M15, M30, H1, H4
     int relevantBullish = 0;
     int relevantBearish = 0;
-    int relevantIndices[] = {2, 3, 4, 5}; // M15, M30, H1, H4
+    int relevantNeutral = 0;
     
-    for(int j = 0; j < 4; j++)
+    // Índices: M15=2, M30=3, H1=4, H4=5
+    for(int idx = 2; idx <= 5; idx++)
     {
-        int idx = relevantIndices[j];
         if(values[idx] == 1.0) relevantBullish++;
         else if(values[idx] == -1.0) relevantBearish++;
+        else relevantNeutral++;
     }
     
-    // Calcular porcentagem de alinhamento baseada nos 9 timeframes
-    int totalSignals = signal.bullishCount + signal.bearishCount;
-    if(totalSignals > 0)
+    // Calcular porcentagem de alinhamento (todos os 9 timeframes)
+    int totalDefinido = signal.bullishCount + signal.bearishCount;
+    if(totalDefinido > 0)
     {
         if(signal.bullishCount > signal.bearishCount)
             signal.alignmentPercent = (double)signal.bullishCount / 9.0 * 100.0;
@@ -1081,18 +1095,18 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         signal.alignmentPercent = 0.0;
     }
     
-    // Verificar alinhamento com direção desejada (usar timeframes relevantes)
+    // Verificar alinhamento com direção desejada
     if(direction == TRADE_BUY)
     {
-        // Precisa de pelo menos 3 dos 4 TFs principais altistas (75%)
-        signal.isAligned = (relevantBullish >= 3);
-        signal.strongTrend = (relevantBullish >= 4); // Todos 4 altistas
+        // BUY: Precisa de pelo menos 2 dos 4 TFs principais altistas (50%) - AJUSTADO
+        signal.isAligned = (relevantBullish >= 2);
+        signal.strongTrend = (relevantBullish >= 3); // 75%+ altistas
     }
     else if(direction == TRADE_SELL)
     {
-        // Precisa de pelo menos 3 dos 4 TFs principais baixistas (75%)
-        signal.isAligned = (relevantBearish >= 3);
-        signal.strongTrend = (relevantBearish >= 4); // Todos 4 baixistas
+        // SELL: Precisa de pelo menos 2 dos 4 TFs principais baixistas (50%) - AJUSTADO
+        signal.isAligned = (relevantBearish >= 2);
+        signal.strongTrend = (relevantBearish >= 3); // 75%+ baixistas
     }
     else
     {
@@ -1100,20 +1114,19 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         signal.strongTrend = false;
     }
     
-    // Análise detalhada incluindo valores individuais dos TFs principais
-    signal.analysis = StringFormat("Bull:%d Bear:%d (M15:%+.0f M30:%+.0f H1:%+.0f H4:%+.0f) Align:%.1f%% Strong:%s", 
+    // Análise detalhada
+    signal.analysis = StringFormat("Total: Bull=%d Bear=%d | Principal: M15=%+.0f M30=%+.0f H1=%+.0f H4=%+.0f (B:%d/Be:%d/N:%d) | Align:%.0f%%", 
         signal.bullishCount, signal.bearishCount,
-        values[2], values[3], values[4], values[5], // M15, M30, H1, H4
-        signal.alignmentPercent, 
-        signal.strongTrend ? "SIM" : "NÃO");
+        values[2], values[3], values[4], values[5],
+        relevantBullish, relevantBearish, relevantNeutral,
+        signal.alignmentPercent);
     
-    WriteLog(2, StringFormat("GG TrendBar %s dir=%s: %s | Alinhado=%s | RelBull=%d RelBear=%d", 
-        symbol, 
+    WriteLog(1, StringFormat("GG TrendBar %s [%s]: %s -> Alinhado=%s Strong=%s", 
+        symbol,
         direction == TRADE_BUY ? "BUY" : "SELL",
-        signal.analysis, 
-        signal.isAligned ? "SIM" : "NÃO",
-        relevantBullish,
-        relevantBearish));
+        signal.analysis,
+        signal.isAligned ? "SIM" : "NAO",
+        signal.strongTrend ? "SIM" : "NAO"));
 }
 
 //+------------------------------------------------------------------+

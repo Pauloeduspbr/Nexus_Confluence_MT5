@@ -1056,10 +1056,10 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         {
             values[i] = buffer[0];  // Barra atual
             
-            // Verificar se valor é válido
-            if(buffer[0] != EMPTY_VALUE && buffer[0] != 0.0)
+            // Verificar se valor é válido (EMPTY_VALUE é inválido, mas 0.0 é válido = NEUTRAL)
+            if(buffer[0] != EMPTY_VALUE)
             {
-                // Contar tendências
+                // Contar tendências (0.0 = neutral, não conta nem como bull nem bear)
                 if(values[i] == 1.0)
                     signal.bullishCount++;
                 else if(values[i] == -1.0)

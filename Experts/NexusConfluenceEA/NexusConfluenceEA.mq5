@@ -413,18 +413,16 @@ bool AttachGGTrendBarToChart()
 //+------------------------------------------------------------------+
 //| Obter short name seguro do indicador                              |
 //+------------------------------------------------------------------+
-string GetIndicatorShortName(const int handle, const string &fallback)
+string GetIndicatorShortName(const int handle, const string fallback)
 {
-    string name = "";
-    if(handle != INVALID_HANDLE)
-    {
-        if(IndicatorGetString(handle, INDICATOR_SHORTNAME, name))
-        {
-            if(StringLen(name) > 0)
-                return name;
-        }
-    }
-    return fallback;
+    if(handle == INVALID_HANDLE)
+        return fallback;
+
+    string name = IndicatorGetString(handle, INDICATOR_SHORTNAME);
+    if(StringLen(name) == 0)
+        return fallback;
+
+    return name;
 }
 
 //+------------------------------------------------------------------+

@@ -387,7 +387,47 @@ bool AttachGGTrendBarToChart()
         return false;
 
     g_GGTrendBarAttached = true;
+
+    int total = ChartIndicatorsTotal(chart_id, 0);
+    string names;
+    for(int i = 0; i < total; i++)
+    {
+        string indicator_name = ChartIndicatorName(chart_id, 0, i);
+        if(i > 0) names += ", ";
+        names += indicator_name;
+    }
+    WriteLog(1, "Indicadores anexados janela 0: " + (names == "" ? "(nenhum)" : names));
     return true;
+}
+
+//+------------------------------------------------------------------+
+//| Verificar se o GG TrendBar continua anexado                      |
+//+------------------------------------------------------------------+
+void EnsureGGTrendBarAttached()
+{
+    long chart_id = ChartID();
+    int total = ChartIndicatorsTotal(chart_id, 0);
+    bool found = false;
+
+    for(int i = 0; i < total; i++)
+    {
+        string indicator_name = ChartIndicatorName(chart_id, 0, i);
+        if(indicator_name == GG_TRENDBAR_SHORTNAME)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if(!found)
+    {
+        g_GGTrendBarAttached = false;
+        WriteLog(0, "GG TrendBar não encontrado na janela principal. Reanexando...");
+        if(AttachGGTrendBarToChart())
+            WriteLog(1, "GG TrendBar reanexado automaticamente.");
+        else
+            WriteLog(0, "Falha ao reanexar o GG TrendBar.");
+    }
 }
 
 //+------------------------------------------------------------------+
@@ -977,6 +1017,13 @@ void OnTick()
 {
     if(!g_InitializationComplete) return;
     
+    static datetime lastPanelCheck = 0;
+    if(TimeCurrent() - lastPanelCheck >= 30)
+    {
+        EnsureGGTrendBarAttached();
+        lastPanelCheck = TimeCurrent();
+    }
+
     static datetime lastTest = 0;
     if(TimeCurrent() - lastTest >= 60)
     {

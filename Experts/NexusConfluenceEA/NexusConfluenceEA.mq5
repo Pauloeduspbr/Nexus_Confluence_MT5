@@ -187,9 +187,11 @@ input bool SaveTradeHistory = true;
 //| Variáveis globais                                                |
 //+------------------------------------------------------------------+
 const int EA_MAGIC_NUMBER = 20241015;
+const string GG_TRENDBAR_SHORTNAME = "GG TrendBar";
 CTrade trade;
 bool g_InitializationComplete = false;
 IndicatorHandles g_handles;
+bool g_GGTrendBarAttached = false;
 
 //+------------------------------------------------------------------+
 //| Função de log                                                    |
@@ -337,6 +339,11 @@ bool InitializeIndicatorHandles(string symbol)
         return false;
     }
     WriteLog(1, "✓ GG TrendBar carregado com sucesso");
+
+    if(AttachGGTrendBarToChart())
+        WriteLog(1, "GG TrendBar anexado ao gráfico principal");
+    else
+        WriteLog(0, "Falha ao anexar o GG TrendBar ao gráfico principal");
     
     WriteLog(1, "========================================");
     WriteLog(1, "TODOS OS INDICADORES CARREGADOS!");
@@ -363,6 +370,24 @@ void ReleaseIndicatorHandles()
     if(g_handles.wae_m30 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_m30);
     if(g_handles.wae_m15 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_m15);
     if(g_handles.gg_trendbar != INVALID_HANDLE) IndicatorRelease(g_handles.gg_trendbar);
+}
+
+//+------------------------------------------------------------------+
+//| Anexar GG TrendBar ao gráfico principal                          |
+//+------------------------------------------------------------------+
+bool AttachGGTrendBarToChart()
+{
+    if(g_handles.gg_trendbar == INVALID_HANDLE)
+        return false;
+
+    long chart_id = ChartID();
+    ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
+
+    if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
+        return false;
+
+    g_GGTrendBarAttached = true;
+    return true;
 }
 
 //+------------------------------------------------------------------+
@@ -932,6 +957,13 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     WriteLog(1, "=== FINALIZANDO NEXUS CONFLUENCE EA ===");
+
+    if(g_GGTrendBarAttached)
+    {
+        ChartIndicatorDelete(ChartID(), 0, GG_TRENDBAR_SHORTNAME);
+        g_GGTrendBarAttached = false;
+    }
+
     ReleaseIndicatorHandles();
     
     if(SendAlerts)

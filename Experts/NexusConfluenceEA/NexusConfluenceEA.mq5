@@ -345,8 +345,10 @@ bool InitializeIndicatorHandles(string symbol)
     WriteLog(1, "✓ WAE carregado com sucesso");
     
     // GG TrendBar
+    // CRITICAL: Use PERIOD_CURRENT to allow indicator access to all timeframes
+    // If we use PERIOD_M15, indicator can only access M15 data internally
     WriteLog(2, "Carregando GG TrendBar...");
-    g_handles.gg_trendbar = iCustom(symbol, PERIOD_M15, basePath + GGTrendBarIndicator,
+    g_handles.gg_trendbar = iCustom(symbol, PERIOD_CURRENT, basePath + GGTrendBarIndicator,
                                    GG_ADX_Period, GG_ADX_Price, GG_Step_Psar, GG_Max_Psar);
     if(g_handles.gg_trendbar == INVALID_HANDLE) {
         WriteLog(0, "ERRO: GG TrendBar falhou - Verifique: " + basePath + GGTrendBarIndicator + ".ex5");
@@ -1012,6 +1014,8 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
     
     // Verificar se o indicador já calculou barras suficientes
     int calculated = BarsCalculated(g_handles.gg_trendbar);
+    WriteLog(1, StringFormat("GG TrendBar: Handle=%d | Barras calculadas=%d", g_handles.gg_trendbar, calculated));
+    
     if(calculated < 50)
     {
         WriteLog(2, StringFormat("GG TrendBar inicializando: %d barras (min: 50)", calculated));
@@ -1019,8 +1023,8 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         return;
     }
     
-    // CRÍTICO: Esperar 1 segundo para o indicador processar
-    Sleep(100);
+    // CRÍTICO: Esperar para o indicador processar
+    Sleep(500);  // Aumentado para 500ms
     
     // Ler buffers do indicador GG TrendBar
     // Buffer 0=M1, 1=M5, 2=M15, 3=M30, 4=H1, 5=H4, 6=D1, 7=W1, 8=MN1
@@ -1037,32 +1041,47 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
     // Ler cada buffer (0-8 contêm os valores -1/0/+1) com múltiplas barras para debug
     for(int i = 0; i < 9; i++)
     {
-        double buffer[3];  // Ler 3 barras para verificar
+        double buffer[10];  // Ler 10 barras para garantir dados suficientes
         ArraySetAsSeries(buffer, true);
+        ArrayInitialize(buffer, EMPTY_VALUE);  // Inicializar com EMPTY_VALUE
         
-        int copied = CopyBuffer(g_handles.gg_trendbar, i, 0, 3, buffer);
+        ResetLastError();  // Limpar erro anterior
+        int copied = CopyBuffer(g_handles.gg_trendbar, i, 0, 10, buffer);
+        int error = GetLastError();
         
-        if(copied >= 1)
+        WriteLog(2, StringFormat("Buffer %d (%s): Copiou %d barras | Erro=%d | [0]=%.1f [1]=%.1f [2]=%.1f", 
+            i, tfNames[i], copied, error, buffer[0], buffer[1], buffer[2]));
+        
+        if(copied >= 3)
         {
             values[i] = buffer[0];  // Barra atual
             
-            // Contar tendências
-            if(values[i] == 1.0)
-                signal.bullishCount++;
-            else if(values[i] == -1.0)
-                signal.bearishCount++;
-            
-            // Log detalhado - mostrar 3 barras
-            string colorSymbol = (values[i] == 1.0) ? "+" : (values[i] == -1.0) ? "-" : "0";
-            bufferDebug += StringFormat("[%s%s:%.0f|%.0f|%.0f] ", colorSymbol, tfNames[i], buffer[0], buffer[1], buffer[2]);
+            // Verificar se valor é válido
+            if(buffer[0] != EMPTY_VALUE && buffer[0] != 0.0)
+            {
+                // Contar tendências
+                if(values[i] == 1.0)
+                    signal.bullishCount++;
+                else if(values[i] == -1.0)
+                    signal.bearishCount++;
+                
+                // Log detalhado - mostrar 3 barras
+                string colorSymbol = (values[i] == 1.0) ? "+" : (values[i] == -1.0) ? "-" : "0";
+                bufferDebug += StringFormat("[%s%s:%.0f|%.0f|%.0f] ", colorSymbol, tfNames[i], buffer[0], buffer[1], buffer[2]);
+            }
+            else
+            {
+                WriteLog(1, StringFormat("⚠ Buffer %d (%s): Valor inválido (EMPTY_VALUE ou 0.0)", i, tfNames[i]));
+                values[i] = 0.0;
+                bufferDebug += StringFormat("[?%s:EMPTY] ", tfNames[i]);
+            }
         }
         else
         {
             values[i] = 0.0;
-            int error = GetLastError();
             WriteLog(0, StringFormat("ERRO ao ler buffer %d (TF %s) - Copiou %d barras - Erro: %d", i, tfNames[i], copied, error));
-            signal.isValid = false;
-            return;
+            bufferDebug += StringFormat("[X%s:ERR] ", tfNames[i]);
+            // NÃO retornar aqui - continuar tentando outros buffers
         }
     }
     

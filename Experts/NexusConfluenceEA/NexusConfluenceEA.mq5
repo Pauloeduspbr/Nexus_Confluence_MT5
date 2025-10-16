@@ -192,6 +192,14 @@ CTrade trade;
 bool g_InitializationComplete = false;
 IndicatorHandles g_handles;
 bool g_GGTrendBarAttached = false;
+int g_trendMagicWindow = -1;
+int g_currencyStrengthWindow = -1;
+int g_rsiomaWindow = -1;
+int g_waeWindow = -1;
+string g_trendMagicShortName;
+string g_currencyStrengthShortName;
+string g_rsiomaShortName;
+string g_waeShortName;
 
 //+------------------------------------------------------------------+
 //| Função de log                                                    |
@@ -344,6 +352,8 @@ bool InitializeIndicatorHandles(string symbol)
         WriteLog(1, "GG TrendBar anexado ao gráfico principal");
     else
         WriteLog(0, "Falha ao anexar o GG TrendBar ao gráfico principal");
+
+    AttachVisualIndicators();
     
     WriteLog(1, "========================================");
     WriteLog(1, "TODOS OS INDICADORES CARREGADOS!");
@@ -401,6 +411,93 @@ bool AttachGGTrendBarToChart()
 }
 
 //+------------------------------------------------------------------+
+//| Obter short name seguro do indicador                              |
+//+------------------------------------------------------------------+
+string GetIndicatorShortName(int handle, const string fallback)
+{
+    string name = IndicatorGetString(handle, INDICATOR_SHORTNAME);
+    if(StringLen(name) == 0)
+        return fallback;
+    return name;
+}
+
+//+------------------------------------------------------------------+
+//| Anexar indicador visual                                           |
+//+------------------------------------------------------------------+
+bool AttachVisualIndicator(int handle, int targetWindow, int &storedWindow, string &storedName, const string fallbackName)
+{
+    if(handle == INVALID_HANDLE)
+        return false;
+
+    long chart_id = ChartID();
+    storedName = GetIndicatorShortName(handle, fallbackName);
+
+    int existingWindow = ChartWindowFind(chart_id, storedName);
+    if(existingWindow != -1)
+        ChartIndicatorDelete(chart_id, existingWindow, storedName);
+
+    if(!ChartIndicatorAdd(chart_id, targetWindow, handle))
+        return false;
+
+    storedWindow = ChartWindowFind(chart_id, storedName);
+    if(storedWindow == -1)
+        storedWindow = targetWindow;
+
+    WriteLog(1, StringFormat("Indicador %s anexado na janela %d", storedName, storedWindow));
+    return true;
+}
+
+//+------------------------------------------------------------------+
+//| Remover indicador visual                                          |
+//+------------------------------------------------------------------+
+void DetachVisualIndicator(int &storedWindow, const string storedName)
+{
+    if(storedWindow == -1 || StringLen(storedName) == 0)
+        return;
+
+    ChartIndicatorDelete(ChartID(), storedWindow, storedName);
+    storedWindow = -1;
+}
+
+//+------------------------------------------------------------------+
+//| Garantir que indicador auxiliar permaneça anexado                |
+//+------------------------------------------------------------------+
+void EnsureVisualIndicatorAttached(int handle, int preferredWindow, int &storedWindow, string &storedName, const string fallbackName)
+{
+    if(handle == INVALID_HANDLE)
+        return;
+
+    long chart_id = ChartID();
+
+    if(StringLen(storedName) == 0)
+        storedName = GetIndicatorShortName(handle, fallbackName);
+
+    int currentWindow = ChartWindowFind(chart_id, storedName);
+    if(currentWindow != -1)
+    {
+        storedWindow = currentWindow;
+        return;
+    }
+
+    WriteLog(0, StringFormat("Indicador %s ausente. Reanexando...", storedName));
+    if(AttachVisualIndicator(handle, preferredWindow, storedWindow, storedName, fallbackName))
+        WriteLog(1, StringFormat("Indicador %s reanexado", storedName));
+    else
+        WriteLog(0, StringFormat("Falha ao reanexar %s", storedName));
+}
+
+//+------------------------------------------------------------------+
+//| Anexar indicadores auxiliares (TrendMagic/CS/RSI/WAE)             |
+//+------------------------------------------------------------------+
+void AttachVisualIndicators()
+{
+    EnsureVisualIndicatorAttached(g_handles.tm_m15, 0, g_trendMagicWindow, g_trendMagicShortName, "TrendMagic M15");
+    EnsureVisualIndicatorAttached(g_handles.cs_m15, -1, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
+    EnsureVisualIndicatorAttached(g_handles.rsi_m15, -1, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
+    EnsureVisualIndicatorAttached(g_handles.wae_m15, -1, g_waeWindow, g_waeShortName, "WAE M15");
+}
+
+//+------------------------------------------------------------------+
 //| Verificar se o GG TrendBar continua anexado                      |
 //+------------------------------------------------------------------+
 void EnsureGGTrendBarAttached()
@@ -428,6 +525,17 @@ void EnsureGGTrendBarAttached()
         else
             WriteLog(0, "Falha ao reanexar o GG TrendBar.");
     }
+
+    // Verifica indicadores auxiliares
+    EnsureVisualIndicatorAttached(g_handles.tm_m15, 0, g_trendMagicWindow, g_trendMagicShortName, "TrendMagic M15");
+    EnsureVisualIndicatorAttached(g_handles.cs_m15, -1, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
+    EnsureVisualIndicatorAttached(g_handles.rsi_m15, -1, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
+    EnsureVisualIndicatorAttached(g_handles.wae_m15, -1, g_waeWindow, g_waeShortName, "WAE M15");
+
+    ensureAux(g_handles.tm_m15, g_trendMagicWindow, g_trendMagicShortName, "TrendMagic M15");
+    ensureAux(g_handles.cs_m15, g_currencyStrengthWindow, g_currencyStrengthShortName, "Currency Strength M15");
+    ensureAux(g_handles.rsi_m15, g_rsiomaWindow, g_rsiomaShortName, "RSIOMA M15");
+    ensureAux(g_handles.wae_m15, g_waeWindow, g_waeShortName, "WAE M15");
 }
 
 //+------------------------------------------------------------------+
@@ -1003,6 +1111,11 @@ void OnDeinit(const int reason)
         ChartIndicatorDelete(ChartID(), 0, GG_TRENDBAR_SHORTNAME);
         g_GGTrendBarAttached = false;
     }
+
+    DetachVisualIndicator(g_trendMagicWindow, g_trendMagicShortName);
+    DetachVisualIndicator(g_currencyStrengthWindow, g_currencyStrengthShortName);
+    DetachVisualIndicator(g_rsiomaWindow, g_rsiomaShortName);
+    DetachVisualIndicator(g_waeWindow, g_waeShortName);
 
     ReleaseIndicatorHandles();
     

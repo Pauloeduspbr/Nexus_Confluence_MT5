@@ -397,27 +397,39 @@ bool AttachGGTrendBarToChart()
         return false;
 
     long chart_id = ChartID();
-    int existingWindow = -1;
-    string existingName = "";
-    if(LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, existingWindow, existingName))
-        ChartIndicatorDelete(chart_id, existingWindow, existingName);
-    else
-        ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
-
-    if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
-        return false;
-
-    g_GGTrendBarAttached = true;
-
-    int total = ChartIndicatorsTotal(chart_id, 0);
-    string names;
-    for(int i = 0; i < total; i++)
+    
+    // Em backtest, ChartIndicatorAdd pode não funcionar visualmente
+    // Mas o handle já está criado e funcionando para leitura de dados
+    bool isTesting = MQLInfoInteger(MQL_TESTER);
+    
+    if(!isTesting)
     {
-        string indicator_name = ChartIndicatorName(chart_id, 0, i);
-        if(i > 0) names += ", ";
-        names += indicator_name;
+        int existingWindow = -1;
+        string existingName = "";
+        if(LocateIndicatorByHandle(chart_id, g_handles.gg_trendbar, existingWindow, existingName))
+            ChartIndicatorDelete(chart_id, existingWindow, existingName);
+        else
+            ChartIndicatorDelete(chart_id, 0, GG_TRENDBAR_SHORTNAME);
+
+        if(!ChartIndicatorAdd(chart_id, 0, g_handles.gg_trendbar))
+            return false;
+
+        int total = ChartIndicatorsTotal(chart_id, 0);
+        string names;
+        for(int i = 0; i < total; i++)
+        {
+            string indicator_name = ChartIndicatorName(chart_id, 0, i);
+            if(i > 0) names += ", ";
+            names += indicator_name;
+        }
+        WriteLog(1, "Indicadores anexados janela 0: " + (names == "" ? "(nenhum)" : names));
     }
-    WriteLog(1, "Indicadores anexados janela 0: " + (names == "" ? "(nenhum)" : names));
+    else
+    {
+        WriteLog(1, "Modo backtest: GG TrendBar handle criado, anexação visual desabilitada");
+    }
+    
+    g_GGTrendBarAttached = true;
     return true;
 }
 
@@ -678,6 +690,12 @@ void EnsureGGTrendBarAttached()
     if(g_handles.gg_trendbar == INVALID_HANDLE)
         return;
 
+    bool isTesting = MQLInfoInteger(MQL_TESTER);
+    
+    // Em modo backtest, pular verificação visual (não funciona)
+    if(isTesting)
+        return;
+
     long chart_id = ChartID();
     int currentWindow = -1;
     string indicatorName = "";
@@ -686,12 +704,10 @@ void EnsureGGTrendBarAttached()
     
     if(ggFound && currentWindow == 0)
     {
-        // GG TrendBar está na janela correta
         g_GGTrendBarAttached = true;
     }
     else if(ggFound && currentWindow != 0)
     {
-        // Está anexado mas na janela errada - remover e recolocar
         WriteLog(1, StringFormat("GG TrendBar na janela %d (esperado 0). Reposicionando...", currentWindow));
         ChartIndicatorDelete(chart_id, currentWindow, indicatorName);
         g_GGTrendBarAttached = false;
@@ -700,7 +716,6 @@ void EnsureGGTrendBarAttached()
     }
     else
     {
-        // Não encontrado - anexar
         g_GGTrendBarAttached = false;
         WriteLog(2, "GG TrendBar ausente. Anexando...");
         if(AttachGGTrendBarToChart())
@@ -987,6 +1002,9 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
     signal.bearishCount = 0;
     signal.isValid = true;
     
+    // DEBUG: Log detalhado da leitura dos buffers
+    string bufferDebug = "GG Buffers: ";
+    
     // Ler cada buffer individualmente
     for(int i = 0; i < 9; i++)
     {
@@ -999,13 +1017,18 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
                 signal.bullishCount++;
             else if(values[i] == -1.0)
                 signal.bearishCount++;
+                
+            bufferDebug += StringFormat("[%d]=%.0f ", i, values[i]);
         }
         else
         {
             values[i] = 0.0; // Neutro se não conseguir ler
-            WriteLog(2, StringFormat("Aviso: Não foi possível ler buffer %d do GG TrendBar", i));
+            bufferDebug += StringFormat("[%d]=ERR ", i);
+            WriteLog(0, StringFormat("ERRO: Não foi possível ler buffer %d do GG TrendBar", i));
         }
     }
+    
+    WriteLog(2, bufferDebug);
     
     // Focar nos timeframes principais para o sinal: M15(2), M30(3), H1(4), H4(5)
     int relevantBullish = 0;
@@ -1059,8 +1082,13 @@ void GetGGTrendBarSignal(string symbol, TRADE_DIRECTION direction, GGTrendBarSig
         signal.alignmentPercent, 
         signal.strongTrend ? "SIM" : "NÃO");
     
-    WriteLog(3, StringFormat("GG TrendBar %s: %s Alinhado=%s", 
-        symbol, signal.analysis, signal.isAligned ? "SIM" : "NÃO"));
+    WriteLog(2, StringFormat("GG TrendBar %s dir=%s: %s | Alinhado=%s | RelBull=%d RelBear=%d", 
+        symbol, 
+        direction == TRADE_BUY ? "BUY" : "SELL",
+        signal.analysis, 
+        signal.isAligned ? "SIM" : "NÃO",
+        relevantBullish,
+        relevantBearish));
 }
 
 //+------------------------------------------------------------------+
@@ -1311,12 +1339,17 @@ void OnTick()
 {
     if(!g_InitializationComplete) return;
     
-    // Verificar indicadores a cada 5 MINUTOS, não a cada 30 segundos!
-    static datetime lastPanelCheck = 0;
-    if(TimeCurrent() - lastPanelCheck >= 300) // 5 minutos = 300 segundos
+    bool isTesting = MQLInfoInteger(MQL_TESTER);
+    
+    // Verificar indicadores apenas em modo real (não em backtest)
+    if(!isTesting)
     {
-        EnsureGGTrendBarAttached();
-        lastPanelCheck = TimeCurrent();
+        static datetime lastPanelCheck = 0;
+        if(TimeCurrent() - lastPanelCheck >= 300) // 5 minutos
+        {
+            EnsureGGTrendBarAttached();
+            lastPanelCheck = TimeCurrent();
+        }
     }
 
     static datetime lastTest = 0;
@@ -1337,14 +1370,14 @@ void OnTick()
         if(IsSetupValid(scoreBuy))
         {
             WriteLog(0, StringFormat("*** SETUP BUY VÁLIDO: %s ***", scoreBuy.reasoning));
-            if(SendAlerts)
+            if(SendAlerts && !isTesting)
                 SendNotification(StringFormat("Nexus: Setup BUY %s - %s", _Symbol, EnumToString(scoreBuy.classification)));
         }
         
         if(IsSetupValid(scoreSell))
         {
             WriteLog(0, StringFormat("*** SETUP SELL VÁLIDO: %s ***", scoreSell.reasoning));
-            if(SendAlerts)
+            if(SendAlerts && !isTesting)
                 SendNotification(StringFormat("Nexus: Setup SELL %s - %s", _Symbol, EnumToString(scoreSell.classification)));
         }
     }

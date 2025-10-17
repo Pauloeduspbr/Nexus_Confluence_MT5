@@ -927,22 +927,20 @@ public:
       string superTrendPath = "NexusConfluenceEA\\" + TrendMagicIndicator;
       Print("[VisualManager] Tentando anexar SuperTrend: ", superTrendPath);
       
-      // Criar handle temporário para o indicador
       int tempHandle = iCustom(_Symbol, PERIOD_CURRENT, superTrendPath, 
                                TM_CCI_Period, TM_ATR_Period, TM_ATR_Multiplier);
       
       if(tempHandle != INVALID_HANDLE)
         {
-         // Tentar adicionar ao gráfico principal
+         // Adicionar ao gráfico principal (window 0)
          int window = ChartIndicatorAdd(chartID, 0, tempHandle);
-         if(window >= 0)
+         if(window == 0)
            {
-            Print("[VisualManager] ✅ SuperTrend anexado ao gráfico principal");
+            Print("[VisualManager] ✅ SuperTrend anexado ao gráfico principal (window 0)");
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar SuperTrend: ", GetLastError());
-            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", superTrendPath);
+            Print("[VisualManager] ❌ Erro ao anexar SuperTrend. Window retornada: ", window, " Erro: ", GetLastError());
             allSuccess = false;
            }
         }
@@ -952,7 +950,10 @@ public:
          allSuccess = false;
         }
       
-      // 2. RSI OMA - Subjanela Nova
+      // Pequeno delay para garantir processamento
+      Sleep(100);
+      
+      // 2. RSI OMA - Nova Subjanela (forçar criação de window 1)
       string rsiPath = "NexusConfluenceEA\\" + RSIOMAIndicator;
       Print("[VisualManager] Tentando anexar RSI OMA: ", rsiPath);
       
@@ -962,15 +963,17 @@ public:
       
       if(tempHandle != INVALID_HANDLE)
         {
-         int window = ChartIndicatorAdd(chartID, -1, tempHandle);
-         if(window >= 0)
+         // Forçar nova subjanela usando número de janelas atuais + 1
+         long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
+         int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
+         
+         if(window > 0)
            {
             Print("[VisualManager] ✅ RSI OMA anexado em subjanela ", window);
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar RSI OMA: ", GetLastError());
-            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", rsiPath);
+            Print("[VisualManager] ❌ Erro ao anexar RSI OMA. Window retornada: ", window, " Erro: ", GetLastError());
             allSuccess = false;
            }
         }
@@ -980,7 +983,10 @@ public:
          allSuccess = false;
         }
       
-      // 3. WAE - Subjanela Nova
+      // Pequeno delay para garantir processamento
+      Sleep(100);
+      
+      // 3. WAE - Nova Subjanela (forçar criação de window 2)
       string waePath = "NexusConfluenceEA\\" + WAEIndicator;
       Print("[VisualManager] Tentando anexar WAE: ", waePath);
       
@@ -990,15 +996,17 @@ public:
       
       if(tempHandle != INVALID_HANDLE)
         {
-         int window = ChartIndicatorAdd(chartID, -1, tempHandle);
-         if(window >= 0)
+         // Forçar nova subjanela usando número de janelas atuais + 1
+         long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
+         int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
+         
+         if(window > 0)
            {
             Print("[VisualManager] ✅ WAE anexado em subjanela ", window);
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar WAE: ", GetLastError());
-            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", waePath);
+            Print("[VisualManager] ❌ Erro ao anexar WAE. Window retornada: ", window, " Erro: ", GetLastError());
             allSuccess = false;
            }
         }
@@ -1014,7 +1022,7 @@ public:
       if(allSuccess)
          Print("[VisualManager] ✅ TODOS os indicadores anexados com sucesso!");
       else
-         Print("[VisualManager] ⚠️ Alguns indicadores precisam ser adicionados manualmente");
+         Print("[VisualManager] ⚠️ Alguns indicadores tiveram problemas na anexação");
       Print("============================================================");
       
       return allSuccess;

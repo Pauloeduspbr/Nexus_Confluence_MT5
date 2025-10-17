@@ -172,9 +172,8 @@ struct RiskCalculation
    double          trailingStart;
   };
 
-class AssetConfig
+struct AssetConfig
   {
-public:
    bool   useCurrencyStrength;
    int    requiredFilters;
    int    minFiltersForTrade;
@@ -192,9 +191,8 @@ public:
    double goodRiskPercent;
   };
 
-class IndicatorHandles
+struct IndicatorHandles
   {
-public:
    int tm_h4;
    int tm_h1;
    int tm_m30;
@@ -274,7 +272,8 @@ public:
 
    ASSET_CLASS ClassifyAsset(const string symbol) const
      {
-  string sym = StringToUpper(symbol);
+  string sym = symbol;
+  StringToUpper(sym);
 
       if(sym == "XAUUSD" || sym == "XAGUSD" || StringFind(sym,"XAU") == 0 || StringFind(sym,"XAG") == 0)
          return ASSET_CLASS_METALS;
@@ -369,130 +368,130 @@ private:
         }
 
   AssetConfig *forexMajor = &m_configs[ASSET_CLASS_FOREX_MAJOR];
-  forexMajor->useCurrencyStrength = true;
-  forexMajor->requiredFilters     = 3;
-  forexMajor->minFiltersForTrade  = 2;
-  forexMajor->idealSLMinPips      = 20;
-  forexMajor->idealSLMaxPips      = 45;
-  forexMajor->slBufferPips        = 5;
-  forexMajor->minATR              = 15;
-  forexMajor->maxATR              = 50;
-  forexMajor->maxSpreadPips       = 2;
-  forexMajor->trailingDistancePips= 25;
-  forexMajor->primeHourStart      = 1000;
-  forexMajor->primeHourEnd        = 1400;
+  forexMajor.useCurrencyStrength = true;
+  forexMajor.requiredFilters     = 3;
+  forexMajor.minFiltersForTrade  = 2;
+  forexMajor.idealSLMinPips      = 20;
+  forexMajor.idealSLMaxPips      = 45;
+  forexMajor.slBufferPips        = 5;
+  forexMajor.minATR              = 15;
+  forexMajor.maxATR              = 50;
+  forexMajor.maxSpreadPips       = 2;
+  forexMajor.trailingDistancePips= 25;
+  forexMajor.primeHourStart      = 1000;
+  forexMajor.primeHourEnd        = 1400;
 
   AssetConfig *forexMinor = &m_configs[ASSET_CLASS_FOREX_MINOR];
-  forexMinor->useCurrencyStrength = true;
-  forexMinor->requiredFilters     = 3;
-  forexMinor->minFiltersForTrade  = 2;
-  forexMinor->idealSLMinPips      = 25;
-  forexMinor->idealSLMaxPips      = 50;
-  forexMinor->slBufferPips        = 7;
-  forexMinor->minATR              = 20;
-  forexMinor->maxATR              = 60;
-  forexMinor->maxSpreadPips       = 3;
-  forexMinor->trailingDistancePips= 30;
-  forexMinor->primeHourStart      = 1000;
-  forexMinor->primeHourEnd        = 1400;
+  forexMinor.useCurrencyStrength = true;
+  forexMinor.requiredFilters     = 3;
+  forexMinor.minFiltersForTrade  = 2;
+  forexMinor.idealSLMinPips      = 25;
+  forexMinor.idealSLMaxPips      = 50;
+  forexMinor.slBufferPips        = 7;
+  forexMinor.minATR              = 20;
+  forexMinor.maxATR              = 60;
+  forexMinor.maxSpreadPips       = 3;
+  forexMinor.trailingDistancePips= 30;
+  forexMinor.primeHourStart      = 1000;
+  forexMinor.primeHourEnd        = 1400;
 
   AssetConfig *forexExotic = &m_configs[ASSET_CLASS_FOREX_EXOTIC];
-  forexExotic->useCurrencyStrength = true;
-  forexExotic->requiredFilters     = 3;
-  forexExotic->minFiltersForTrade  = 2;
-  forexExotic->idealSLMinPips      = 40;
-  forexExotic->idealSLMaxPips      = 90;
-  forexExotic->slBufferPips        = 15;
-  forexExotic->minATR              = 25;
-  forexExotic->maxATR              = 120;
-  forexExotic->maxSpreadPips       = 15;
-  forexExotic->trailingDistancePips= 45;
-  forexExotic->primeHourStart      = 1000;
-  forexExotic->primeHourEnd        = 1400;
+  forexExotic.useCurrencyStrength = true;
+  forexExotic.requiredFilters     = 3;
+  forexExotic.minFiltersForTrade  = 2;
+  forexExotic.idealSLMinPips      = 40;
+  forexExotic.idealSLMaxPips      = 90;
+  forexExotic.slBufferPips        = 15;
+  forexExotic.minATR              = 25;
+  forexExotic.maxATR              = 120;
+  forexExotic.maxSpreadPips       = 15;
+  forexExotic.trailingDistancePips= 45;
+  forexExotic.primeHourStart      = 1000;
+  forexExotic.primeHourEnd        = 1400;
 
   AssetConfig *currencyB3 = &m_configs[ASSET_CLASS_CURRENCY_B3];
-  currencyB3->useCurrencyStrength = true;
-  currencyB3->requiredFilters     = 3;
-  currencyB3->minFiltersForTrade  = 2;
-  currencyB3->idealSLMinPips      = 15;
-  currencyB3->idealSLMaxPips      = 35;
-  currencyB3->slBufferPips        = 5;
-  currencyB3->minATR              = 10;
-  currencyB3->maxATR              = 40;
-  currencyB3->maxSpreadPips       = 3;
-  currencyB3->trailingDistancePips= 30;
-  currencyB3->primeHourStart      = 1400;
-  currencyB3->primeHourEnd        = 1600;
+  currencyB3.useCurrencyStrength = true;
+  currencyB3.requiredFilters     = 3;
+  currencyB3.minFiltersForTrade  = 2;
+  currencyB3.idealSLMinPips      = 15;
+  currencyB3.idealSLMaxPips      = 35;
+  currencyB3.slBufferPips        = 5;
+  currencyB3.minATR              = 10;
+  currencyB3.maxATR              = 40;
+  currencyB3.maxSpreadPips       = 3;
+  currencyB3.trailingDistancePips= 30;
+  currencyB3.primeHourStart      = 1400;
+  currencyB3.primeHourEnd        = 1600;
 
   AssetConfig *indexB3 = &m_configs[ASSET_CLASS_INDEX_B3];
-  indexB3->useCurrencyStrength = false;
-  indexB3->requiredFilters     = 2;
-  indexB3->minFiltersForTrade  = 2;
-  indexB3->idealSLMinPips      = 200;
-  indexB3->idealSLMaxPips      = 450;
-  indexB3->slBufferPips        = 50;
-  indexB3->minATR              = 200;
-  indexB3->maxATR              = 600;
-  indexB3->maxSpreadPips       = 15;
-  indexB3->trailingDistancePips= 300;
-  indexB3->primeHourStart      = 1400;
-  indexB3->primeHourEnd        = 1600;
+  indexB3.useCurrencyStrength = false;
+  indexB3.requiredFilters     = 2;
+  indexB3.minFiltersForTrade  = 2;
+  indexB3.idealSLMinPips      = 200;
+  indexB3.idealSLMaxPips      = 450;
+  indexB3.slBufferPips        = 50;
+  indexB3.minATR              = 200;
+  indexB3.maxATR              = 600;
+  indexB3.maxSpreadPips       = 15;
+  indexB3.trailingDistancePips= 300;
+  indexB3.primeHourStart      = 1400;
+  indexB3.primeHourEnd        = 1600;
 
   AssetConfig *indexUS = &m_configs[ASSET_CLASS_INDEX_US];
-  indexUS->useCurrencyStrength = false;
-  indexUS->requiredFilters     = 2;
-  indexUS->minFiltersForTrade  = 2;
-  indexUS->idealSLMinPips      = 15;
-  indexUS->idealSLMaxPips      = 40;
-  indexUS->slBufferPips        = 5;
-  indexUS->minATR              = 8;
-  indexUS->maxATR              = 25;
-  indexUS->maxSpreadPips       = 3;
-  indexUS->trailingDistancePips= 30;
-  indexUS->primeHourStart      = 1130;
-  indexUS->primeHourEnd        = 1800;
+  indexUS.useCurrencyStrength = false;
+  indexUS.requiredFilters     = 2;
+  indexUS.minFiltersForTrade  = 2;
+  indexUS.idealSLMinPips      = 15;
+  indexUS.idealSLMaxPips      = 40;
+  indexUS.slBufferPips        = 5;
+  indexUS.minATR              = 8;
+  indexUS.maxATR              = 25;
+  indexUS.maxSpreadPips       = 3;
+  indexUS.trailingDistancePips= 30;
+  indexUS.primeHourStart      = 1130;
+  indexUS.primeHourEnd        = 1800;
 
   AssetConfig *indexEU = &m_configs[ASSET_CLASS_INDEX_EU];
-  indexEU->useCurrencyStrength = false;
-  indexEU->requiredFilters     = 2;
-  indexEU->minFiltersForTrade  = 2;
-  indexEU->idealSLMinPips      = 15;
-  indexEU->idealSLMaxPips      = 40;
-  indexEU->slBufferPips        = 5;
-  indexEU->minATR              = 8;
-  indexEU->maxATR              = 25;
-  indexEU->maxSpreadPips       = 3;
-  indexEU->trailingDistancePips= 25;
-  indexEU->primeHourStart      = 500;
-  indexEU->primeHourEnd        = 900;
+  indexEU.useCurrencyStrength = false;
+  indexEU.requiredFilters     = 2;
+  indexEU.minFiltersForTrade  = 2;
+  indexEU.idealSLMinPips      = 15;
+  indexEU.idealSLMaxPips      = 40;
+  indexEU.slBufferPips        = 5;
+  indexEU.minATR              = 8;
+  indexEU.maxATR              = 25;
+  indexEU.maxSpreadPips       = 3;
+  indexEU.trailingDistancePips= 25;
+  indexEU.primeHourStart      = 500;
+  indexEU.primeHourEnd        = 900;
 
   AssetConfig *metals = &m_configs[ASSET_CLASS_METALS];
-  metals->useCurrencyStrength = true;
-  metals->requiredFilters     = 3;
-  metals->minFiltersForTrade  = 2;
-  metals->idealSLMinPips      = 5;
-  metals->idealSLMaxPips      = 15;
-  metals->slBufferPips        = 1.5;
-  metals->minATR              = 4;
-  metals->maxATR              = 15;
-  metals->maxSpreadPips       = 1;
-  metals->trailingDistancePips= 12;
-  metals->primeHourStart      = 500;
-  metals->primeHourEnd        = 1400;
+  metals.useCurrencyStrength = true;
+  metals.requiredFilters     = 3;
+  metals.minFiltersForTrade  = 2;
+  metals.idealSLMinPips      = 5;
+  metals.idealSLMaxPips      = 15;
+  metals.slBufferPips        = 1.5;
+  metals.minATR              = 4;
+  metals.maxATR              = 15;
+  metals.maxSpreadPips       = 1;
+  metals.trailingDistancePips= 12;
+  metals.primeHourStart      = 500;
+  metals.primeHourEnd        = 1400;
 
   AssetConfig *crypto = &m_configs[ASSET_CLASS_CRYPTO];
-  crypto->useCurrencyStrength = false;
-  crypto->requiredFilters     = 2;
-  crypto->minFiltersForTrade  = 2;
-  crypto->idealSLMinPips      = 150;
-  crypto->idealSLMaxPips      = 400;
-  crypto->slBufferPips        = 30;
-  crypto->minATR              = 80;
-  crypto->maxATR              = 300;
-  crypto->maxSpreadPips       = 10;
-  crypto->trailingDistancePips= 180;
-  crypto->primeHourStart      = 0;
-  crypto->primeHourEnd        = 2359;
+  crypto.useCurrencyStrength = false;
+  crypto.requiredFilters     = 2;
+  crypto.minFiltersForTrade  = 2;
+  crypto.idealSLMinPips      = 150;
+  crypto.idealSLMaxPips      = 400;
+  crypto.slBufferPips        = 30;
+  crypto.minATR              = 80;
+  crypto.maxATR              = 300;
+  crypto.maxSpreadPips       = 10;
+  crypto.trailingDistancePips= 180;
+  crypto.primeHourStart      = 0;
+  crypto.primeHourEnd        = 2359;
      }
   };
 
@@ -609,13 +608,13 @@ public:
          return false;
 
       string path = ComposeIndicatorPath(TrendMagicIndicator);
-      m_handles->tm_h4  = iCustom(symbol,PERIOD_H4,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
-      m_handles->tm_h1  = iCustom(symbol,PERIOD_H1,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
-      m_handles->tm_m30 = iCustom(symbol,PERIOD_M30,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
-      m_handles->tm_m15 = iCustom(symbol,PERIOD_M15,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
+      m_handles.tm_h4  = iCustom(symbol,PERIOD_H4,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
+      m_handles.tm_h1  = iCustom(symbol,PERIOD_H1,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
+      m_handles.tm_m30 = iCustom(symbol,PERIOD_M30,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
+      m_handles.tm_m15 = iCustom(symbol,PERIOD_M15,path,TM_CCI_Period,TM_ATR_Period,TM_ATR_Multiplier);
 
-      if(m_handles->tm_h4 == INVALID_HANDLE || m_handles->tm_h1 == INVALID_HANDLE ||
-         m_handles->tm_m30 == INVALID_HANDLE || m_handles->tm_m15 == INVALID_HANDLE)
+      if(m_handles.tm_h4 == INVALID_HANDLE || m_handles.tm_h1 == INVALID_HANDLE ||
+         m_handles.tm_m30 == INVALID_HANDLE || m_handles.tm_m15 == INVALID_HANDLE)
         {
          Print("[TraderMagic] Falha ao criar handles");
          return false;
@@ -627,10 +626,10 @@ public:
      {
       if(m_handles == NULL)
          return;
-      if(m_handles->tm_h4 != INVALID_HANDLE) IndicatorRelease(m_handles->tm_h4);
-      if(m_handles->tm_h1 != INVALID_HANDLE) IndicatorRelease(m_handles->tm_h1);
-      if(m_handles->tm_m30 != INVALID_HANDLE) IndicatorRelease(m_handles->tm_m30);
-      if(m_handles->tm_m15 != INVALID_HANDLE) IndicatorRelease(m_handles->tm_m15);
+      if(m_handles.tm_h4 != INVALID_HANDLE) IndicatorRelease(m_handles.tm_h4);
+      if(m_handles.tm_h1 != INVALID_HANDLE) IndicatorRelease(m_handles.tm_h1);
+      if(m_handles.tm_m30 != INVALID_HANDLE) IndicatorRelease(m_handles.tm_m30);
+      if(m_handles.tm_m15 != INVALID_HANDLE) IndicatorRelease(m_handles.tm_m15);
      }
 
    bool GetSignal(const ENUM_TIMEFRAMES timeframe,TMSignal &signal) const
@@ -685,10 +684,10 @@ private:
       return INVALID_HANDLE;
       switch(timeframe)
         {
-      case PERIOD_H4:  return m_handles->tm_h4;
-      case PERIOD_H1:  return m_handles->tm_h1;
-      case PERIOD_M30: return m_handles->tm_m30;
-      case PERIOD_M15: return m_handles->tm_m15;
+      case PERIOD_H4:  return m_handles.tm_h4;
+      case PERIOD_H1:  return m_handles.tm_h1;
+      case PERIOD_M30: return m_handles.tm_m30;
+      case PERIOD_M15: return m_handles.tm_m15;
          default:         return INVALID_HANDLE;
         }
      }
@@ -714,8 +713,8 @@ public:
          return false;
 
       string path = ComposeIndicatorPath(CurrencyStrengthIndicator);
-      m_handles->cs_m15 = iCustom(symbol,PERIOD_M15,path,CS_CalculationPeriod,CS_SmoothingPeriod,CS_ShowInPercent);
-      if(m_handles->cs_m15 == INVALID_HANDLE)
+      m_handles.cs_m15 = iCustom(symbol,PERIOD_M15,path,CS_CalculationPeriod,CS_SmoothingPeriod,CS_ShowInPercent);
+      if(m_handles.cs_m15 == INVALID_HANDLE)
         {
          Print("[CurrencyStrength] Falha ao criar handle");
          return false;
@@ -727,7 +726,7 @@ public:
      {
       if(m_handles == NULL)
          return;
-      if(m_handles->cs_m15 != INVALID_HANDLE) IndicatorRelease(m_handles->cs_m15);
+      if(m_handles.cs_m15 != INVALID_HANDLE) IndicatorRelease(m_handles.cs_m15);
      }
 
    CSSignal GetSignal(const bool isBuy,const ASSET_CLASS assetType) const
@@ -737,7 +736,7 @@ public:
       result.isAligned = false;
       result.strength  = 0.0;
 
-  if(m_handles == NULL || m_handles->cs_m15 == INVALID_HANDLE)
+  if(m_handles == NULL || m_handles.cs_m15 == INVALID_HANDLE)
          return result;
 
       if(!(assetType == ASSET_CLASS_FOREX_MAJOR || assetType == ASSET_CLASS_FOREX_MINOR ||
@@ -749,9 +748,9 @@ public:
 
       double base[3];
       double quote[3];
-    if(CopyBuffer(m_handles->cs_m15,0,0,3,base) != 3)
+    if(CopyBuffer(m_handles.cs_m15,0,0,3,base) != 3)
          return result;
-    if(CopyBuffer(m_handles->cs_m15,1,0,3,quote) != 3)
+    if(CopyBuffer(m_handles.cs_m15,1,0,3,quote) != 3)
          return result;
 
       double baseStrength  = base[0];
@@ -789,13 +788,13 @@ public:
       if(m_handles == NULL)
          return false;
       string path = ComposeIndicatorPath(RSIOMAIndicator);
-    m_handles->rsi_h4  = iCustom(symbol,PERIOD_H4,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
-    m_handles->rsi_h1  = iCustom(symbol,PERIOD_H1,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
-    m_handles->rsi_m30 = iCustom(symbol,PERIOD_M30,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
-    m_handles->rsi_m15 = iCustom(symbol,PERIOD_M15,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
+    m_handles.rsi_h4  = iCustom(symbol,PERIOD_H4,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
+    m_handles.rsi_h1  = iCustom(symbol,PERIOD_H1,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
+    m_handles.rsi_m30 = iCustom(symbol,PERIOD_M30,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
+    m_handles.rsi_m15 = iCustom(symbol,PERIOD_M15,path,RSI_Period,RSI_MA_Period,RSI_MA_Method,RSI_HighLevel,RSI_LowLevel,RSI_ShowLevels);
 
-    if(m_handles->rsi_h4 == INVALID_HANDLE || m_handles->rsi_h1 == INVALID_HANDLE ||
-      m_handles->rsi_m30 == INVALID_HANDLE || m_handles->rsi_m15 == INVALID_HANDLE)
+    if(m_handles.rsi_h4 == INVALID_HANDLE || m_handles.rsi_h1 == INVALID_HANDLE ||
+      m_handles.rsi_m30 == INVALID_HANDLE || m_handles.rsi_m15 == INVALID_HANDLE)
         {
          Print("[RSIOMA] Falha ao criar handles");
          return false;
@@ -807,10 +806,10 @@ public:
      {
       if(m_handles == NULL)
          return;
-    if(m_handles->rsi_h4 != INVALID_HANDLE) IndicatorRelease(m_handles->rsi_h4);
-    if(m_handles->rsi_h1 != INVALID_HANDLE) IndicatorRelease(m_handles->rsi_h1);
-    if(m_handles->rsi_m30 != INVALID_HANDLE) IndicatorRelease(m_handles->rsi_m30);
-    if(m_handles->rsi_m15 != INVALID_HANDLE) IndicatorRelease(m_handles->rsi_m15);
+    if(m_handles.rsi_h4 != INVALID_HANDLE) IndicatorRelease(m_handles.rsi_h4);
+    if(m_handles.rsi_h1 != INVALID_HANDLE) IndicatorRelease(m_handles.rsi_h1);
+    if(m_handles.rsi_m30 != INVALID_HANDLE) IndicatorRelease(m_handles.rsi_m30);
+    if(m_handles.rsi_m15 != INVALID_HANDLE) IndicatorRelease(m_handles.rsi_m15);
      }
 
    bool GetSignal(const ENUM_TIMEFRAMES timeframe,const bool isBuy,RSISignal &signal) const
@@ -857,10 +856,10 @@ private:
          return INVALID_HANDLE;
       switch(timeframe)
         {
-      case PERIOD_H4:  return m_handles->rsi_h4;
-      case PERIOD_H1:  return m_handles->rsi_h1;
-      case PERIOD_M30: return m_handles->rsi_m30;
-      case PERIOD_M15: return m_handles->rsi_m15;
+      case PERIOD_H4:  return m_handles.rsi_h4;
+      case PERIOD_H1:  return m_handles.rsi_h1;
+      case PERIOD_M30: return m_handles.rsi_m30;
+      case PERIOD_M15: return m_handles.rsi_m15;
          default:         return INVALID_HANDLE;
         }
      }
@@ -883,13 +882,13 @@ public:
       if(m_handles == NULL)
          return false;
       string path = ComposeIndicatorPath(WAEIndicator);
-    m_handles->wae_h4  = iCustom(symbol,PERIOD_H4,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
-    m_handles->wae_h1  = iCustom(symbol,PERIOD_H1,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
-    m_handles->wae_m30 = iCustom(symbol,PERIOD_M30,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
-    m_handles->wae_m15 = iCustom(symbol,PERIOD_M15,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
+    m_handles.wae_h4  = iCustom(symbol,PERIOD_H4,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
+    m_handles.wae_h1  = iCustom(symbol,PERIOD_H1,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
+    m_handles.wae_m30 = iCustom(symbol,PERIOD_M30,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
+    m_handles.wae_m15 = iCustom(symbol,PERIOD_M15,path,WAE_FastMA,WAE_SlowMA,WAE_BBLength,WAE_BBMultiplier,WAE_Sensitivity);
 
-    if(m_handles->wae_h4 == INVALID_HANDLE || m_handles->wae_h1 == INVALID_HANDLE ||
-      m_handles->wae_m30 == INVALID_HANDLE || m_handles->wae_m15 == INVALID_HANDLE)
+    if(m_handles.wae_h4 == INVALID_HANDLE || m_handles.wae_h1 == INVALID_HANDLE ||
+      m_handles.wae_m30 == INVALID_HANDLE || m_handles.wae_m15 == INVALID_HANDLE)
         {
          Print("[WAE] Falha ao criar handles");
          return false;
@@ -901,10 +900,10 @@ public:
      {
       if(m_handles == NULL)
          return;
-    if(m_handles->wae_h4 != INVALID_HANDLE) IndicatorRelease(m_handles->wae_h4);
-    if(m_handles->wae_h1 != INVALID_HANDLE) IndicatorRelease(m_handles->wae_h1);
-    if(m_handles->wae_m30 != INVALID_HANDLE) IndicatorRelease(m_handles->wae_m30);
-    if(m_handles->wae_m15 != INVALID_HANDLE) IndicatorRelease(m_handles->wae_m15);
+    if(m_handles.wae_h4 != INVALID_HANDLE) IndicatorRelease(m_handles.wae_h4);
+    if(m_handles.wae_h1 != INVALID_HANDLE) IndicatorRelease(m_handles.wae_h1);
+    if(m_handles.wae_m30 != INVALID_HANDLE) IndicatorRelease(m_handles.wae_m30);
+    if(m_handles.wae_m15 != INVALID_HANDLE) IndicatorRelease(m_handles.wae_m15);
      }
 
    bool GetSignal(const ENUM_TIMEFRAMES timeframe,const bool isBuy,WAESignal &signal) const
@@ -955,10 +954,10 @@ private:
          return INVALID_HANDLE;
       switch(timeframe)
         {
-      case PERIOD_H4:  return m_handles->wae_h4;
-      case PERIOD_H1:  return m_handles->wae_h1;
-      case PERIOD_M30: return m_handles->wae_m30;
-      case PERIOD_M15: return m_handles->wae_m15;
+      case PERIOD_H4:  return m_handles.wae_h4;
+      case PERIOD_H1:  return m_handles.wae_h1;
+      case PERIOD_M30: return m_handles.wae_m30;
+      case PERIOD_M15: return m_handles.wae_m15;
          default:         return INVALID_HANDLE;
         }
      }
@@ -1065,13 +1064,13 @@ public:
          return result;
 
       TMSignal h4Signal, h1Signal, m30Signal, m15Signal;
-    if(!m_indicatorManager->GetTraderMagicSignal(PERIOD_H4,h4Signal))
+    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_H4,h4Signal))
          return result;
-    if(!m_indicatorManager->GetTraderMagicSignal(PERIOD_H1,h1Signal))
+    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_H1,h1Signal))
          return result;
-    if(!m_indicatorManager->GetTraderMagicSignal(PERIOD_M30,m30Signal))
+    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_M30,m30Signal))
          return result;
-    if(!m_indicatorManager->GetTraderMagicSignal(PERIOD_M15,m15Signal))
+    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_M15,m15Signal))
          return result;
 
       if(!h4Signal.isValid || !h1Signal.isValid || !m15Signal.isValid)
@@ -1162,7 +1161,7 @@ public:
       bool isBuy = (direction == TRADE_DIRECTION_BUY);
 
       TMSignal tm;
-  if(!m_indicatorManager->GetTraderMagicSignal(PERIOD_M15,tm) || !tm.isValid || tm.direction != direction)
+  if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_M15,tm) || !tm.isValid || tm.direction != direction)
          return score;
 
       score.traderMagicPoints = 1;
@@ -1172,16 +1171,16 @@ public:
          assetType == ASSET_CLASS_METALS)
         {
          score.requiredPoints = 2;
-      CSSignal cs = m_indicatorManager->GetCurrencyStrengthSignal(isBuy,assetType);
+  CSSignal cs = (*m_indicatorManager).GetCurrencyStrengthSignal(isBuy,assetType);
          if(cs.isValid && cs.isAligned)
             score.currencyStrengthPoints = 1;
 
          RSISignal rsi;
-      if(m_indicatorManager->GetRSISignal(PERIOD_M15,isBuy,rsi) && rsi.isValid && rsi.isAligned)
+  if((*m_indicatorManager).GetRSISignal(PERIOD_M15,isBuy,rsi) && rsi.isValid && rsi.isAligned)
             score.rsiomaPoints = 1;
 
          WAESignal wae;
-      if(m_indicatorManager->GetWAESignal(PERIOD_M15,isBuy,wae) && wae.isValid && wae.isAligned)
+  if((*m_indicatorManager).GetWAESignal(PERIOD_M15,isBuy,wae) && wae.isValid && wae.isAligned)
             score.waePoints = 1;
 
          score.totalPoints = score.currencyStrengthPoints + score.rsiomaPoints + score.waePoints;
@@ -1190,10 +1189,10 @@ public:
         {
          score.requiredPoints = 2;
          RSISignal rsi;
-      if(m_indicatorManager->GetRSISignal(PERIOD_M15,isBuy,rsi) && rsi.isValid && rsi.isAligned)
+  if((*m_indicatorManager).GetRSISignal(PERIOD_M15,isBuy,rsi) && rsi.isValid && rsi.isAligned)
             score.rsiomaPoints = 1;
          WAESignal wae;
-      if(m_indicatorManager->GetWAESignal(PERIOD_M15,isBuy,wae) && wae.isValid && wae.isAligned)
+  if((*m_indicatorManager).GetWAESignal(PERIOD_M15,isBuy,wae) && wae.isValid && wae.isAligned)
             score.waePoints = 1;
          score.totalPoints = score.rsiomaPoints + score.waePoints;
         }
@@ -1252,7 +1251,7 @@ public:
          return calc;
         }
 
-  const AssetConfig *config = m_assetManager->GetConfig(assetClass);
+  const AssetConfig *config = (*m_assetManager).GetConfig(assetClass);
       if(config == NULL)
         {
          calc.errorMessage = "Configuração de ativo inválida";
@@ -1271,13 +1270,13 @@ public:
 
       double point = SymbolInfoDouble(symbol,SYMBOL_POINT);
       double slPips = calc.slDistance/point;
-      if(slPips < config->idealSLMinPips || slPips > config->idealSLMaxPips)
+      if(slPips < config.idealSLMinPips || slPips > config.idealSLMaxPips)
         {
          calc.errorMessage = "SL fora do range ideal";
          return calc;
         }
 
-      double riskPercent = (score.classification == SETUP_PREMIUM) ? config->premiumRiskPercent : config->goodRiskPercent;
+      double riskPercent = (score.classification == SETUP_PREMIUM) ? config.premiumRiskPercent : config.goodRiskPercent;
       double balance = AccountInfoDouble(ACCOUNT_BALANCE);
       double riskAmount = balance * (riskPercent/100.0);
 
@@ -1287,8 +1286,8 @@ public:
       double tickVal   = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE);
       double tickSize  = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE);
       double pipValue  = (tickSize > 0.0) ? (tickVal * point / tickSize) : tickVal;
-    if(config->pipValueOverride > 0)
-      pipValue = config->pipValueOverride;
+    if(config.pipValueOverride > 0)
+      pipValue = config.pipValueOverride;
 
       if(pipValue <= 0.0)
         {
@@ -1351,7 +1350,7 @@ private:
     if(config == NULL)
       return 0.0;
 
-    double buffer = ConvertPipsToPrice(symbol,config->slBufferPips);
+    double buffer = ConvertPipsToPrice(symbol,config.slBufferPips);
     double lows[];
     double highs[];
       int bars = MathMin(LookbackStructureBars,120);
@@ -1441,9 +1440,9 @@ public:
   record.closeTime = (datetime)HistoryDealGetInteger(deal,DEAL_TIME);
   record.openTime  = record.closeTime;
       record.symbol    = HistoryDealGetString(deal,DEAL_SYMBOL);
-  double entryPrice= HistoryDealGetDouble(deal,DEAL_PRICE_POSITION);
-      record.openPrice = entryPrice;
-      record.closePrice= HistoryDealGetDouble(deal,DEAL_PRICE);
+  double exitPrice = HistoryDealGetDouble(deal,DEAL_PRICE);
+  record.openPrice = exitPrice;
+  record.closePrice= exitPrice;
       record.profit    = HistoryDealGetDouble(deal,DEAL_PROFIT);
       record.riskAmount= 0.0;
       record.rr        = (record.profit != 0.0 && record.riskAmount != 0.0) ? (record.profit/record.riskAmount) : 0.0;
@@ -1578,7 +1577,7 @@ public:
          return false;
         }
 
-  if(m_hoursManager == NULL || !m_hoursManager->IsValidTradingTime(assetClass))
+  if(m_hoursManager == NULL || !(*m_hoursManager).IsValidTradingTime(assetClass))
          return false;
 
       if(CheckMaxDrawdown())
@@ -1597,11 +1596,11 @@ public:
      {
   double spreadPoints = (double)SymbolInfoInteger(symbol,SYMBOL_SPREAD);
     double spreadPips = spreadPoints;
-  const AssetConfig *config = (m_assetManager != NULL) ? m_assetManager->GetConfig(assetClass) : NULL;
+  const AssetConfig *config = (m_assetManager != NULL) ? (*m_assetManager).GetConfig(assetClass) : NULL;
     if(config == NULL)
       return false;
 
-    if(spreadPips > config->maxSpreadPips)
+    if(spreadPips > config.maxSpreadPips)
         {
          PrintFormat("[Protection] Spread alto %.2f pips",spreadPips);
          return false;
@@ -1664,12 +1663,12 @@ private:
          return true;
         }
       IndicatorRelease(handle);
-      const AssetConfig *config = (m_assetManager != NULL) ? m_assetManager->GetConfig(assetClass) : NULL;
+  const AssetConfig *config = (m_assetManager != NULL) ? (*m_assetManager).GetConfig(assetClass) : NULL;
       if(config == NULL)
          return true;
 
       double atrPips = atr[0]/SymbolInfoDouble(symbol,SYMBOL_POINT);
-      return (atrPips >= config->minATR && atrPips <= config->maxATR);
+      return (atrPips >= config.minATR && atrPips <= config.maxATR);
      }
 
    static bool IsNewsTime()
@@ -1781,8 +1780,8 @@ private:
       trade.stopLoss     = risk.stopLoss;
       trade.tp1Level     = risk.tp1;
       trade.tp2Level     = risk.tp2;
-  const AssetConfig *config = (m_assetManager != NULL) ? m_assetManager->GetConfig(assetClass) : NULL;
-  double trailingBase = (config != NULL) ? config->trailingDistancePips : 0.0;
+  const AssetConfig *config = (m_assetManager != NULL) ? (*m_assetManager).GetConfig(assetClass) : NULL;
+  double trailingBase = (config != NULL) ? config.trailingDistancePips : 0.0;
   trade.trailingDistance = ConvertPipsToPrice(symbol,trailingBase) * TrailingDistanceMultiplier;
       trade.tp1Hit       = false;
       trade.tp2Hit       = false;
@@ -1895,7 +1894,7 @@ private:
          return false;
 
       TMSignal h4Signal;
-  if(m_indicatorManager->GetTraderMagicSignal(PERIOD_H4,h4Signal) && h4Signal.isValid)
+  if((*m_indicatorManager).GetTraderMagicSignal(PERIOD_H4,h4Signal) && h4Signal.isValid)
         {
          if(trade.direction == TRADE_DIRECTION_BUY && h4Signal.direction == TRADE_DIRECTION_SELL)
             return true;
@@ -1904,7 +1903,7 @@ private:
         }
 
       TMSignal m15Signal;
-  if(m_indicatorManager->GetTraderMagicSignal(PERIOD_M15,m15Signal) && m15Signal.isValid)
+  if((*m_indicatorManager).GetTraderMagicSignal(PERIOD_M15,m15Signal) && m15Signal.isValid)
         {
          if(trade.direction == TRADE_DIRECTION_BUY && m15Signal.direction == TRADE_DIRECTION_SELL)
             return true;
@@ -1912,8 +1911,8 @@ private:
             return true;
         }
 
-  ASSET_CLASS asset = (m_assetManager != NULL) ? m_assetManager->ClassifyAsset(trade.symbol) : ASSET_CLASS_UNKNOWN;
-  if(m_hoursManager == NULL || !m_hoursManager->IsValidTradingTime(asset))
+  ASSET_CLASS asset = (m_assetManager != NULL) ? (*m_assetManager).ClassifyAsset(trade.symbol) : ASSET_CLASS_UNKNOWN;
+  if(m_hoursManager == NULL || !(*m_hoursManager).IsValidTradingTime(asset))
          return true;
 
       MqlDateTime dt;
@@ -2052,22 +2051,22 @@ void SetupGlobalObjects()
    protectionSystem = new CProtectionSystem();
 
   if(tfAnalyzer != NULL)
-    tfAnalyzer->Attach(indicatorManager,assetManager);
+    (*tfAnalyzer).Attach(indicatorManager,assetManager);
   if(setupScorer != NULL)
-    setupScorer->Attach(indicatorManager,assetManager);
+    (*setupScorer).Attach(indicatorManager,assetManager);
   if(riskManager != NULL)
-    riskManager->Attach(assetManager);
+    (*riskManager).Attach(assetManager);
   if(tradeManager != NULL)
-    tradeManager->Attach(assetManager,indicatorManager,hoursManager,statistics);
+    (*tradeManager).Attach(assetManager,indicatorManager,hoursManager,statistics);
   if(protectionSystem != NULL)
-    protectionSystem->Attach(assetManager,hoursManager);
+    (*protectionSystem).Attach(assetManager,hoursManager);
   }
 
 void DestroyGlobalObjects()
   {
    if(indicatorManager != NULL)
      {
-      indicatorManager->Release();
+    (*indicatorManager).Release();
       delete indicatorManager;
       indicatorManager = NULL;
      }
@@ -2131,7 +2130,7 @@ int OnInit()
 
    SetupGlobalObjects();
 
-  if(indicatorManager == NULL || !indicatorManager->Initialize(_Symbol))
+  if(indicatorManager == NULL || !(*indicatorManager).Initialize(_Symbol))
      {
       Print("Falha ao inicializar indicadores");
       return INIT_FAILED;
@@ -2142,8 +2141,8 @@ int OnInit()
       Print("Asset manager não disponível");
       return INIT_FAILED;
      }
-   ASSET_CLASS currentAsset = assetManager->ClassifyAsset(_Symbol);
-   if(!assetManager->IsAssetSupported(currentAsset))
+  ASSET_CLASS currentAsset = (*assetManager).ClassifyAsset(_Symbol);
+  if(!(*assetManager).IsAssetSupported(currentAsset))
      {
       Print("Ativo não suportado");
       return INIT_FAILED;
@@ -2175,7 +2174,7 @@ void OnTimer()
    if(g_lastReportMonth != dt.mon)
      {
     if(statistics != NULL)
-      statistics->GenerateMonthlyReport();
+      (*statistics).GenerateMonthlyReport();
       g_lastReportMonth = dt.mon;
      }
 
@@ -2190,7 +2189,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
      {
       ulong dealTicket = trans.deal;
       if(HistoryDealGetInteger(dealTicket,DEAL_MAGIC) == EA_MAGIC_NUMBER && HistoryDealGetInteger(dealTicket,DEAL_ENTRY) == DEAL_ENTRY_OUT)
-         statistics->RecordClosedDeal(dealTicket);
+         (*statistics).RecordClosedDeal(dealTicket);
      }
   }
 
@@ -2199,18 +2198,18 @@ void ProcessNewSetup(const ASSET_CLASS assetClass)
   if(tfAnalyzer == NULL || setupScorer == NULL || protectionSystem == NULL || riskManager == NULL || tradeManager == NULL)
     return;
 
-  MultiTFResult mtf = tfAnalyzer->Analyze(_Symbol,assetClass);
+  MultiTFResult mtf = (*tfAnalyzer).Analyze(_Symbol,assetClass);
   if(!mtf.isValid)
     return;
 
-  SetupScore score = setupScorer->Evaluate(_Symbol,assetClass,mtf.direction);
+  SetupScore score = (*setupScorer).Evaluate(_Symbol,assetClass,mtf.direction);
   if(score.classification == SETUP_REJECT)
     return;
 
-  if(!protectionSystem->ValidateMarketConditions(_Symbol,assetClass))
+  if(!(*protectionSystem).ValidateMarketConditions(_Symbol,assetClass))
     return;
 
-  RiskCalculation risk = riskManager->Calculate(_Symbol,score,assetClass);
+  RiskCalculation risk = (*riskManager).Calculate(_Symbol,score,assetClass);
   if(!risk.isValid)
     {
     if(risk.errorMessage != "")
@@ -2218,7 +2217,7 @@ void ProcessNewSetup(const ASSET_CLASS assetClass)
     return;
     }
 
-  tradeManager->ExecuteTrade(_Symbol,risk,assetClass);
+  (*tradeManager).ExecuteTrade(_Symbol,risk,assetClass);
   }
 
 void OnTick()
@@ -2226,15 +2225,15 @@ void OnTick()
   if(assetManager == NULL || protectionSystem == NULL)
     return;
 
-  ASSET_CLASS assetClass = assetManager->ClassifyAsset(_Symbol);
-  if(!protectionSystem->ValidateBasicConditions(assetClass))
+  ASSET_CLASS assetClass = (*assetManager).ClassifyAsset(_Symbol);
+  if(!(*protectionSystem).ValidateBasicConditions(assetClass))
     {
     if(tradeManager != NULL)
-      tradeManager->ManageOpenTrades();
+      (*tradeManager).ManageOpenTrades();
     return;
     }
 
   ProcessNewSetup(assetClass);
   if(tradeManager != NULL)
-    tradeManager->ManageOpenTrades();
+    (*tradeManager).ManageOpenTrades();
   }

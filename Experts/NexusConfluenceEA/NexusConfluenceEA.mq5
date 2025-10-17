@@ -766,6 +766,9 @@ public:
    // Criar objetos visuais do GG_TrendBar
    void CreateGGTrendBarVisuals()
      {
+      // PRIMEIRO: Deletar objetos criados pelo indicador original (se existirem)
+      DeleteOriginalIndicatorObjects();
+      
       // Criar headers dos timeframes
       for(int i = 0; i < 9; i++)
         {
@@ -813,7 +816,35 @@ public:
         }
       
       ChartRedraw(0);
-      Print("[VisualManager] GG_TrendBar objetos visuais criados");
+      Print("[VisualManager] GG_TrendBar objetos visuais criados no canto superior direito");
+     }
+
+   // Deletar objetos criados pelo indicador original
+   void DeleteOriginalIndicatorObjects()
+     {
+      // Deletar headers do indicador original (sem prefix "EA_")
+      for(int i = 0; i < 9; i++)
+        {
+         string label_name = "TF_" + m_timeframes[i];
+         if(ObjectFind(0, label_name) >= 0)
+           {
+            ObjectDelete(0, label_name);
+            Print("[VisualManager] Removido objeto duplicado: ", label_name);
+           }
+        }
+      
+      // Deletar indicadores do indicador original
+      for(int i = 0; i < 9; i++)
+        {
+         string ind_name = "Ind_" + IntegerToString(i);
+         if(ObjectFind(0, ind_name) >= 0)
+           {
+            ObjectDelete(0, ind_name);
+            Print("[VisualManager] Removido objeto duplicado: ", ind_name);
+           }
+        }
+      
+      ChartRedraw(0);
      }
 
    // Atualizar cores dos indicadores com base nos valores
@@ -858,7 +889,7 @@ public:
    // Remover todos os objetos visuais
    void RemoveAllVisuals()
      {
-      // Remover headers
+      // Remover headers do EA
       for(int i = 0; i < 9; i++)
         {
          string label_name = "EA_TF_" + m_timeframes[i];
@@ -866,7 +897,7 @@ public:
             ObjectDelete(0, label_name);
         }
       
-      // Remover indicadores
+      // Remover indicadores do EA
       for(int i = 0; i < 9; i++)
         {
          string ind_name = "EA_Ind_" + IntegerToString(i);
@@ -874,45 +905,39 @@ public:
             ObjectDelete(0, ind_name);
         }
       
+      // Remover também objetos do indicador original (caso existam)
+      DeleteOriginalIndicatorObjects();
+      
       ChartRedraw(0);
       Print("[VisualManager] Objetos visuais removidos");
      }
 
-   // Adicionar indicadores ao gráfico (via ChartIndicatorAdd)
-   void AttachIndicatorsToChart()
+   // NOTA: Indicadores devem ser adicionados MANUALMENTE pelo usuário
+   // ChartIndicatorAdd não funciona corretamente com iCustom em EAs
+   // Os objetos visuais do GG_TrendBar são criados pelo EA
+   void ShowIndicatorInstructions()
      {
-      long chartID = ChartID();
-      
-      // Adicionar SuperTrend ao gráfico principal (subwindow 0)
-      string superTrendPath = ComposeIndicatorPath(TrendMagicIndicator);
-      int superTrendWindow = ChartIndicatorAdd(chartID, 0, iCustom(_Symbol, PERIOD_CURRENT, superTrendPath, 
-                                               TM_CCI_Period, TM_ATR_Period, TM_ATR_Multiplier));
-      if(superTrendWindow >= 0)
-         Print("[VisualManager] SuperTrend anexado ao gráfico principal");
-      else
-         Print("[VisualManager] Erro ao anexar SuperTrend: ", GetLastError());
-      
-      // Adicionar RSI OMA em subjanela
-      string rsiPath = ComposeIndicatorPath(RSIOMAIndicator);
-      int rsiWindow = ChartIndicatorAdd(chartID, -1, iCustom(_Symbol, PERIOD_CURRENT, rsiPath,
-                                        RSI_Period, RSI_MA_Period, RSI_MA_Method, 
-                                        RSI_HighLevel, RSI_LowLevel, RSI_ShowLevels));
-      if(rsiWindow >= 0)
-         Print("[VisualManager] RSI OMA anexado em subjanela ", rsiWindow);
-      else
-         Print("[VisualManager] Erro ao anexar RSI OMA: ", GetLastError());
-      
-      // Adicionar WAE em subjanela
-      string waePath = ComposeIndicatorPath(WAEIndicator);
-      int waeWindow = ChartIndicatorAdd(chartID, -1, iCustom(_Symbol, PERIOD_CURRENT, waePath,
-                                        WAE_FastMA, WAE_SlowMA, WAE_BBLength, 
-                                        WAE_BBMultiplier, WAE_Sensitivity));
-      if(waeWindow >= 0)
-         Print("[VisualManager] WAE anexado em subjanela ", waeWindow);
-      else
-         Print("[VisualManager] Erro ao anexar WAE: ", GetLastError());
-      
-      ChartRedraw(chartID);
+      Print("============================================================");
+      Print("INSTRUÇÕES PARA ADICIONAR INDICADORES MANUALMENTE:");
+      Print("============================================================");
+      Print("1. SUPERTREND (TrendMagic):");
+      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > TrendMagic_MT5");
+      Print("   - CCI Period: ", TM_CCI_Period);
+      Print("   - ATR Period: ", TM_ATR_Period);
+      Print("   - ATR Multiplier: ", TM_ATR_Multiplier);
+      Print("");
+      Print("2. RSI OMA:");
+      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > RSIOMA_v2HHLSX_MT5");
+      Print("   - RSI Period: ", RSI_Period);
+      Print("   - MA Period: ", RSI_MA_Period);
+      Print("");
+      Print("3. WAE:");
+      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > WaddahAttarExplosion_Professional");
+      Print("   - Fast MA: ", WAE_FastMA);
+      Print("   - Slow MA: ", WAE_SlowMA);
+      Print("");
+      Print("4. GG_TrendBar JÁ ESTÁ VISÍVEL no canto superior direito");
+      Print("============================================================");
      }
   };
 
@@ -1307,11 +1332,11 @@ public:
       ok = m_rsi.Initialize(symbol) && ok;
       ok = m_wae.Initialize(symbol) && ok;
       
-      // Criar objetos visuais do GG_TrendBar
+      // Criar apenas objetos visuais do GG_TrendBar
       m_visualManager.CreateGGTrendBarVisuals();
       
-      // Anexar indicadores ao gráfico
-      m_visualManager.AttachIndicatorsToChart();
+      // Mostrar instruções para adicionar outros indicadores manualmente
+      m_visualManager.ShowIndicatorInstructions();
       
       return ok;
      }
@@ -2519,6 +2544,38 @@ void OnTimer()
      }
 
    ValidateSystemIntegrity();
+   
+   // Remover objetos duplicados criados pelo indicador GG_TrendBar original
+   if(indicatorManager != NULL)
+     {
+      static int cleanupCounter = 0;
+      cleanupCounter++;
+      // Limpar a cada 10 segundos (timer está em 1 segundo)
+      if(cleanupCounter >= 10)
+        {
+         RemoveDuplicateGGTrendBarObjects();
+         cleanupCounter = 0;
+        }
+     }
+  }
+
+// Função auxiliar para remover objetos duplicados
+void RemoveDuplicateGGTrendBarObjects()
+  {
+   string timeframes[] = {"M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"};
+   
+   for(int i = 0; i < 9; i++)
+     {
+      // Deletar headers do indicador original (sem prefix "EA_")
+      string label_name = "TF_" + timeframes[i];
+      if(ObjectFind(0, label_name) >= 0)
+         ObjectDelete(0, label_name);
+      
+      // Deletar indicadores do indicador original
+      string ind_name = "Ind_" + IntegerToString(i);
+      if(ObjectFind(0, ind_name) >= 0)
+         ObjectDelete(0, ind_name);
+     }
   }
 
 void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &request,const MqlTradeResult &result)

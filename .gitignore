@@ -36,3 +36,6 @@ Experts/NexusConfluenceEA/NexusConfluenceEA.log
 GG_compile.log
 GG_TrendBar_Indicator.ex5
 Indicators/NexusConfluenceEA/GG_TrendBar_Indicator_BACKUP.mq5
+Experts/NexusConfluenceEA/compile_ea.bat
+.gitignore
+Experts/NexusConfluenceEA/compile.log

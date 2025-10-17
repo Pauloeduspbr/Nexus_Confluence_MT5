@@ -172,8 +172,9 @@ struct RiskCalculation
    double          trailingStart;
   };
 
-struct AssetConfig
+class AssetConfig
   {
+public:
    bool   useCurrencyStrength;
    int    requiredFilters;
    int    minFiltersForTrade;
@@ -191,8 +192,9 @@ struct AssetConfig
    double goodRiskPercent;
   };
 
-struct IndicatorHandles
+class IndicatorHandles
   {
+public:
    int tm_h4;
    int tm_h1;
    int tm_m30;
@@ -272,7 +274,7 @@ public:
 
    ASSET_CLASS ClassifyAsset(const string symbol) const
      {
-      string sym = StringUpper(symbol);
+  string sym = StringToUpper(symbol);
 
       if(sym == "XAUUSD" || sym == "XAGUSD" || StringFind(sym,"XAU") == 0 || StringFind(sym,"XAG") == 0)
          return ASSET_CLASS_METALS;
@@ -1576,7 +1578,7 @@ public:
          return false;
         }
 
-      if(!m_hoursManager.IsValidTradingTime(assetClass))
+  if(m_hoursManager == NULL || !m_hoursManager->IsValidTradingTime(assetClass))
          return false;
 
       if(CheckMaxDrawdown())
@@ -1593,9 +1595,9 @@ public:
 
    bool ValidateMarketConditions(const string symbol,const ASSET_CLASS assetClass) const
      {
-    double spreadPoints = SymbolInfoInteger(symbol,SYMBOL_SPREAD);
+  double spreadPoints = (double)SymbolInfoInteger(symbol,SYMBOL_SPREAD);
     double spreadPips = spreadPoints;
-    const AssetConfig *config = m_assetManager->GetConfig(assetClass);
+  const AssetConfig *config = (m_assetManager != NULL) ? m_assetManager->GetConfig(assetClass) : NULL;
     if(config == NULL)
       return false;
 
@@ -1684,8 +1686,9 @@ private:
 class CTradeManager
   {
 private:
-   struct ActiveTrade
+   class ActiveTrade
      {
+     public:
       string          symbol;
       double          volume;
       double          entryPrice;
@@ -1778,7 +1781,7 @@ private:
       trade.stopLoss     = risk.stopLoss;
       trade.tp1Level     = risk.tp1;
       trade.tp2Level     = risk.tp2;
-  const AssetConfig *config = m_assetManager->GetConfig(assetClass);
+  const AssetConfig *config = (m_assetManager != NULL) ? m_assetManager->GetConfig(assetClass) : NULL;
   double trailingBase = (config != NULL) ? config->trailingDistancePips : 0.0;
   trade.trailingDistance = ConvertPipsToPrice(symbol,trailingBase) * TrailingDistanceMultiplier;
       trade.tp1Hit       = false;
@@ -1888,11 +1891,11 @@ private:
 
    bool CheckEarlyExit(const ActiveTrade &trade)
      {
-      if(!m_indicatorManager)
+  if(m_indicatorManager == NULL)
          return false;
 
       TMSignal h4Signal;
-      if(m_indicatorManager.GetTraderMagicSignal(PERIOD_H4,h4Signal) && h4Signal.isValid)
+  if(m_indicatorManager->GetTraderMagicSignal(PERIOD_H4,h4Signal) && h4Signal.isValid)
         {
          if(trade.direction == TRADE_DIRECTION_BUY && h4Signal.direction == TRADE_DIRECTION_SELL)
             return true;
@@ -1901,7 +1904,7 @@ private:
         }
 
       TMSignal m15Signal;
-      if(m_indicatorManager.GetTraderMagicSignal(PERIOD_M15,m15Signal) && m15Signal.isValid)
+  if(m_indicatorManager->GetTraderMagicSignal(PERIOD_M15,m15Signal) && m15Signal.isValid)
         {
          if(trade.direction == TRADE_DIRECTION_BUY && m15Signal.direction == TRADE_DIRECTION_SELL)
             return true;
@@ -1909,8 +1912,8 @@ private:
             return true;
         }
 
-      ASSET_CLASS asset = m_assetManager.ClassifyAsset(trade.symbol);
-      if(!m_hoursManager.IsValidTradingTime(asset))
+  ASSET_CLASS asset = (m_assetManager != NULL) ? m_assetManager->ClassifyAsset(trade.symbol) : ASSET_CLASS_UNKNOWN;
+  if(m_hoursManager == NULL || !m_hoursManager->IsValidTradingTime(asset))
          return true;
 
       MqlDateTime dt;
@@ -2048,18 +2051,23 @@ void SetupGlobalObjects()
    statistics       = new CStatistics();
    protectionSystem = new CProtectionSystem();
 
-   tfAnalyzer.Attach(indicatorManager,assetManager);
-   setupScorer.Attach(indicatorManager,assetManager);
-   riskManager.Attach(assetManager);
-   tradeManager.Attach(assetManager,indicatorManager,hoursManager,statistics);
-   protectionSystem.Attach(assetManager,hoursManager);
+  if(tfAnalyzer != NULL)
+    tfAnalyzer->Attach(indicatorManager,assetManager);
+  if(setupScorer != NULL)
+    setupScorer->Attach(indicatorManager,assetManager);
+  if(riskManager != NULL)
+    riskManager->Attach(assetManager);
+  if(tradeManager != NULL)
+    tradeManager->Attach(assetManager,indicatorManager,hoursManager,statistics);
+  if(protectionSystem != NULL)
+    protectionSystem->Attach(assetManager,hoursManager);
   }
 
 void DestroyGlobalObjects()
   {
    if(indicatorManager != NULL)
      {
-      indicatorManager.Release();
+      indicatorManager->Release();
       delete indicatorManager;
       indicatorManager = NULL;
      }
@@ -2123,14 +2131,19 @@ int OnInit()
 
    SetupGlobalObjects();
 
-   if(!indicatorManager.Initialize(_Symbol))
+  if(indicatorManager == NULL || !indicatorManager->Initialize(_Symbol))
      {
       Print("Falha ao inicializar indicadores");
       return INIT_FAILED;
      }
 
-   ASSET_CLASS currentAsset = assetManager.ClassifyAsset(_Symbol);
-   if(!assetManager.IsAssetSupported(currentAsset))
+   if(assetManager == NULL)
+     {
+      Print("Asset manager não disponível");
+      return INIT_FAILED;
+     }
+   ASSET_CLASS currentAsset = assetManager->ClassifyAsset(_Symbol);
+   if(!assetManager->IsAssetSupported(currentAsset))
      {
       Print("Ativo não suportado");
       return INIT_FAILED;
@@ -2161,8 +2174,8 @@ void OnTimer()
    TimeToStruct(now,dt);
    if(g_lastReportMonth != dt.mon)
      {
-      if(statistics != NULL)
-         statistics.GenerateMonthlyReport();
+    if(statistics != NULL)
+      statistics->GenerateMonthlyReport();
       g_lastReportMonth = dt.mon;
      }
 
@@ -2177,47 +2190,51 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
      {
       ulong dealTicket = trans.deal;
       if(HistoryDealGetInteger(dealTicket,DEAL_MAGIC) == EA_MAGIC_NUMBER && HistoryDealGetInteger(dealTicket,DEAL_ENTRY) == DEAL_ENTRY_OUT)
-         statistics.RecordClosedDeal(dealTicket);
+         statistics->RecordClosedDeal(dealTicket);
      }
   }
 
 void ProcessNewSetup(const ASSET_CLASS assetClass)
   {
-   MultiTFResult mtf = tfAnalyzer.Analyze(_Symbol,assetClass);
-   if(!mtf.isValid)
-      return;
+  if(tfAnalyzer == NULL || setupScorer == NULL || protectionSystem == NULL || riskManager == NULL || tradeManager == NULL)
+    return;
 
-   SetupScore score = setupScorer.Evaluate(_Symbol,assetClass,mtf.direction);
-   if(score.classification == SETUP_REJECT)
-      return;
+  MultiTFResult mtf = tfAnalyzer->Analyze(_Symbol,assetClass);
+  if(!mtf.isValid)
+    return;
 
-   if(!protectionSystem.ValidateMarketConditions(_Symbol,assetClass))
-      return;
+  SetupScore score = setupScorer->Evaluate(_Symbol,assetClass,mtf.direction);
+  if(score.classification == SETUP_REJECT)
+    return;
 
-   RiskCalculation risk = riskManager.Calculate(_Symbol,score,assetClass);
-   if(!risk.isValid)
-     {
-      if(risk.errorMessage != "")
-         Print("[RiskManager] ",risk.errorMessage);
-      return;
-     }
+  if(!protectionSystem->ValidateMarketConditions(_Symbol,assetClass))
+    return;
 
-   tradeManager.ExecuteTrade(_Symbol,risk,assetClass);
+  RiskCalculation risk = riskManager->Calculate(_Symbol,score,assetClass);
+  if(!risk.isValid)
+    {
+    if(risk.errorMessage != "")
+      Print("[RiskManager] ",risk.errorMessage);
+    return;
+    }
+
+  tradeManager->ExecuteTrade(_Symbol,risk,assetClass);
   }
 
-int OnTick()
+void OnTick()
   {
-   if(assetManager == NULL || protectionSystem == NULL)
-      return 0;
+  if(assetManager == NULL || protectionSystem == NULL)
+    return;
 
-   ASSET_CLASS assetClass = assetManager.ClassifyAsset(_Symbol);
-   if(!protectionSystem.ValidateBasicConditions(assetClass))
-     {
-      tradeManager.ManageOpenTrades();
-      return 0;
-     }
+  ASSET_CLASS assetClass = assetManager->ClassifyAsset(_Symbol);
+  if(!protectionSystem->ValidateBasicConditions(assetClass))
+    {
+    if(tradeManager != NULL)
+      tradeManager->ManageOpenTrades();
+    return;
+    }
 
-   ProcessNewSetup(assetClass);
-   tradeManager.ManageOpenTrades();
-   return 0;
+  ProcessNewSetup(assetClass);
+  if(tradeManager != NULL)
+    tradeManager->ManageOpenTrades();
   }

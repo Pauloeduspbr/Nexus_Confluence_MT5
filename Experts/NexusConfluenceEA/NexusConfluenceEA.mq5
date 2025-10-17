@@ -622,9 +622,10 @@ public:
       m_symbol = symbol;
       string path = ComposeIndicatorPath(GGTrendBarIndicator);
       
-      // GG_TrendBar é aplicado no gráfico atual (PERIOD_CURRENT)
-      // mas fornece dados de todos os timeframes internamente
-      m_handle = iCustom(symbol, PERIOD_CURRENT, path, 
+      // IMPORTANTE: Usar PERIOD_M1 em vez de PERIOD_CURRENT
+      // Isso evita que o indicador crie objetos visuais no gráfico atual
+      // O indicador só cria objetos quando está no timeframe do gráfico
+      m_handle = iCustom(symbol, PERIOD_M1, path, 
                          GG_ADX_Period, GG_ADX_Price, 
                          GG_Step_Psar, GG_Max_Psar);
                          
@@ -636,7 +637,7 @@ public:
         }
         
       m_initialized = true;
-      Print("[GG_TrendBar] Inicializado com sucesso");
+      Print("[GG_TrendBar] Inicializado com sucesso (dados de M1, sem objetos visuais)");
       return true;
      }
 
@@ -912,32 +913,111 @@ public:
       Print("[VisualManager] Objetos visuais removidos");
      }
 
-   // NOTA: Indicadores devem ser adicionados MANUALMENTE pelo usuário
-   // ChartIndicatorAdd não funciona corretamente com iCustom em EAs
-   // Os objetos visuais do GG_TrendBar são criados pelo EA
-   void ShowIndicatorInstructions()
+   // Anexar indicadores ao gráfico usando abordagem correta
+   bool AttachIndicatorsToChart()
      {
+      long chartID = ChartID();
+      bool allSuccess = true;
+      
       Print("============================================================");
-      Print("INSTRUÇÕES PARA ADICIONAR INDICADORES MANUALMENTE:");
+      Print("[VisualManager] Iniciando anexação de indicadores...");
       Print("============================================================");
-      Print("1. SUPERTREND (TrendMagic):");
-      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > TrendMagic_MT5");
-      Print("   - CCI Period: ", TM_CCI_Period);
-      Print("   - ATR Period: ", TM_ATR_Period);
-      Print("   - ATR Multiplier: ", TM_ATR_Multiplier);
-      Print("");
-      Print("2. RSI OMA:");
-      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > RSIOMA_v2HHLSX_MT5");
-      Print("   - RSI Period: ", RSI_Period);
-      Print("   - MA Period: ", RSI_MA_Period);
-      Print("");
-      Print("3. WAE:");
-      Print("   - Inserir > Indicadores > Personalizado > NexusConfluenceEA > WaddahAttarExplosion_Professional");
-      Print("   - Fast MA: ", WAE_FastMA);
-      Print("   - Slow MA: ", WAE_SlowMA);
-      Print("");
-      Print("4. GG_TrendBar JÁ ESTÁ VISÍVEL no canto superior direito");
+      
+      // 1. SUPERTREND - Gráfico Principal (Window 0)
+      string superTrendPath = "NexusConfluenceEA\\" + TrendMagicIndicator;
+      Print("[VisualManager] Tentando anexar SuperTrend: ", superTrendPath);
+      
+      // Criar handle temporário para o indicador
+      int tempHandle = iCustom(_Symbol, PERIOD_CURRENT, superTrendPath, 
+                               TM_CCI_Period, TM_ATR_Period, TM_ATR_Multiplier);
+      
+      if(tempHandle != INVALID_HANDLE)
+        {
+         // Tentar adicionar ao gráfico principal
+         int window = ChartIndicatorAdd(chartID, 0, tempHandle);
+         if(window >= 0)
+           {
+            Print("[VisualManager] ✅ SuperTrend anexado ao gráfico principal");
+           }
+         else
+           {
+            Print("[VisualManager] ❌ Erro ao anexar SuperTrend: ", GetLastError());
+            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", superTrendPath);
+            allSuccess = false;
+           }
+        }
+      else
+        {
+         Print("[VisualManager] ❌ Erro ao criar handle SuperTrend: ", GetLastError());
+         allSuccess = false;
+        }
+      
+      // 2. RSI OMA - Subjanela Nova
+      string rsiPath = "NexusConfluenceEA\\" + RSIOMAIndicator;
+      Print("[VisualManager] Tentando anexar RSI OMA: ", rsiPath);
+      
+      tempHandle = iCustom(_Symbol, PERIOD_CURRENT, rsiPath,
+                          RSI_Period, RSI_MA_Period, RSI_MA_Method, 
+                          RSI_HighLevel, RSI_LowLevel, RSI_ShowLevels);
+      
+      if(tempHandle != INVALID_HANDLE)
+        {
+         int window = ChartIndicatorAdd(chartID, -1, tempHandle);
+         if(window >= 0)
+           {
+            Print("[VisualManager] ✅ RSI OMA anexado em subjanela ", window);
+           }
+         else
+           {
+            Print("[VisualManager] ❌ Erro ao anexar RSI OMA: ", GetLastError());
+            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", rsiPath);
+            allSuccess = false;
+           }
+        }
+      else
+        {
+         Print("[VisualManager] ❌ Erro ao criar handle RSI OMA: ", GetLastError());
+         allSuccess = false;
+        }
+      
+      // 3. WAE - Subjanela Nova
+      string waePath = "NexusConfluenceEA\\" + WAEIndicator;
+      Print("[VisualManager] Tentando anexar WAE: ", waePath);
+      
+      tempHandle = iCustom(_Symbol, PERIOD_CURRENT, waePath,
+                          WAE_FastMA, WAE_SlowMA, WAE_BBLength, 
+                          WAE_BBMultiplier, WAE_Sensitivity);
+      
+      if(tempHandle != INVALID_HANDLE)
+        {
+         int window = ChartIndicatorAdd(chartID, -1, tempHandle);
+         if(window >= 0)
+           {
+            Print("[VisualManager] ✅ WAE anexado em subjanela ", window);
+           }
+         else
+           {
+            Print("[VisualManager] ❌ Erro ao anexar WAE: ", GetLastError());
+            Print("[VisualManager] SOLUÇÃO: Adicione manualmente - Inserir > Indicadores > Personalizado > ", waePath);
+            allSuccess = false;
+           }
+        }
+      else
+        {
+         Print("[VisualManager] ❌ Erro ao criar handle WAE: ", GetLastError());
+         allSuccess = false;
+        }
+      
+      ChartRedraw(chartID);
+      
       Print("============================================================");
+      if(allSuccess)
+         Print("[VisualManager] ✅ TODOS os indicadores anexados com sucesso!");
+      else
+         Print("[VisualManager] ⚠️ Alguns indicadores precisam ser adicionados manualmente");
+      Print("============================================================");
+      
+      return allSuccess;
      }
   };
 
@@ -1332,11 +1412,26 @@ public:
       ok = m_rsi.Initialize(symbol) && ok;
       ok = m_wae.Initialize(symbol) && ok;
       
-      // Criar apenas objetos visuais do GG_TrendBar
+      if(!ok)
+        {
+         Print("[CIndicatorManager] Erro ao inicializar indicadores base");
+         return false;
+        }
+      
+      // PRIMEIRO: Deletar objetos duplicados do GG_TrendBar
+      m_visualManager.DeleteOriginalIndicatorObjects();
+      
+      // SEGUNDO: Criar objetos visuais do GG_TrendBar (EA gerencia)
       m_visualManager.CreateGGTrendBarVisuals();
       
-      // Mostrar instruções para adicionar outros indicadores manualmente
-      m_visualManager.ShowIndicatorInstructions();
+      // TERCEIRO: Anexar outros indicadores ao gráfico
+      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart();
+      
+      if(!indicatorsAttached)
+        {
+         Print("[CIndicatorManager] ⚠️ Atenção: Alguns indicadores não foram anexados automaticamente");
+         Print("[CIndicatorManager] Verifique os logs acima para instruções manuais");
+        }
       
       return ok;
      }

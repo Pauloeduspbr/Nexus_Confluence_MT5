@@ -730,6 +730,192 @@ public:
      }
   };
 
+//+------------------------------------------------------------------+
+//| Classe para gerenciar objetos visuais do GG_TrendBar             |
+//+------------------------------------------------------------------+
+class CVisualManager
+  {
+private:
+   string m_timeframes[9];
+   color  m_upColor;
+   color  m_downColor;
+   color  m_flatColor;
+   int    m_corner;
+
+public:
+   CVisualManager()
+     {
+      // Inicializar timeframes
+      m_timeframes[0] = "M1";
+      m_timeframes[1] = "M5";
+      m_timeframes[2] = "M15";
+      m_timeframes[3] = "M30";
+      m_timeframes[4] = "H1";
+      m_timeframes[5] = "H4";
+      m_timeframes[6] = "D1";
+      m_timeframes[7] = "W1";
+      m_timeframes[8] = "MN1";
+      
+      // Cores padrão (podem ser configuradas)
+      m_upColor = clrLime;
+      m_downColor = clrRed;
+      m_flatColor = clrYellow;
+      m_corner = CORNER_RIGHT_UPPER;
+     }
+
+   // Criar objetos visuais do GG_TrendBar
+   void CreateGGTrendBarVisuals()
+     {
+      // Criar headers dos timeframes
+      for(int i = 0; i < 9; i++)
+        {
+         string label_name = "EA_TF_" + m_timeframes[i];
+         
+         if(ObjectFind(0, label_name) >= 0)
+            ObjectDelete(0, label_name);
+         
+         if(ObjectCreate(0, label_name, OBJ_LABEL, 0, 0, 0))
+           {
+            ObjectSetInteger(0, label_name, OBJPROP_CORNER, m_corner);
+            ObjectSetInteger(0, label_name, OBJPROP_XDISTANCE, i * 40 + 15);
+            ObjectSetInteger(0, label_name, OBJPROP_YDISTANCE, 20);
+            ObjectSetInteger(0, label_name, OBJPROP_BACK, false);
+            ObjectSetInteger(0, label_name, OBJPROP_SELECTABLE, false);
+            ObjectSetInteger(0, label_name, OBJPROP_HIDDEN, false);
+            ObjectSetString(0, label_name, OBJPROP_TEXT, m_timeframes[i]);
+            ObjectSetString(0, label_name, OBJPROP_FONT, "Tahoma");
+            ObjectSetInteger(0, label_name, OBJPROP_FONTSIZE, 8);
+            ObjectSetInteger(0, label_name, OBJPROP_COLOR, clrWhite);
+           }
+        }
+      
+      // Criar indicadores (quadrados coloridos)
+      for(int i = 0; i < 9; i++)
+        {
+         string ind_name = "EA_Ind_" + IntegerToString(i);
+         
+         if(ObjectFind(0, ind_name) >= 0)
+            ObjectDelete(0, ind_name);
+         
+         if(ObjectCreate(0, ind_name, OBJ_LABEL, 0, 0, 0))
+           {
+            ObjectSetInteger(0, ind_name, OBJPROP_CORNER, m_corner);
+            ObjectSetInteger(0, ind_name, OBJPROP_XDISTANCE, i * 40 + 15);
+            ObjectSetInteger(0, ind_name, OBJPROP_YDISTANCE, 35);
+            ObjectSetInteger(0, ind_name, OBJPROP_BACK, false);
+            ObjectSetInteger(0, ind_name, OBJPROP_SELECTABLE, false);
+            ObjectSetInteger(0, ind_name, OBJPROP_HIDDEN, false);
+            ObjectSetString(0, ind_name, OBJPROP_TEXT, "n"); // Wingdings 'n' = quadrado
+            ObjectSetString(0, ind_name, OBJPROP_FONT, "Wingdings");
+            ObjectSetInteger(0, ind_name, OBJPROP_FONTSIZE, 12);
+            ObjectSetInteger(0, ind_name, OBJPROP_COLOR, m_flatColor); // Inicialmente amarelo
+           }
+        }
+      
+      ChartRedraw(0);
+      Print("[VisualManager] GG_TrendBar objetos visuais criados");
+     }
+
+   // Atualizar cores dos indicadores com base nos valores
+   void UpdateGGTrendBarColors(const GGTrendBarSignal &signal)
+     {
+      if(!signal.isValid)
+         return;
+      
+      int values[9];
+      values[0] = signal.m1Value;
+      values[1] = signal.m5Value;
+      values[2] = signal.m15Value;
+      values[3] = signal.m30Value;
+      values[4] = signal.h1Value;
+      values[5] = signal.h4Value;
+      values[6] = signal.d1Value;
+      values[7] = signal.w1Value;
+      values[8] = signal.mn1Value;
+      
+      for(int i = 0; i < 9; i++)
+        {
+         string ind_name = "EA_Ind_" + IntegerToString(i);
+         
+         if(ObjectFind(0, ind_name) >= 0)
+           {
+            color trend_color = m_flatColor;
+            
+            if(values[i] == 1)
+               trend_color = m_upColor;    // Verde - bullish
+            else if(values[i] == -1)
+               trend_color = m_downColor;  // Vermelho - bearish
+            else
+               trend_color = m_flatColor;  // Amarelo - neutro
+            
+            ObjectSetInteger(0, ind_name, OBJPROP_COLOR, trend_color);
+           }
+        }
+      
+      ChartRedraw(0);
+     }
+
+   // Remover todos os objetos visuais
+   void RemoveAllVisuals()
+     {
+      // Remover headers
+      for(int i = 0; i < 9; i++)
+        {
+         string label_name = "EA_TF_" + m_timeframes[i];
+         if(ObjectFind(0, label_name) >= 0)
+            ObjectDelete(0, label_name);
+        }
+      
+      // Remover indicadores
+      for(int i = 0; i < 9; i++)
+        {
+         string ind_name = "EA_Ind_" + IntegerToString(i);
+         if(ObjectFind(0, ind_name) >= 0)
+            ObjectDelete(0, ind_name);
+        }
+      
+      ChartRedraw(0);
+      Print("[VisualManager] Objetos visuais removidos");
+     }
+
+   // Adicionar indicadores ao gráfico (via ChartIndicatorAdd)
+   void AttachIndicatorsToChart()
+     {
+      long chartID = ChartID();
+      
+      // Adicionar SuperTrend ao gráfico principal (subwindow 0)
+      string superTrendPath = ComposeIndicatorPath(TrendMagicIndicator);
+      int superTrendWindow = ChartIndicatorAdd(chartID, 0, iCustom(_Symbol, PERIOD_CURRENT, superTrendPath, 
+                                               TM_CCI_Period, TM_ATR_Period, TM_ATR_Multiplier));
+      if(superTrendWindow >= 0)
+         Print("[VisualManager] SuperTrend anexado ao gráfico principal");
+      else
+         Print("[VisualManager] Erro ao anexar SuperTrend: ", GetLastError());
+      
+      // Adicionar RSI OMA em subjanela
+      string rsiPath = ComposeIndicatorPath(RSIOMAIndicator);
+      int rsiWindow = ChartIndicatorAdd(chartID, -1, iCustom(_Symbol, PERIOD_CURRENT, rsiPath,
+                                        RSI_Period, RSI_MA_Period, RSI_MA_Method, 
+                                        RSI_HighLevel, RSI_LowLevel, RSI_ShowLevels));
+      if(rsiWindow >= 0)
+         Print("[VisualManager] RSI OMA anexado em subjanela ", rsiWindow);
+      else
+         Print("[VisualManager] Erro ao anexar RSI OMA: ", GetLastError());
+      
+      // Adicionar WAE em subjanela
+      string waePath = ComposeIndicatorPath(WAEIndicator);
+      int waeWindow = ChartIndicatorAdd(chartID, -1, iCustom(_Symbol, PERIOD_CURRENT, waePath,
+                                        WAE_FastMA, WAE_SlowMA, WAE_BBLength, 
+                                        WAE_BBMultiplier, WAE_Sensitivity));
+      if(waeWindow >= 0)
+         Print("[VisualManager] WAE anexado em subjanela ", waeWindow);
+      else
+         Print("[VisualManager] Erro ao anexar WAE: ", GetLastError());
+      
+      ChartRedraw(chartID);
+     }
+  };
+
 class CTraderMagic
   {
 private:
@@ -1108,6 +1294,7 @@ private:
    CCurrencyStrength m_currencyStrength;
    CRSIOMA          m_rsi;
    CWAE             m_wae;
+   CVisualManager   m_visualManager;
 
 public:
    bool Initialize(const string symbol)
@@ -1119,6 +1306,13 @@ public:
       ok = m_currencyStrength.Initialize(symbol) && ok;
       ok = m_rsi.Initialize(symbol) && ok;
       ok = m_wae.Initialize(symbol) && ok;
+      
+      // Criar objetos visuais do GG_TrendBar
+      m_visualManager.CreateGGTrendBarVisuals();
+      
+      // Anexar indicadores ao gráfico
+      m_visualManager.AttachIndicatorsToChart();
+      
       return ok;
      }
 
@@ -1129,6 +1323,15 @@ public:
       m_currencyStrength.Release();
       m_rsi.Release();
       m_wae.Release();
+      
+      // Remover objetos visuais
+      m_visualManager.RemoveAllVisuals();
+     }
+   
+   // Atualizar visualização do GG_TrendBar
+   void UpdateVisuals(const GGTrendBarSignal &signal)
+     {
+      m_visualManager.UpdateGGTrendBarColors(signal);
      }
 
    bool GetGGTrendBarSignal(GGTrendBarSignal &signal) const
@@ -2361,6 +2564,16 @@ void OnTick()
   {
   if(assetManager == NULL || protectionSystem == NULL)
     return;
+
+  // Atualizar visualização do GG_TrendBar
+  if(indicatorManager != NULL)
+    {
+    GGTrendBarSignal ggSignal;
+    if((*indicatorManager).GetGGTrendBarSignal(ggSignal) && ggSignal.isValid)
+      {
+      (*indicatorManager).UpdateVisuals(ggSignal);
+      }
+    }
 
   ASSET_CLASS assetClass = (*assetManager).ClassifyAsset(_Symbol);
   if(!(*protectionSystem).ValidateBasicConditions(assetClass))

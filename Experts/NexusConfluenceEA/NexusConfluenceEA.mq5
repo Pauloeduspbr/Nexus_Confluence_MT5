@@ -64,8 +64,15 @@ input int    WAE_BBLength             = 20;
 input double WAE_BBMultiplier         = 2.0;
 input int    WAE_Sensitivity          = 150;
 
+input group "=== GG TRENDBAR - PARÂMETROS ==="
+input int    GG_ADX_Period            = 14;           // ADX period
+input ENUM_APPLIED_PRICE GG_ADX_Price = PRICE_CLOSE;  // Price for PSAR comparison
+input double GG_Step_Psar             = 0.02;         // PSAR step
+input double GG_Max_Psar              = 0.20;         // PSAR maximum
+
 input group "=== INDICADORES - NOMES DOS ARQUIVOS ==="
 input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // Pasta relativa em MQL5/Indicators
+input string GGTrendBarIndicator      = "GG_TrendBar_Indicator";
 input string TrendMagicIndicator      = "TrendMagic_MT5";
 input string CurrencyStrengthIndicator= "CurrencyStrengthMeter_MT5";
 input string RSIOMAIndicator          = "RSIOMA_v2HHLSX_MT5";
@@ -132,6 +139,25 @@ struct WAESignal
    bool  isAligned;
    bool  isExpanding;
    double strength;
+  };
+
+struct GGTrendBarSignal
+  {
+   bool            isValid;
+   int             m1Value;      // +1 bullish, 0 neutral, -1 bearish
+   int             m5Value;
+   int             m15Value;
+   int             m30Value;
+   int             h1Value;
+   int             h4Value;
+   int             d1Value;
+   int             w1Value;
+   int             mn1Value;
+   bool            h4Bullish;
+   bool            h1Bullish;
+   bool            m30Bullish;
+   bool            m15Bullish;
+   TRADE_DIRECTION overallDirection;
   };
 
 struct MultiTFResult
@@ -580,6 +606,130 @@ private:
   };
 
 //--- Classes de indicadores específicos
+//--- GG TrendBar - Indicador Multi-Timeframe Principal
+class CGGTrendBar
+  {
+private:
+   int      m_handle;
+   string   m_symbol;
+   bool     m_initialized;
+
+public:
+   CGGTrendBar():m_initialized(false),m_handle(INVALID_HANDLE){}
+
+   bool Initialize(const string symbol)
+     {
+      m_symbol = symbol;
+      string path = ComposeIndicatorPath(GGTrendBarIndicator);
+      
+      // GG_TrendBar é aplicado no gráfico atual (PERIOD_CURRENT)
+      // mas fornece dados de todos os timeframes internamente
+      m_handle = iCustom(symbol, PERIOD_CURRENT, path, 
+                         GG_ADX_Period, GG_ADX_Price, 
+                         GG_Step_Psar, GG_Max_Psar);
+                         
+      if(m_handle == INVALID_HANDLE)
+        {
+         Print("[GG_TrendBar] Falha ao criar handle");
+         m_initialized = false;
+         return false;
+        }
+        
+      m_initialized = true;
+      Print("[GG_TrendBar] Inicializado com sucesso");
+      return true;
+     }
+
+   void Release()
+     {
+      if(m_handle != INVALID_HANDLE)
+         IndicatorRelease(m_handle);
+      m_initialized = false;
+     }
+
+   bool GetSignal(GGTrendBarSignal &signal) const
+     {
+      signal.isValid = false;
+      
+      if(m_handle == INVALID_HANDLE)
+         return false;
+
+      // Buffers do GG_TrendBar:
+      // 0=M1, 1=M5, 2=M15, 3=M30, 4=H1, 5=H4, 6=D1, 7=W1, 8=MN1
+      // Valores: +1 (bullish), 0 (neutral), -1 (bearish)
+      
+      double m1[1], m5[1], m15[1], m30[1], h1[1], h4[1], d1[1], w1[1], mn1[1];
+      
+      // Copiar valores de todos os timeframes
+      if(CopyBuffer(m_handle, 0, 0, 1, m1) != 1 ||
+         CopyBuffer(m_handle, 1, 0, 1, m5) != 1 ||
+         CopyBuffer(m_handle, 2, 0, 1, m15) != 1 ||
+         CopyBuffer(m_handle, 3, 0, 1, m30) != 1 ||
+         CopyBuffer(m_handle, 4, 0, 1, h1) != 1 ||
+         CopyBuffer(m_handle, 5, 0, 1, h4) != 1 ||
+         CopyBuffer(m_handle, 6, 0, 1, d1) != 1 ||
+         CopyBuffer(m_handle, 7, 0, 1, w1) != 1 ||
+         CopyBuffer(m_handle, 8, 0, 1, mn1) != 1)
+        {
+         Print("[GG_TrendBar] Erro ao copiar buffers");
+         return false;
+        }
+
+      // Preencher estrutura de sinal
+      signal.m1Value  = (int)m1[0];
+      signal.m5Value  = (int)m5[0];
+      signal.m15Value = (int)m15[0];
+      signal.m30Value = (int)m30[0];
+      signal.h1Value  = (int)h1[0];
+      signal.h4Value  = (int)h4[0];
+      signal.d1Value  = (int)d1[0];
+      signal.w1Value  = (int)w1[0];
+      signal.mn1Value = (int)mn1[0];
+
+      // Determinar direção booleana para timeframes principais
+      signal.h4Bullish  = (signal.h4Value == 1);
+      signal.h1Bullish  = (signal.h1Value == 1);
+      signal.m30Bullish = (signal.m30Value == 1);
+      signal.m15Bullish = (signal.m15Value == 1);
+
+      // Determinar direção geral (baseada em H4 como diretor)
+      if(signal.h4Value == 1)
+         signal.overallDirection = TRADE_DIRECTION_BUY;
+      else if(signal.h4Value == -1)
+         signal.overallDirection = TRADE_DIRECTION_SELL;
+      else
+         signal.overallDirection = TRADE_DIRECTION_NONE;
+
+      signal.isValid = true;
+      return true;
+     }
+
+   // Verificar alinhamento multi-timeframe (H4 + H1 obrigatório)
+   bool IsMultiTFAligned(const GGTrendBarSignal &signal, bool &isPremium) const
+     {
+      isPremium = false;
+      
+      if(!signal.isValid)
+         return false;
+
+      // H4 e H1 devem estar alinhados (mesma direção não-neutra)
+      if(signal.h4Value == 0 || signal.h1Value == 0)
+         return false; // Neutro = aguardar
+         
+      if(signal.h4Value != signal.h1Value)
+         return false; // Cores opostas = rejeitado
+
+      // Setup BOM: H4 + H1 alinhados
+      bool goodSetup = true;
+      
+      // Setup PREMIUM: H4 + H1 + M30 alinhados
+      if(signal.m30Value == signal.h4Value)
+         isPremium = true;
+
+      return goodSetup;
+     }
+  };
+
 class CTraderMagic
   {
 private:
@@ -953,6 +1103,7 @@ class CIndicatorManager
   {
 private:
    string           m_symbol;
+   CGGTrendBar      m_ggTrendBar;
    CTraderMagic     m_traderMagic;
    CCurrencyStrength m_currencyStrength;
    CRSIOMA          m_rsi;
@@ -963,7 +1114,8 @@ public:
      {
       m_symbol = symbol;
 
-      bool ok = m_traderMagic.Initialize(symbol);
+      bool ok = m_ggTrendBar.Initialize(symbol);
+      ok = m_traderMagic.Initialize(symbol) && ok;
       ok = m_currencyStrength.Initialize(symbol) && ok;
       ok = m_rsi.Initialize(symbol) && ok;
       ok = m_wae.Initialize(symbol) && ok;
@@ -972,10 +1124,21 @@ public:
 
    void Release()
      {
+      m_ggTrendBar.Release();
       m_traderMagic.Release();
       m_currencyStrength.Release();
       m_rsi.Release();
       m_wae.Release();
+     }
+
+   bool GetGGTrendBarSignal(GGTrendBarSignal &signal) const
+     {
+      return m_ggTrendBar.GetSignal(signal);
+     }
+
+   bool IsMultiTFAligned(const GGTrendBarSignal &signal, bool &isPremium) const
+     {
+      return m_ggTrendBar.IsMultiTFAligned(signal, isPremium);
      }
 
    bool GetTraderMagicSignal(const ENUM_TIMEFRAMES timeframe,TMSignal &signal) const
@@ -1025,30 +1188,42 @@ public:
       if(m_indicatorManager == NULL)
          return result;
 
-      TMSignal h4Signal, h1Signal, m30Signal, m15Signal;
-    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_H4,h4Signal))
+      // USAR GG_TrendBar como fonte principal de análise multi-timeframe
+      GGTrendBarSignal ggSignal;
+      if(!(*m_indicatorManager).GetGGTrendBarSignal(ggSignal))
+        {
+         Print("[MTF] Erro ao obter sinal GG_TrendBar");
          return result;
-    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_H1,h1Signal))
-         return result;
-    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_M30,m30Signal))
-         return result;
-    if(!(*m_indicatorManager).GetTraderMagicSignal(PERIOD_M15,m15Signal))
-         return result;
+        }
 
-      if(!h4Signal.isValid || !h1Signal.isValid || !m15Signal.isValid)
+      if(!ggSignal.isValid)
+        {
+         Print("[MTF] GG_TrendBar sinal inválido");
          return result;
+        }
 
-      if(h4Signal.direction != h1Signal.direction)
+      // Verificar alinhamento H4 + H1 (obrigatório)
+      bool isPremium = false;
+      if(!(*m_indicatorManager).IsMultiTFAligned(ggSignal, isPremium))
+        {
+         Print("[MTF] Timeframes não alinhados - H4:", ggSignal.h4Value, " H1:", ggSignal.h1Value);
          return result;
+        }
 
-      bool m30Aligned = (m30Signal.isValid && m30Signal.direction == h4Signal.direction);
-      result.direction = h4Signal.direction;
+      // Definir direção baseada no H4 (timeframe diretor)
+      result.direction = ggSignal.overallDirection;
       result.h4Aligned = true;
       result.h1Aligned = true;
-      result.m30Aligned = m30Aligned;
+      result.m30Aligned = isPremium; // M30 alinhado = setup premium
 
-      result.structureValid = ValidateStructure(symbol,h4Signal.direction);
+      Print("[MTF] Alinhamento confirmado - Dir:", result.direction, 
+            " H4:", ggSignal.h4Value, " H1:", ggSignal.h1Value, 
+            " M30:", ggSignal.m30Value, " Premium:", isPremium);
+
+      // Validar estrutura de preços no H4
+      result.structureValid = ValidateStructure(symbol, result.direction);
       result.isValid = result.structureValid;
+      
       return result;
      }
 

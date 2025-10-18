@@ -1,0 +1,961 @@
+//+------------------------------------------------------------------+
+//| Estrategias.mqh                                                  |
+//| Nexus Confluence EA v4.1 - Sistema Multi-Timeframe Universal     |
+//|                                                                   |
+//| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
+//|                                                                   |
+//| FUNÇÕES PRINCIPAIS:                                              |
+//|   - DefineMultiTimeframes(): Define TFs macro conforme TF oper   |
+//|   - AnalyzeMultiTimeframeAlignment(): Valida alinhamento macro   |
+//|   - AnalyzeMicroFilters(): Analisa filtros e pontua setup        |
+//|   - GetTrendMagicSignal(): Lê sinal Trend Magic                  |
+//|   - GetCurrencyStrengthSignal(): Lê força de moedas             |
+//|   - GetRSIOMASignal(): Lê RSI OMA                               |
+//|   - GetWAESignal(): Lê WAE                                      |
+//|   - GetGGTrendBarSignal(): Lê GG TrendBar                       |
+//|   - CalculateSetupScore(): Pontua e classifica setup            |
+//|                                                                   |
+//| DEPENDÊNCIAS:                                                    |
+//|   - Parametros.mqh (enums, structs, inputs)                     |
+//|                                                                   |
+//| AUTOR: GitHub Copilot + Desenvolvedor                            |
+//| DATA: Outubro 2025                                               |
+//| VERSÃO: 4.1 - Multi-Timeframe                                    |
+//+------------------------------------------------------------------+
+#property copyright "Nexus Confluence EA v4.1"
+#property version   "4.10"
+#property strict
+
+// Incluir primeiro o arquivo de parâmetros
+#include "Parametros.mqh"
+
+//+------------------------------------------------------------------+
+//| VARIÁVEIS GLOBAIS DO MÓDULO ESTRATÉGIAS                          |
+//+------------------------------------------------------------------+
+
+// Timeframes macro definidos dinamicamente
+ENUM_TIMEFRAMES g_tfMacro1       = PERIOD_H4;   // MACRO-1 (mais longo)
+ENUM_TIMEFRAMES g_tfMacro2       = PERIOD_H1;   // MACRO-2 (intermediário)
+ENUM_TIMEFRAMES g_tfMacro3       = PERIOD_M30;  // MACRO-3 (curto) - pode ser PERIOD_CURRENT se não aplicável
+ENUM_TIMEFRAMES g_tfOperacional  = PERIOD_M15;  // OPERACIONAL (atual do gráfico)
+int             g_numNiveisMacro = 3;           // 2 ou 3 níveis macro
+
+// Handles dos indicadores (preenchidos em InitializeIndicators)
+IndicatorHandles g_handles;
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: DefineMultiTimeframes                                    |
+//| Define os timeframes macro conforme o TF operacional do gráfico |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - tfOper: Timeframe atual do gráfico (Period())               |
+//|   - tfM1: (output) Timeframe MACRO-1 definido                   |
+//|   - tfM2: (output) Timeframe MACRO-2 definido                   |
+//|   - tfM3: (output) Timeframe MACRO-3 definido                   |
+//|   - numNiveisMacro: (output) 2 ou 3 níveis macro                |
+//|                                                                  |
+//| RETORNO: void (modifica variáveis por referência)               |
+//+------------------------------------------------------------------+
+void DefineMultiTimeframes(ENUM_TIMEFRAMES tfOper,
+                           ENUM_TIMEFRAMES &tfM1,
+                           ENUM_TIMEFRAMES &tfM2,
+                           ENUM_TIMEFRAMES &tfM3,
+                           int &numNiveisMacro)
+{
+   // Switch baseado no timeframe operacional
+   switch(tfOper)
+   {
+      case PERIOD_M1:
+         // M1 → MACRO-1: M30, MACRO-2: M15, MACRO-3: M5
+         tfM1 = PERIOD_M30;
+         tfM2 = PERIOD_M15;
+         tfM3 = PERIOD_M5;
+         numNiveisMacro = 3;
+         PrintFormat("🎯 TF Detectado: M1 → Macro: M30/M15/M5 (3 níveis)");
+         break;
+         
+      case PERIOD_M5:
+         // M5 → MACRO-1: H1, MACRO-2: M30, MACRO-3: M15
+         tfM1 = PERIOD_H1;
+         tfM2 = PERIOD_M30;
+         tfM3 = PERIOD_M15;
+         numNiveisMacro = 3;
+         PrintFormat("🎯 TF Detectado: M5 → Macro: H1/M30/M15 (3 níveis)");
+         break;
+         
+      case PERIOD_M15:
+         // M15 → MACRO-1: H4, MACRO-2: H1, MACRO-3: M30 (SISTEMA ORIGINAL)
+         tfM1 = PERIOD_H4;
+         tfM2 = PERIOD_H1;
+         tfM3 = PERIOD_M30;
+         numNiveisMacro = 3;
+         PrintFormat("🎯 TF Detectado: M15 → Macro: H4/H1/M30 (3 níveis) ⭐ ORIGINAL");
+         break;
+         
+      case PERIOD_M30:
+         // M30 → MACRO-1: D1, MACRO-2: H4, MACRO-3: H1
+         tfM1 = PERIOD_D1;
+         tfM2 = PERIOD_H4;
+         tfM3 = PERIOD_H1;
+         numNiveisMacro = 3;
+         PrintFormat("🎯 TF Detectado: M30 → Macro: D1/H4/H1 (3 níveis)");
+         break;
+         
+      case PERIOD_H1:
+         // H1 → MACRO-1: D1, MACRO-2: H4 (APENAS 2 NÍVEIS)
+         tfM1 = PERIOD_D1;
+         tfM2 = PERIOD_H4;
+         tfM3 = PERIOD_CURRENT; // Não aplicável
+         numNiveisMacro = 2;
+         PrintFormat("🎯 TF Detectado: H1 → Macro: D1/H4 (2 níveis apenas)");
+         break;
+         
+      case PERIOD_H4:
+         // H4 → MACRO-1: W1, MACRO-2: D1 (APENAS 2 NÍVEIS)
+         tfM1 = PERIOD_W1;
+         tfM2 = PERIOD_D1;
+         tfM3 = PERIOD_CURRENT; // Não aplicável
+         numNiveisMacro = 2;
+         PrintFormat("🎯 TF Detectado: H4 → Macro: W1/D1 (2 níveis apenas)");
+         break;
+         
+      default:
+         // Não suportado: D1, W1, MN1
+         PrintFormat("❌ ERRO: Timeframe %s não suportado pelo sistema!", EnumToString(tfOper));
+         tfM1 = PERIOD_CURRENT;
+         tfM2 = PERIOD_CURRENT;
+         tfM3 = PERIOD_CURRENT;
+         numNiveisMacro = 0;
+         break;
+   }
+   
+   // Atualizar variáveis globais
+   g_tfMacro1 = tfM1;
+   g_tfMacro2 = tfM2;
+   g_tfMacro3 = tfM3;
+   g_tfOperacional = tfOper;
+   g_numNiveisMacro = numNiveisMacro;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: InitializeIndicators                                     |
+//| Inicializa todos os handles dos indicadores                     |
+//|                                                                  |
+//| RETORNO: true se sucesso, false se erro                         |
+//+------------------------------------------------------------------+
+bool InitializeIndicators(string symbol)
+{
+   PrintFormat("📊 Inicializando indicadores para %s...", symbol);
+   
+   // Construir caminhos dos indicadores
+   string path_tm = IndicatorsBasePath + TrendMagicIndicator;
+   string path_cs = IndicatorsBasePath + CurrencyStrengthIndicator;
+   string path_rsi = IndicatorsBasePath + RSIOMAIndicator;
+   string path_wae = IndicatorsBasePath + WAEIndicator;
+   string path_gg = IndicatorsBasePath + GGTrendBarIndicator;
+   
+   //--- TREND MAGIC ---
+   // MACRO-1
+   g_handles.tm_macro1 = iCustom(symbol, g_tfMacro1, path_tm,
+                                  TM_MACRO1_CCI_Period,
+                                  TM_MACRO1_ATR_Period,
+                                  TM_MACRO1_ATR_Multiplier);
+   if(g_handles.tm_macro1 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-1 (%s)", EnumToString(g_tfMacro1));
+      return false;
+   }
+   
+   // MACRO-2
+   g_handles.tm_macro2 = iCustom(symbol, g_tfMacro2, path_tm,
+                                  TM_MACRO2_CCI_Period,
+                                  TM_MACRO2_ATR_Period,
+                                  TM_MACRO2_ATR_Multiplier);
+   if(g_handles.tm_macro2 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-2 (%s)", EnumToString(g_tfMacro2));
+      return false;
+   }
+   
+   // MACRO-3 (se aplicável)
+   if(g_numNiveisMacro == 3)
+   {
+      g_handles.tm_macro3 = iCustom(symbol, g_tfMacro3, path_tm,
+                                     TM_MACRO3_CCI_Period,
+                                     TM_MACRO3_ATR_Period,
+                                     TM_MACRO3_ATR_Multiplier);
+      if(g_handles.tm_macro3 == INVALID_HANDLE)
+      {
+         PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-3 (%s)", EnumToString(g_tfMacro3));
+         return false;
+      }
+   }
+   else
+   {
+      g_handles.tm_macro3 = INVALID_HANDLE; // Não aplicável
+   }
+   
+   // OPERACIONAL
+   g_handles.tm_oper = iCustom(symbol, g_tfOperacional, path_tm,
+                                TM_OPER_CCI_Period,
+                                TM_OPER_ATR_Period,
+                                TM_OPER_ATR_Multiplier);
+   if(g_handles.tm_oper == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle Trend Magic OPERACIONAL (%s)", EnumToString(g_tfOperacional));
+      return false;
+   }
+   
+   //--- CURRENCY STRENGTH (apenas operacional) ---
+   g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
+                                CS_CalculationPeriod,
+                                CS_SmoothingPeriod,
+                                CS_ShowInPercent);
+   if(g_handles.cs_oper == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle Currency Strength");
+      return false;
+   }
+   
+   //--- RSI OMA ---
+   // MACRO-1
+   g_handles.rsi_macro1 = iCustom(symbol, g_tfMacro1, path_rsi,
+                                   RSI_MACRO1_Period,
+                                   RSI_MACRO1_MA_Period,
+                                   RSI_MACRO1_MA_Method,
+                                   RSI_MACRO1_HighLevel,
+                                   RSI_MACRO1_LowLevel,
+                                   RSI_MACRO1_ShowLevels);
+   if(g_handles.rsi_macro1 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-1");
+      return false;
+   }
+   
+   // MACRO-2
+   g_handles.rsi_macro2 = iCustom(symbol, g_tfMacro2, path_rsi,
+                                   RSI_MACRO2_Period,
+                                   RSI_MACRO2_MA_Period,
+                                   RSI_MACRO2_MA_Method,
+                                   RSI_MACRO2_HighLevel,
+                                   RSI_MACRO2_LowLevel,
+                                   RSI_MACRO2_ShowLevels);
+   if(g_handles.rsi_macro2 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-2");
+      return false;
+   }
+   
+   // MACRO-3 (se aplicável)
+   if(g_numNiveisMacro == 3)
+   {
+      g_handles.rsi_macro3 = iCustom(symbol, g_tfMacro3, path_rsi,
+                                      RSI_MACRO3_Period,
+                                      RSI_MACRO3_MA_Period,
+                                      RSI_MACRO3_MA_Method,
+                                      RSI_MACRO3_HighLevel,
+                                      RSI_MACRO3_LowLevel,
+                                      RSI_MACRO3_ShowLevels);
+      if(g_handles.rsi_macro3 == INVALID_HANDLE)
+      {
+         PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-3");
+         return false;
+      }
+   }
+   else
+   {
+      g_handles.rsi_macro3 = INVALID_HANDLE;
+   }
+   
+   // OPERACIONAL
+   g_handles.rsi_oper = iCustom(symbol, g_tfOperacional, path_rsi,
+                                 RSI_OPER_Period,
+                                 RSI_OPER_MA_Period,
+                                 RSI_OPER_MA_Method,
+                                 RSI_OPER_HighLevel,
+                                 RSI_OPER_LowLevel,
+                                 RSI_OPER_ShowLevels);
+   if(g_handles.rsi_oper == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle RSI OMA OPERACIONAL");
+      return false;
+   }
+   
+   //--- WAE ---
+   // MACRO-1
+   g_handles.wae_macro1 = iCustom(symbol, g_tfMacro1, path_wae,
+                                   WAE_MACRO1_FastMA,
+                                   WAE_MACRO1_SlowMA,
+                                   WAE_MACRO1_BBLength,
+                                   WAE_MACRO1_BBMultiplier,
+                                   WAE_MACRO1_Sensitivity);
+   if(g_handles.wae_macro1 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle WAE MACRO-1");
+      return false;
+   }
+   
+   // MACRO-2
+   g_handles.wae_macro2 = iCustom(symbol, g_tfMacro2, path_wae,
+                                   WAE_MACRO2_FastMA,
+                                   WAE_MACRO2_SlowMA,
+                                   WAE_MACRO2_BBLength,
+                                   WAE_MACRO2_BBMultiplier,
+                                   WAE_MACRO2_Sensitivity);
+   if(g_handles.wae_macro2 == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle WAE MACRO-2");
+      return false;
+   }
+   
+   // MACRO-3 (se aplicável)
+   if(g_numNiveisMacro == 3)
+   {
+      g_handles.wae_macro3 = iCustom(symbol, g_tfMacro3, path_wae,
+                                      WAE_MACRO3_FastMA,
+                                      WAE_MACRO3_SlowMA,
+                                      WAE_MACRO3_BBLength,
+                                      WAE_MACRO3_BBMultiplier,
+                                      WAE_MACRO3_Sensitivity);
+      if(g_handles.wae_macro3 == INVALID_HANDLE)
+      {
+         PrintFormat("❌ Erro ao criar handle WAE MACRO-3");
+         return false;
+      }
+   }
+   else
+   {
+      g_handles.wae_macro3 = INVALID_HANDLE;
+   }
+   
+   // OPERACIONAL
+   g_handles.wae_oper = iCustom(symbol, g_tfOperacional, path_wae,
+                                 WAE_OPER_FastMA,
+                                 WAE_OPER_SlowMA,
+                                 WAE_OPER_BBLength,
+                                 WAE_OPER_BBMultiplier,
+                                 WAE_OPER_Sensitivity);
+   if(g_handles.wae_oper == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle WAE OPERACIONAL");
+      return false;
+   }
+   
+   //--- GG TRENDBAR (global) ---
+   g_handles.gg_global = iCustom(symbol, PERIOD_CURRENT, path_gg,
+                                  GG_ADX_Period,
+                                  GG_ADX_Price,
+                                  GG_Step_Psar,
+                                  GG_Max_Psar);
+   if(g_handles.gg_global == INVALID_HANDLE)
+   {
+      PrintFormat("❌ Erro ao criar handle GG TrendBar");
+      return false;
+   }
+   
+   PrintFormat("✅ Todos os indicadores inicializados com sucesso!");
+   PrintFormat("   MACRO-1: %s | MACRO-2: %s | MACRO-3: %s | OPER: %s",
+               EnumToString(g_tfMacro1),
+               EnumToString(g_tfMacro2),
+               (g_numNiveisMacro == 3) ? EnumToString(g_tfMacro3) : "N/A",
+               EnumToString(g_tfOperacional));
+   
+   return true;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: GetTrendMagicSignal                                      |
+//| Lê sinal do Trend Magic para um handle específico               |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - handle: Handle do indicador                                 |
+//|   - timeframe: Timeframe do sinal                               |
+//|                                                                  |
+//| RETORNO: TMSignal (struct com direção e força)                  |
+//+------------------------------------------------------------------+
+TMSignal GetTrendMagicSignal(int handle, ENUM_TIMEFRAMES timeframe)
+{
+   TMSignal result;
+   result.isValid = false;
+   result.direction = TRADE_DIRECTION_NONE;
+   result.strength = 0.0;
+   result.timeframe = timeframe;
+   result.turnedRecently = false;
+   
+   if(handle == INVALID_HANDLE)
+   {
+      return result;
+   }
+   
+   // Buffers: 0 = Up (azul), 1 = Down (vermelho)
+   double bufferUp[3], bufferDown[3];
+   
+   if(CopyBuffer(handle, 0, 0, 3, bufferUp) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, bufferDown) != 3)
+   {
+      PrintFormat("❌ Erro ao copiar buffer Trend Magic (%s)", EnumToString(timeframe));
+      return result;
+   }
+   
+   // Determinar direção atual (qual linha está ativa)
+   bool currentBullish = (bufferUp[0] != EMPTY_VALUE && bufferUp[0] > 0);
+   bool currentBearish = (bufferDown[0] != EMPTY_VALUE && bufferDown[0] > 0);
+   
+   // Verificar se mudou de cor recentemente (últimos 2 candles)
+   bool wasBullish = (bufferUp[2] != EMPTY_VALUE && bufferUp[2] > 0);
+   bool wasBearish = (bufferDown[2] != EMPTY_VALUE && bufferDown[2] > 0);
+   
+   // Detectar mudança confirmada
+   if(currentBullish && !wasBullish)
+   {
+      result.turnedRecently = true;
+   }
+   else if(currentBearish && !wasBearish)
+   {
+      result.turnedRecently = true;
+   }
+   
+   // Definir direção
+   if(currentBullish)
+   {
+      result.direction = TRADE_DIRECTION_BUY;
+      result.strength = bufferUp[0];
+      result.isValid = true;
+   }
+   else if(currentBearish)
+   {
+      result.direction = TRADE_DIRECTION_SELL;
+      result.strength = bufferDown[0];
+      result.isValid = true;
+   }
+   else
+   {
+      // Indeciso (amarelo ou sem sinal)
+      result.direction = TRADE_DIRECTION_NONE;
+      result.isValid = false;
+   }
+   
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: GetCurrencyStrengthSignal                                |
+//| Lê força das moedas e verifica alinhamento                      |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - symbol: Símbolo a analisar                                  |
+//|   - direction: Direção pretendida do trade                      |
+//|   - assetClass: Classe do ativo (para lógica inversa metais)   |
+//|                                                                  |
+//| RETORNO: CSSignal (struct com alinhamento)                      |
+//+------------------------------------------------------------------+
+CSSignal GetCurrencyStrengthSignal(string symbol, TRADE_DIRECTION direction, ASSET_CLASS assetClass)
+{
+   CSSignal result;
+   result.isValid = false;
+   result.isAligned = false;
+   result.strength = 0.0;
+   
+   // Verificar se Currency Strength é aplicável
+   if(assetClass != ASSET_CLASS_FOREX_MAJOR &&
+      assetClass != ASSET_CLASS_FOREX_MINOR &&
+      assetClass != ASSET_CLASS_FOREX_EXOTIC &&
+      assetClass != ASSET_CLASS_CURRENCY_B3 &&
+      assetClass != ASSET_CLASS_METALS)
+   {
+      return result; // Não aplicável para índices
+   }
+   
+   if(g_handles.cs_oper == INVALID_HANDLE)
+   {
+      return result;
+   }
+   
+   // Buffers: 0 = Base Currency, 1 = Quote Currency
+   double baseStrength[1], quoteStrength[1];
+   
+   if(CopyBuffer(g_handles.cs_oper, 0, 0, 1, baseStrength) != 1 ||
+      CopyBuffer(g_handles.cs_oper, 1, 0, 1, quoteStrength) != 1)
+   {
+      PrintFormat("❌ Erro ao copiar buffer Currency Strength");
+      return result;
+   }
+   
+   result.strength = MathAbs(baseStrength[0] - quoteStrength[0]);
+   result.isValid = true;
+   
+   // Lógica normal (Forex)
+   if(assetClass != ASSET_CLASS_METALS)
+   {
+      if(direction == TRADE_DIRECTION_BUY)
+      {
+         // Para compra: moeda base deve ser mais forte
+         result.isAligned = (baseStrength[0] > quoteStrength[0]);
+      }
+      else if(direction == TRADE_DIRECTION_SELL)
+      {
+         // Para venda: moeda cotação deve ser mais forte
+         result.isAligned = (quoteStrength[0] > baseStrength[0]);
+      }
+   }
+   else
+   {
+      // Lógica INVERSA para metais (XAU/USD, XAG/USD)
+      // Ouro sobe quando USD fraco
+      if(direction == TRADE_DIRECTION_BUY)
+      {
+         // Para compra de ouro: USD (quote) deve estar fraco
+         result.isAligned = (quoteStrength[0] < baseStrength[0]);
+      }
+      else if(direction == TRADE_DIRECTION_SELL)
+      {
+         // Para venda de ouro: USD (quote) deve estar forte
+         result.isAligned = (quoteStrength[0] > baseStrength[0]);
+      }
+   }
+   
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: GetRSIOMASignal                                          |
+//| Lê sinal do RSI OMA (linha vermelha vs azul + inclinação)      |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - handle: Handle do indicador                                 |
+//|   - direction: Direção pretendida                               |
+//|   - timeframe: Timeframe para log                               |
+//|                                                                  |
+//| RETORNO: RSISignal (struct com alinhamento e inclinação)        |
+//+------------------------------------------------------------------+
+RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES timeframe)
+{
+   RSISignal result;
+   result.isValid = false;
+   result.isAligned = false;
+   result.strength = 0.0;
+   result.slope = 0.0;
+   
+   if(handle == INVALID_HANDLE)
+   {
+      return result;
+   }
+   
+   // Buffers: 0 = RSI (linha vermelha), 1 = MA (linha azul)
+   double rsiRed[3], rsiBlue[3];
+   
+   if(CopyBuffer(handle, 0, 0, 3, rsiRed) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, rsiBlue) != 3)
+   {
+      PrintFormat("❌ Erro ao copiar buffer RSI OMA (%s)", EnumToString(timeframe));
+      return result;
+   }
+   
+   // Calcular inclinação linha vermelha (últimos 3 candles)
+   result.slope = (rsiRed[0] - rsiRed[2]) / 2.0;
+   result.strength = MathAbs(rsiRed[0] - rsiBlue[0]);
+   result.isValid = true;
+   
+   // Verificar posição e inclinação
+   bool redAboveBlue = (rsiRed[0] > rsiBlue[0]);
+   bool slopePositive = (result.slope > 0.5);  // Mínimo 0.5 de inclinação
+   bool slopeNegative = (result.slope < -0.5);
+   
+   if(direction == TRADE_DIRECTION_BUY)
+   {
+      // Para compra: linha vermelha acima da azul + inclinação positiva
+      result.isAligned = (redAboveBlue && slopePositive);
+   }
+   else if(direction == TRADE_DIRECTION_SELL)
+   {
+      // Para venda: linha vermelha abaixo da azul + inclinação negativa
+      result.isAligned = (!redAboveBlue && slopeNegative);
+   }
+   
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: GetWAESignal                                             |
+//| Lê sinal do WAE (histograma + expansão)                         |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - handle: Handle do indicador                                 |
+//|   - direction: Direção pretendida                               |
+//|   - timeframe: Timeframe para log                               |
+//|                                                                  |
+//| RETORNO: WAESignal (struct com expansão e força)                |
+//+------------------------------------------------------------------+
+WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES timeframe)
+{
+   WAESignal result;
+   result.isValid = false;
+   result.isAligned = false;
+   result.isExpanding = false;
+   result.strength = 0.0;
+   
+   if(handle == INVALID_HANDLE)
+   {
+      return result;
+   }
+   
+   // Buffers: 0 = Trend Up (verde), 1 = Trend Down (vermelho),
+   //          2 = Explosion Line (amarela), 3 = Dead Zone
+   double trendUp[3], trendDown[3], explosion[1];
+   
+   if(CopyBuffer(handle, 0, 0, 3, trendUp) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, trendDown) != 3 ||
+      CopyBuffer(handle, 2, 0, 1, explosion) != 1)
+   {
+      PrintFormat("❌ Erro ao copiar buffer WAE (%s)", EnumToString(timeframe));
+      return result;
+   }
+   
+   // Determinar cor do histograma (verde ou vermelho)
+   bool isGreen = (trendUp[0] > trendDown[0] && trendUp[0] > 0);
+   bool isRed = (trendDown[0] > trendUp[0] && trendDown[0] > 0);
+   
+   // Calcular força do histograma
+   double currentStrength = MathMax(trendUp[0], trendDown[0]);
+   result.strength = currentStrength;
+   
+   // Verificar expansão (últimos 3 candles)
+   bool expanding = (currentStrength > MathMax(trendUp[1], trendDown[1]) &&
+                     MathMax(trendUp[1], trendDown[1]) > MathMax(trendUp[2], trendDown[2]));
+   result.isExpanding = expanding;
+   
+   // Verificar se está acima da linha de explosão
+   bool aboveExplosion = (currentStrength > explosion[0]);
+   
+   result.isValid = true;
+   
+   if(direction == TRADE_DIRECTION_BUY)
+   {
+      // Para compra: verde + expandindo + acima explosão
+      result.isAligned = (isGreen && expanding && aboveExplosion);
+   }
+   else if(direction == TRADE_DIRECTION_SELL)
+   {
+      // Para venda: vermelho + expandindo + acima explosão
+      result.isAligned = (isRed && expanding && aboveExplosion);
+   }
+   
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: GetGGTrendBarSignal                                      |
+//| Lê sinais multi-timeframe do GG TrendBar                        |
+//|                                                                  |
+//| RETORNO: GGTrendBarSignal (struct com sinais de todos os TFs)   |
+//+------------------------------------------------------------------+
+GGTrendBarSignal GetGGTrendBarSignal()
+{
+   GGTrendBarSignal result;
+   result.isValid = false;
+   
+   if(g_handles.gg_global == INVALID_HANDLE)
+   {
+      return result;
+   }
+   
+   // GG TrendBar tem 18 buffers (9 TFs × 2)
+   // Buffers de dados: 0=M1, 2=M5, 4=M15, 6=M30, 8=H1, 10=H4, 12=D1, 14=W1, 16=MN1
+   double m1[1], m5[1], m15[1], m30[1], h1[1], h4[1], d1[1], w1[1], mn1[1];
+   
+   if(CopyBuffer(g_handles.gg_global, 0, 0, 1, m1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 2, 0, 1, m5) != 1 ||
+      CopyBuffer(g_handles.gg_global, 4, 0, 1, m15) != 1 ||
+      CopyBuffer(g_handles.gg_global, 6, 0, 1, m30) != 1 ||
+      CopyBuffer(g_handles.gg_global, 8, 0, 1, h1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 10, 0, 1, h4) != 1 ||
+      CopyBuffer(g_handles.gg_global, 12, 0, 1, d1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 14, 0, 1, w1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 16, 0, 1, mn1) != 1)
+   {
+      PrintFormat("❌ Erro ao copiar buffers GG TrendBar");
+      return result;
+   }
+   
+   // Preencher valores (+1 = bullish, 0 = neutral, -1 = bearish)
+   result.m1Value = (int)m1[0];
+   result.m5Value = (int)m5[0];
+   result.m15Value = (int)m15[0];
+   result.m30Value = (int)m30[0];
+   result.h1Value = (int)h1[0];
+   result.h4Value = (int)h4[0];
+   result.d1Value = (int)d1[0];
+   result.w1Value = (int)w1[0];
+   result.mn1Value = (int)mn1[0];
+   
+   // Interpretação booleana
+   result.h4Bullish = (result.h4Value == 1);
+   result.h1Bullish = (result.h1Value == 1);
+   result.m30Bullish = (result.m30Value == 1);
+   result.m15Bullish = (result.m15Value == 1);
+   
+   // Determinar direção geral (pode ser usado como confirmação)
+   int sumSignals = result.h4Value + result.h1Value + result.m30Value + result.m15Value;
+   if(sumSignals >= 2)
+   {
+      result.overallDirection = TRADE_DIRECTION_BUY;
+   }
+   else if(sumSignals <= -2)
+   {
+      result.overallDirection = TRADE_DIRECTION_SELL;
+   }
+   else
+   {
+      result.overallDirection = TRADE_DIRECTION_NONE;
+   }
+   
+   result.isValid = true;
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: AnalyzeMultiTimeframeAlignment                           |
+//| Valida alinhamento dos timeframes macro (OBRIGATÓRIO)           |
+//|                                                                  |
+//| RETORNO: MultiTFResult (struct com resultado da análise)        |
+//+------------------------------------------------------------------+
+MultiTFResult AnalyzeMultiTimeframeAlignment()
+{
+   MultiTFResult result;
+   result.isValid = false;
+   result.direction = TRADE_DIRECTION_NONE;
+   result.h4Aligned = false;
+   result.h1Aligned = false;
+   result.m30Aligned = false;
+   result.structureValid = false;
+   
+   // Obter sinais Trend Magic de todos os timeframes macro
+   TMSignal tm_macro1 = GetTrendMagicSignal(g_handles.tm_macro1, g_tfMacro1);
+   TMSignal tm_macro2 = GetTrendMagicSignal(g_handles.tm_macro2, g_tfMacro2);
+   TMSignal tm_macro3;
+   
+   if(g_numNiveisMacro == 3)
+   {
+      tm_macro3 = GetTrendMagicSignal(g_handles.tm_macro3, g_tfMacro3);
+   }
+   
+   // Validação 1: MACRO-1 e MACRO-2 OBRIGATÓRIOS
+   if(!tm_macro1.isValid || !tm_macro2.isValid)
+   {
+      PrintFormat("❌ MACRO-1 ou MACRO-2 inválidos");
+      return result;
+   }
+   
+   // Validação 2: MACRO-1 e MACRO-2 devem estar na MESMA DIREÇÃO
+   if(tm_macro1.direction != tm_macro2.direction)
+   {
+      PrintFormat("⚠️ MACRO-1 e MACRO-2 em direções opostas - aguardar alinhamento");
+      return result;
+   }
+   
+   // Validação 3: Nenhum pode estar indeciso (amarelo)
+   if(tm_macro1.direction == TRADE_DIRECTION_NONE ||
+      tm_macro2.direction == TRADE_DIRECTION_NONE)
+   {
+      PrintFormat("⚠️ MACRO-1 ou MACRO-2 indecisos (amarelo) - aguardar definição");
+      return result;
+   }
+   
+   // MACRO-1 e MACRO-2 alinhados!
+   result.direction = tm_macro1.direction;
+   result.h4Aligned = true; // Representação abstrata
+   result.h1Aligned = true;
+   
+   // Validação 4: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
+   if(g_numNiveisMacro == 3 && tm_macro3.isValid)
+   {
+      if(tm_macro3.direction == result.direction)
+      {
+         result.m30Aligned = true; // PREMIUM
+         PrintFormat("🏆 ALINHAMENTO PREMIUM: MACRO-1 + MACRO-2 + MACRO-3 na mesma direção (%s)",
+                     (result.direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
+      }
+      else
+      {
+         result.m30Aligned = false; // GOOD (ou CAUTIOUS se oposto)
+         
+         // Se MACRO-3 está OPOSTO e parâmetro AllowCautiousSetups está DESABILITADO → REJEITAR
+         if(!AllowCautiousSetups && tm_macro3.direction != TRADE_DIRECTION_NONE)
+         {
+            PrintFormat("⚠️ MACRO-3 oposto e setups cautelosos desabilitados - REJEITADO");
+            result.isValid = false;
+            return result;
+         }
+         
+         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1 + MACRO-2 alinhados, MACRO-3 %s",
+                     (tm_macro3.direction == TRADE_DIRECTION_NONE) ? "neutro" : "oposto");
+      }
+   }
+   else if(g_numNiveisMacro == 2)
+   {
+      // Sistema de 2 níveis (H1 ou H4) - sempre GOOD se passar
+      result.m30Aligned = false; // N/A
+      PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1 + MACRO-2 alinhados (sistema 2 níveis)");
+   }
+   
+   // TODO: Validar estrutura de preços H4 (topos/fundos, EMA 50, etc)
+   result.structureValid = true; // Simplificado por ora
+   
+   result.isValid = true;
+   return result;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: CalculateSetupScore                                      |
+//| Pontua e classifica o setup com base nos filtros micro          |
+//|                                                                  |
+//| PARÂMETROS:                                                      |
+//|   - symbol: Símbolo a analisar                                  |
+//|   - assetClass: Classe do ativo                                 |
+//|   - direction: Direção do alinhamento macro                     |
+//|   - m30Aligned: Se MACRO-3 está alinhado (para PREMIUM)        |
+//|                                                                  |
+//| RETORNO: SetupScore (struct com pontuação e classificação)      |
+//+------------------------------------------------------------------+
+SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRECTION direction, bool m30Aligned)
+{
+   SetupScore score;
+   score.classification = SETUP_REJECT;
+   score.direction = direction;
+   score.traderMagicPoints = 1; // Já validado no alinhamento macro
+   score.currencyStrengthPoints = 0;
+   score.rsiomaPoints = 0;
+   score.waePoints = 0;
+   score.totalPoints = 0;
+   
+   // Determinar quantos filtros são necessários
+   bool useCS = (assetClass == ASSET_CLASS_FOREX_MAJOR ||
+                 assetClass == ASSET_CLASS_FOREX_MINOR ||
+                 assetClass == ASSET_CLASS_FOREX_EXOTIC ||
+                 assetClass == ASSET_CLASS_CURRENCY_B3 ||
+                 assetClass == ASSET_CLASS_METALS);
+   
+   if(useCS)
+   {
+      // Sistema 3 filtros: CS + RSI + WAE (precisa 2 de 3)
+      score.requiredPoints = 2;
+      
+      // Currency Strength
+      CSSignal cs = GetCurrencyStrengthSignal(symbol, direction, assetClass);
+      if(cs.isValid && cs.isAligned)
+      {
+         score.currencyStrengthPoints = 1;
+      }
+      
+      // RSI OMA
+      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
+      if(rsi.isValid && rsi.isAligned)
+      {
+         score.rsiomaPoints = 1;
+      }
+      
+      // WAE
+      WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
+      if(wae.isValid && wae.isAligned)
+      {
+         score.waePoints = 1;
+      }
+      
+      score.totalPoints = score.currencyStrengthPoints + score.rsiomaPoints + score.waePoints;
+      
+      // Classificação
+      if(score.totalPoints >= 3 && m30Aligned)
+      {
+         score.classification = SETUP_PREMIUM; // 3/3 + MACRO-3 alinhado
+      }
+      else if(score.totalPoints >= 2)
+      {
+         score.classification = SETUP_GOOD; // 2/3
+      }
+      else
+      {
+         score.classification = SETUP_REJECT; // <2
+      }
+   }
+   else
+   {
+      // Sistema 2 filtros: RSI + WAE (precisa 2 de 2) - ÍNDICES
+      score.requiredPoints = 2;
+      
+      // RSI OMA
+      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
+      if(rsi.isValid && rsi.isAligned)
+      {
+         score.rsiomaPoints = 1;
+      }
+      
+      // WAE
+      WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
+      if(wae.isValid && wae.isAligned)
+      {
+         score.waePoints = 1;
+      }
+      
+      score.totalPoints = score.rsiomaPoints + score.waePoints;
+      
+      // Classificação (mais rigorosa para índices)
+      if(score.totalPoints >= 2 && m30Aligned)
+      {
+         score.classification = SETUP_PREMIUM; // 2/2 + MACRO-3 alinhado
+      }
+      else if(score.totalPoints >= 2)
+      {
+         score.classification = SETUP_GOOD; // 2/2 mas MACRO-3 não alinhado
+      }
+      else
+      {
+         score.classification = SETUP_REJECT; // <2
+      }
+   }
+   
+   // Log detalhado
+   PrintFormat("📊 PONTUAÇÃO SETUP (%s):", symbol);
+   PrintFormat("   Direção: %s", (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
+   PrintFormat("   TM: %d | CS: %d | RSI: %d | WAE: %d | TOTAL: %d/%d",
+               score.traderMagicPoints,
+               score.currencyStrengthPoints,
+               score.rsiomaPoints,
+               score.waePoints,
+               score.totalPoints,
+               score.requiredPoints);
+   PrintFormat("   Classificação: %s",
+               (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM" :
+               (score.classification == SETUP_GOOD) ? "⭐ GOOD" : "❌ REJECT");
+   
+   return score;
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO: ReleaseIndicators                                        |
+//| Libera todos os handles dos indicadores                         |
+//+------------------------------------------------------------------+
+void ReleaseIndicators()
+{
+   if(g_handles.tm_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro1);
+   if(g_handles.tm_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro2);
+   if(g_handles.tm_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro3);
+   if(g_handles.tm_oper != INVALID_HANDLE) IndicatorRelease(g_handles.tm_oper);
+   
+   if(g_handles.cs_oper != INVALID_HANDLE) IndicatorRelease(g_handles.cs_oper);
+   
+   if(g_handles.rsi_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro1);
+   if(g_handles.rsi_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro2);
+   if(g_handles.rsi_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro3);
+   if(g_handles.rsi_oper != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_oper);
+   
+   if(g_handles.wae_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro1);
+   if(g_handles.wae_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro2);
+   if(g_handles.wae_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro3);
+   if(g_handles.wae_oper != INVALID_HANDLE) IndicatorRelease(g_handles.wae_oper);
+   
+   if(g_handles.gg_global != INVALID_HANDLE) IndicatorRelease(g_handles.gg_global);
+   
+   PrintFormat("✅ Todos os handles de indicadores liberados");
+}
+
+//+------------------------------------------------------------------+

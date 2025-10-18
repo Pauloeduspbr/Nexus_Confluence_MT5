@@ -1,0 +1,411 @@
+//+------------------------------------------------------------------+
+//| Parametros.mqh                                                    |
+//| Nexus Confluence EA v4.1 - Sistema Multi-Timeframe Universal     |
+//|                                                                   |
+//| PROPÓSITO: Centralizar TODOS os inputs e enumerações do EA       |
+//|                                                                   |
+//| ORGANIZAÇÃO:                                                      |
+//|   1. Enumerações (enums)                                         |
+//|   2. Estruturas de dados (structs)                               |
+//|   3. Inputs gerais do EA                                         |
+//|   4. Inputs dos indicadores por timeframe:                       |
+//|      - MACRO-1 (timeframe mais longo)                            |
+//|      - MACRO-2 (timeframe intermediário)                         |
+//|      - MACRO-3 (timeframe curto) - pode não existir em H1/H4    |
+//|      - OPERACIONAL (timeframe atual do gráfico)                  |
+//|                                                                   |
+//| AUTOR: GitHub Copilot + Desenvolvedor                            |
+//| DATA: Outubro 2025                                               |
+//| VERSÃO: 4.1 - Multi-Timeframe                                    |
+//+------------------------------------------------------------------+
+#property copyright "Nexus Confluence EA v4.1"
+#property version   "4.10"
+#property strict
+
+//+------------------------------------------------------------------+
+//| SEÇÃO 1: ENUMERAÇÕES (ENUMS)                                     |
+//+------------------------------------------------------------------+
+
+//--- Direção do trade
+enum TRADE_DIRECTION
+{
+   TRADE_DIRECTION_NONE = -1,  // Sem direção (indeciso/amarelo)
+   TRADE_DIRECTION_BUY  = 0,   // Compra
+   TRADE_DIRECTION_SELL = 1    // Venda
+};
+
+//--- Classificação do setup
+enum SETUP_CLASS
+{
+   SETUP_REJECT  = 0,  // Rejeitado (não operar)
+   SETUP_GOOD    = 1,  // Bom (2/3 filtros ou 2/2 + condições)
+   SETUP_PREMIUM = 2   // Premium (3/3 filtros ou 2/2 todos alinhados)
+};
+
+//--- Classe de ativo
+enum ASSET_CLASS
+{
+   ASSET_CLASS_UNKNOWN      = 0,  // Desconhecido
+   ASSET_CLASS_FOREX_MAJOR  = 1,  // Forex Major (EUR/USD, GBP/USD, etc)
+   ASSET_CLASS_FOREX_MINOR  = 2,  // Forex Minor (EUR/GBP, EUR/JPY, etc)
+   ASSET_CLASS_FOREX_EXOTIC = 3,  // Forex Exotic (USD/BRL, USD/MXN, etc)
+   ASSET_CLASS_CURRENCY_B3  = 4,  // WDO (Mini Dólar B3)
+   ASSET_CLASS_INDEX_B3     = 5,  // WIN (Mini Índice Bovespa)
+   ASSET_CLASS_INDEX_US     = 6,  // Índices US (S&P500, Nasdaq, Dow)
+   ASSET_CLASS_INDEX_EU     = 7,  // Índices Europa (DAX, FTSE, CAC)
+   ASSET_CLASS_METALS       = 8,  // Metais (Ouro, Prata)
+   ASSET_CLASS_CRYPTO       = 9,  // Criptomoedas (BTC, ETH)
+   ASSET_CLASS_TOTAL        = 10  // Total de classes (controle)
+};
+
+//+------------------------------------------------------------------+
+//| SEÇÃO 2: ESTRUTURAS DE DADOS (STRUCTS)                           |
+//+------------------------------------------------------------------+
+
+//--- Sinal do Trend Magic
+struct TMSignal
+{
+   bool            isValid;         // Sinal válido?
+   TRADE_DIRECTION direction;       // Direção (BUY/SELL/NONE)
+   double          strength;        // Força do sinal
+   ENUM_TIMEFRAMES timeframe;       // Timeframe do sinal
+   bool            turnedRecently;  // Virou recentemente (2 candles)
+};
+
+//--- Sinal do Currency Strength
+struct CSSignal
+{
+   bool   isValid;    // Sinal válido?
+   bool   isAligned;  // Alinhado com direção pretendida?
+   double strength;   // Diferença de força entre moedas
+};
+
+//--- Sinal do RSI OMA
+struct RSISignal
+{
+   bool   isValid;    // Sinal válido?
+   bool   isAligned;  // Alinhado com direção pretendida?
+   double strength;   // Força do RSI
+   double slope;      // Inclinação da linha vermelha
+};
+
+//--- Sinal do WAE
+struct WAESignal
+{
+   bool   isValid;      // Sinal válido?
+   bool   isAligned;    // Alinhado com direção pretendida?
+   bool   isExpanding;  // Histograma expandindo?
+   double strength;     // Força do histograma
+};
+
+//--- Sinal do GG TrendBar
+struct GGTrendBarSignal
+{
+   bool            isValid;           // Sinal válido?
+   int             m1Value;           // +1 bullish, 0 neutral, -1 bearish
+   int             m5Value;
+   int             m15Value;
+   int             m30Value;
+   int             h1Value;
+   int             h4Value;
+   int             d1Value;
+   int             w1Value;
+   int             mn1Value;
+   bool            h4Bullish;         // H4 altista?
+   bool            h1Bullish;         // H1 altista?
+   bool            m30Bullish;        // M30 altista?
+   bool            m15Bullish;        // M15 altista?
+   TRADE_DIRECTION overallDirection;  // Direção geral
+};
+
+//--- Resultado análise multi-timeframe
+struct MultiTFResult
+{
+   bool            isValid;         // Análise válida?
+   TRADE_DIRECTION direction;       // Direção do alinhamento
+   bool            h4Aligned;       // MACRO-1 alinhado (representação abstrata)
+   bool            h1Aligned;       // MACRO-2 alinhado
+   bool            m30Aligned;      // MACRO-3 alinhado (se aplicável)
+   bool            structureValid;  // Estrutura de preços válida?
+};
+
+//--- Pontuação do setup
+struct SetupScore
+{
+   SETUP_CLASS     classification;          // Classificação final
+   int             requiredPoints;          // Pontos requeridos (2 ou 3)
+   int             totalPoints;             // Total de pontos obtidos
+   int             traderMagicPoints;       // TM (sempre 1 se válido)
+   int             currencyStrengthPoints;  // CS (0 ou 1)
+   int             rsiomaPoints;            // RSI (0 ou 1)
+   int             waePoints;               // WAE (0 ou 1)
+   TRADE_DIRECTION direction;               // Direção do setup
+};
+
+//--- Cálculo de risco
+struct RiskCalculation
+{
+   bool            isValid;         // Cálculo válido?
+   string          errorMessage;    // Mensagem de erro (se houver)
+   TRADE_DIRECTION direction;       // Direção do trade
+   SETUP_CLASS     classification;  // Classificação do setup
+   double          entryPrice;      // Preço de entrada
+   double          stopLoss;        // Stop Loss
+   double          slDistance;      // Distância até SL
+   double          positionSize;    // Tamanho da posição (lotes)
+   double          riskAmount;      // Valor em risco (moeda da conta)
+   double          tp1;             // Take Profit 1
+   double          tp2;             // Take Profit 2
+   double          trailingStart;   // Preço inicial para trailing
+};
+
+//--- Configuração por classe de ativo
+struct AssetConfig
+{
+   bool   useCurrencyStrength;      // Usar Currency Strength?
+   int    requiredFilters;          // Total de filtros (2 ou 3)
+   int    minFiltersForTrade;       // Mínimo para trade (2)
+   double idealSLMinPips;           // SL mínimo ideal (pips)
+   double idealSLMaxPips;           // SL máximo ideal (pips)
+   double slBufferPips;             // Buffer adicional (pips)
+   double minATR;                   // ATR mínimo
+   double maxATR;                   // ATR máximo
+   double maxSpreadPips;            // Spread máximo permitido (pips)
+   double trailingDistancePips;     // Distância trailing (pips)
+   double pipValueOverride;         // Valor pip override (0 = auto)
+   int    primeHourStart;           // Horário prime início (HHMM)
+   int    primeHourEnd;             // Horário prime fim (HHMM)
+   double premiumRiskPercent;       // Risco % setup premium
+   double goodRiskPercent;          // Risco % setup good
+};
+
+//--- Handles dos indicadores
+struct IndicatorHandles
+{
+   int tm_macro1;     // Trend Magic MACRO-1
+   int tm_macro2;     // Trend Magic MACRO-2
+   int tm_macro3;     // Trend Magic MACRO-3
+   int tm_oper;       // Trend Magic Operacional
+   
+   int cs_oper;       // Currency Strength Operacional
+   
+   int rsi_macro1;    // RSI OMA MACRO-1
+   int rsi_macro2;    // RSI OMA MACRO-2
+   int rsi_macro3;    // RSI OMA MACRO-3
+   int rsi_oper;      // RSI OMA Operacional
+   
+   int wae_macro1;    // WAE MACRO-1
+   int wae_macro2;    // WAE MACRO-2
+   int wae_macro3;    // WAE MACRO-3
+   int wae_oper;      // WAE Operacional
+   
+   int gg_global;     // GG TrendBar Global
+};
+
+//--- Registro de trade
+struct TradeRecord
+{
+   datetime        openTime;      // Hora abertura
+   datetime        closeTime;     // Hora fechamento
+   string          symbol;        // Símbolo
+   TRADE_DIRECTION direction;     // Direção
+   double          openPrice;     // Preço abertura
+   double          closePrice;    // Preço fechamento
+   double          profit;        // Lucro/Prejuízo
+   double          riskAmount;    // Valor arriscado
+   double          rr;            // Risk/Reward real
+   SETUP_CLASS     setupClass;    // Classificação setup
+   string          closeReason;   // Razão fechamento
+   bool            tp1Hit;        // TP1 atingido?
+   bool            tp2Hit;        // TP2 atingido?
+};
+
+//+------------------------------------------------------------------+
+//| SEÇÃO 3: INPUTS GERAIS DO EA                                     |
+//+------------------------------------------------------------------+
+
+input group "════════════════════════════════════════════════════════"
+input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
+input group "════════════════════════════════════════════════════════"
+
+input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
+input double AccountRiskPercent       = 1.5;   // 📊 Risco padrão por trade (%)
+input double MaxRiskPremium           = 2.0;   // 🏆 Risco máximo setup PREMIUM (%)
+input double MaxDrawdownPercent       = 15.0;  // ⚠️ Drawdown máximo permitido (%)
+input int    MaxSimultaneousTrades    = 3;     // 🔢 Máximo de trades simultâneos
+input bool   EnableSecondaryHours     = true;  // 🕐 Habilitar horários secundários Forex
+input bool   EnableMorningB3          = false; // 🇧🇷 Habilitar sessão da manhã B3
+input bool   AvoidNews                = true;  // 📰 Evitar operar próximo a notícias
+input bool   ValidateATRRange         = true;  // 📏 Validar ATR ideal por ativo
+input bool   SendAlerts               = true;  // 🔔 Enviar notificações push
+input bool   AllowCautiousSetups      = false; // ⚠️ Permitir setups CAUTELOSOS (2/2 + MACRO-3 oposto)
+
+input group "=== 💰 GESTÃO DE LOTE ==="
+input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)
+                                               // Forex: 0.01 | B3: 1.0 | Índices: 0.1
+
+input group "=== 📅 FILTRO SEMANAL - Dias da Semana ==="
+input bool   TradeOnMonday            = true;  // 📅 Operar na Segunda-feira
+input bool   TradeOnTuesday           = true;  // 📅 Operar na Terça-feira
+input bool   TradeOnWednesday         = true;  // 📅 Operar na Quarta-feira
+input bool   TradeOnThursday          = true;  // 📅 Operar na Quinta-feira
+input bool   TradeOnFriday            = true;  // 📅 Operar na Sexta-feira
+input bool   TradeOnSaturday          = false; // 📅 Operar no Sábado (Cripto 24/7)
+input bool   TradeOnSunday            = false; // 📅 Operar no Domingo (Cripto 24/7)
+
+input group "=== ⏰ HORÁRIOS CUSTOMIZÁVEIS (para otimização) ==="
+input bool   UseCustomTradingHours    = false; // ⏰ Usar horários customizados
+input int    CustomStartHour          = 9;     // ⏰ Horário início (hora)
+input int    CustomStartMinute        = 0;     // ⏰ Horário início (minuto)
+input int    CustomEndHour            = 17;    // ⏰ Horário fim (hora)
+input int    CustomEndMinute          = 30;    // ⏰ Horário fim (minuto)
+
+input group "=== 🎯 GESTÃO DE SAÍDAS ==="
+input bool   EnablePartialTP          = true;  // ✂️ Habilitar saídas parciais
+input bool   EnableTrailing           = true;  // 📈 Habilitar trailing stop
+input double TP1_RR                   = 1.0;   // 🎯 RR para TP1 (50% posição)
+input double TP2_RR                   = 2.0;   // 🎯 RR para TP2 (25% posição)
+input double TrailingDistanceMultiplier = 1.0; // 📏 Multiplicador distância trailing
+
+input group "=== 🛡️ PROTEÇÕES ==="
+input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
+input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estrutura M15
+input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
+
+input group "=== 📁 INDICADORES - Caminhos dos Arquivos ==="
+input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // 📂 Pasta relativa em MQL5/Indicators
+input string GGTrendBarIndicator      = "GG_TrendBar_Indicator";
+input string TrendMagicIndicator      = "TrendMagic_MT5";
+input string CurrencyStrengthIndicator= "CurrencyStrengthMeter_MT5";
+input string RSIOMAIndicator          = "RSIOMA_v2HHLSX_MT5";
+input string WAEIndicator             = "WaddahAttarExplosion_Professional";
+
+//+------------------------------------------------------------------+
+//| SEÇÃO 4: INPUTS DOS INDICADORES - ORGANIZADOS POR TIMEFRAME     |
+//+------------------------------------------------------------------+
+
+//╔══════════════════════════════════════════════════════════════════╗
+//║                  📊 TREND MAGIC - TODOS OS TFs                   ║
+//╚══════════════════════════════════════════════════════════════════╝
+
+input group "=== 📈 TREND MAGIC - MACRO-1 (Timeframe mais longo) ==="
+input int    TM_MACRO1_CCI_Period     = 50;    // CCI Period
+input int    TM_MACRO1_ATR_Period     = 5;     // ATR Period
+input double TM_MACRO1_ATR_Multiplier = 1.0;   // ATR Multiplier
+
+input group "=== 📈 TREND MAGIC - MACRO-2 (Timeframe intermediário) ==="
+input int    TM_MACRO2_CCI_Period     = 50;    // CCI Period
+input int    TM_MACRO2_ATR_Period     = 5;     // ATR Period
+input double TM_MACRO2_ATR_Multiplier = 1.0;   // ATR Multiplier
+
+input group "=== 📈 TREND MAGIC - MACRO-3 (Timeframe curto - pode não existir em H1/H4) ==="
+input int    TM_MACRO3_CCI_Period     = 50;    // CCI Period
+input int    TM_MACRO3_ATR_Period     = 5;     // ATR Period
+input double TM_MACRO3_ATR_Multiplier = 1.0;   // ATR Multiplier
+
+input group "=== 📈 TREND MAGIC - OPERACIONAL (Timeframe atual do gráfico) ==="
+input int    TM_OPER_CCI_Period       = 50;    // CCI Period
+input int    TM_OPER_ATR_Period       = 5;     // ATR Period
+input double TM_OPER_ATR_Multiplier   = 1.0;   // ATR Multiplier
+
+//╔══════════════════════════════════════════════════════════════════╗
+//║              💱 CURRENCY STRENGTH - APENAS OPERACIONAL           ║
+//║  (Analisa força das moedas, não depende de timeframe macro)     ║
+//╚══════════════════════════════════════════════════════════════════╝
+
+input group "=== 💱 CURRENCY STRENGTH - OPERACIONAL ==="
+input int    CS_CalculationPeriod     = 24;    // Período de cálculo
+input int    CS_SmoothingPeriod       = 5;     // Período de suavização
+input bool   CS_ShowInPercent         = true;  // Exibir em porcentagem
+
+//╔══════════════════════════════════════════════════════════════════╗
+//║                   📊 RSI OMA - TODOS OS TFs                      ║
+//╚══════════════════════════════════════════════════════════════════╝
+
+input group "=== 📊 RSI OMA - MACRO-1 (Timeframe mais longo) ==="
+input int              RSI_MACRO1_Period    = 14;        // RSI Period
+input int              RSI_MACRO1_MA_Period = 9;         // Moving Average Period
+input ENUM_MA_METHOD   RSI_MACRO1_MA_Method = MODE_SMA;  // MA Method
+input double           RSI_MACRO1_HighLevel = 70.0;      // High Level (sobrecompra)
+input double           RSI_MACRO1_LowLevel  = 30.0;      // Low Level (sobrevenda)
+input bool             RSI_MACRO1_ShowLevels= true;      // Show Levels
+
+input group "=== 📊 RSI OMA - MACRO-2 (Timeframe intermediário) ==="
+input int              RSI_MACRO2_Period    = 14;
+input int              RSI_MACRO2_MA_Period = 9;
+input ENUM_MA_METHOD   RSI_MACRO2_MA_Method = MODE_SMA;
+input double           RSI_MACRO2_HighLevel = 70.0;
+input double           RSI_MACRO2_LowLevel  = 30.0;
+input bool             RSI_MACRO2_ShowLevels= true;
+
+input group "=== 📊 RSI OMA - MACRO-3 (Timeframe curto - pode não existir) ==="
+input int              RSI_MACRO3_Period    = 14;
+input int              RSI_MACRO3_MA_Period = 9;
+input ENUM_MA_METHOD   RSI_MACRO3_MA_Method = MODE_SMA;
+input double           RSI_MACRO3_HighLevel = 70.0;
+input double           RSI_MACRO3_LowLevel  = 30.0;
+input bool             RSI_MACRO3_ShowLevels= true;
+
+input group "=== 📊 RSI OMA - OPERACIONAL (Timeframe atual) ==="
+input int              RSI_OPER_Period      = 14;
+input int              RSI_OPER_MA_Period   = 9;
+input ENUM_MA_METHOD   RSI_OPER_MA_Method   = MODE_SMA;
+input double           RSI_OPER_HighLevel   = 70.0;
+input double           RSI_OPER_LowLevel    = 30.0;
+input bool             RSI_OPER_ShowLevels  = true;
+
+//╔══════════════════════════════════════════════════════════════════╗
+//║                   💥 WAE - TODOS OS TFs                          ║
+//╚══════════════════════════════════════════════════════════════════╝
+
+input group "=== 💥 WAE - MACRO-1 (Timeframe mais longo) ==="
+input int    WAE_MACRO1_FastMA        = 20;    // Fast MA Period
+input int    WAE_MACRO1_SlowMA        = 40;    // Slow MA Period
+input int    WAE_MACRO1_BBLength      = 20;    // Bollinger Bands Length
+input double WAE_MACRO1_BBMultiplier  = 2.0;   // Bollinger Bands Multiplier
+input int    WAE_MACRO1_Sensitivity   = 150;   // Sensitivity
+
+input group "=== 💥 WAE - MACRO-2 (Timeframe intermediário) ==="
+input int    WAE_MACRO2_FastMA        = 20;
+input int    WAE_MACRO2_SlowMA        = 40;
+input int    WAE_MACRO2_BBLength      = 20;
+input double WAE_MACRO2_BBMultiplier  = 2.0;
+input int    WAE_MACRO2_Sensitivity   = 150;
+
+input group "=== 💥 WAE - MACRO-3 (Timeframe curto - pode não existir) ==="
+input int    WAE_MACRO3_FastMA        = 20;
+input int    WAE_MACRO3_SlowMA        = 40;
+input int    WAE_MACRO3_BBLength      = 20;
+input double WAE_MACRO3_BBMultiplier  = 2.0;
+input int    WAE_MACRO3_Sensitivity   = 150;
+
+input group "=== 💥 WAE - OPERACIONAL (Timeframe atual) ==="
+input int    WAE_OPER_FastMA          = 20;
+input int    WAE_OPER_SlowMA          = 40;
+input int    WAE_OPER_BBLength        = 20;
+input double WAE_OPER_BBMultiplier    = 2.0;
+input int    WAE_OPER_Sensitivity     = 150;
+
+//╔══════════════════════════════════════════════════════════════════╗
+//║              📊 GG TRENDBAR - GLOBAL (Interno Multi-TF)          ║
+//║  (Indicador analisa todos os timeframes internamente)           ║
+//╚══════════════════════════════════════════════════════════════════╝
+
+input group "=== 📊 GG TRENDBAR - GLOBAL ==="
+input int                GG_ADX_Period = 14;           // ADX Period
+input ENUM_APPLIED_PRICE GG_ADX_Price  = PRICE_CLOSE;  // Price Type
+input double             GG_Step_Psar  = 0.02;         // PSAR Step
+input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
+
+input group "════════════════════════════════════════════════════════"
+input group "     ✅ FIM DOS PARÂMETROS - TOTAL: 90+ INPUTS         "
+input group "════════════════════════════════════════════════════════"
+
+//+------------------------------------------------------------------+
+//| CONSTANTES GLOBAIS                                               |
+//+------------------------------------------------------------------+
+const int    EA_MAGIC_NUMBER = 20241015;  // Magic Number do EA
+const string EA_VERSION      = "4.1";     // Versão do EA
+const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
+
+//+------------------------------------------------------------------+

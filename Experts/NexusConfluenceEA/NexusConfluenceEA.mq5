@@ -756,32 +756,8 @@ private:
    // Armazenar informações dos indicadores anexados para remoção posterior
    int    m_superTrendWindow;
    int    m_rsiWindow;
-   int    m_waeWindow;
-   bool   m_indicatorsAttached;
-
-  int DetermineIndicatorWindow(const long chartID,const int indicatorHandle,const int fallbackWindow) const
-    {
-    if(indicatorHandle == INVALID_HANDLE)
-      return fallbackWindow;
-
-    string shortName = "";
-    if(IndicatorGetString(indicatorHandle,INDICATOR_SHORTNAME,shortName))
-      {
-      int detected = ChartWindowFind(chartID,shortName);
-      if(detected >= 0)
-        return detected;
-      }
-
-    return fallbackWindow;
-    }
-
-  void LogAttachmentSuccess(const string name,const int windowIndex) const
-    {
-    if(windowIndex <= 0)
-      Print("[VisualManager] ✅ ",name," anexado ao gráfico (window ",windowIndex,")");
-    else
-      Print("[VisualManager] ✅ ",name," anexado em subwindow ",windowIndex);
-    }
+  int    m_waeWindow;
+  bool   m_indicatorsAttached;
 
 public:
    CVisualManager()
@@ -1047,8 +1023,7 @@ public:
 
          if(window >= 0)
            {
-            int actualWindow = DetermineIndicatorWindow(chartID, ggVisualHandle, requestedWindow);
-            LogAttachmentSuccess("GG_TrendBar", actualWindow);
+            Print("[VisualManager] ✅ GG_TrendBar anexado ao gráfico (window ", window, ")");
             attached++;
            }
          else
@@ -1078,9 +1053,8 @@ public:
 
          if(window >= 0)
            {
-            int actualWindow = DetermineIndicatorWindow(chartID, superTrendHandle, requestedWindow);
-            m_superTrendWindow = actualWindow;
-            LogAttachmentSuccess("SuperTrend (TrendMagic)", actualWindow);
+            m_superTrendWindow = window;
+            Print("[VisualManager] ✅ SuperTrend (TrendMagic) anexado ao gráfico (window ", window, ")");
             attached++;
            }
          else
@@ -1115,9 +1089,8 @@ public:
 
          if(window >= 0)
            {
-            int actualWindow = DetermineIndicatorWindow(chartID, rsiHandle, requestedWindow);
-            m_rsiWindow = actualWindow;
-            LogAttachmentSuccess("RSI OMA", actualWindow);
+            m_rsiWindow = window;
+            Print("[VisualManager] ✅ RSI OMA anexado em subwindow ", window);
             attached++;
            }
          else
@@ -1160,9 +1133,8 @@ public:
 
          if(window >= 0)
            {
-            int actualWindow = DetermineIndicatorWindow(chartID, waeHandle, requestedWindow);
-            m_waeWindow = actualWindow;
-            LogAttachmentSuccess("WAE", actualWindow);
+            m_waeWindow = window;
+            Print("[VisualManager] ✅ WAE anexado em subwindow ", window);
             attached++;
            }
          else

@@ -749,6 +749,12 @@ private:
    color  m_downColor;
    color  m_flatColor;
    int    m_corner;
+   
+   // Armazenar informações dos indicadores anexados para remoção posterior
+   int    m_superTrendWindow;
+   int    m_rsiWindow;
+   int    m_waeWindow;
+   bool   m_indicatorsAttached;
 
 public:
    CVisualManager()
@@ -769,6 +775,12 @@ public:
       m_downColor = clrRed;
       m_flatColor = clrYellow;
       m_corner = CORNER_RIGHT_UPPER;
+      
+      // Inicializar variáveis de controle
+      m_superTrendWindow = -1;
+      m_rsiWindow = -1;
+      m_waeWindow = -1;
+      m_indicatorsAttached = false;
      }
 
    // Criar objetos visuais do GG_TrendBar
@@ -897,6 +909,73 @@ public:
    // Remover todos os objetos visuais
    void RemoveAllVisuals()
      {
+      Print("============================================================");
+      Print("[VisualManager] Removendo TODOS os objetos e indicadores...");
+      Print("============================================================");
+      
+      long chartID = ChartID();
+      
+      // 1. REMOVER INDICADORES ANEXADOS DO GRÁFICO
+      if(m_indicatorsAttached)
+        {
+         // Remover SuperTrend (window 0)
+         if(m_superTrendWindow >= 0)
+           {
+            if(ChartIndicatorDelete(chartID, m_superTrendWindow, TrendMagicIndicator))
+              {
+               Print("[VisualManager] ✅ SuperTrend removido do gráfico");
+              }
+            else
+              {
+               // Tentar remover pelo nome completo
+               string fullName = "NexusConfluenceEA\\" + TrendMagicIndicator;
+               if(ChartIndicatorDelete(chartID, m_superTrendWindow, fullName))
+                  Print("[VisualManager] ✅ SuperTrend removido do gráfico (nome completo)");
+               else
+                  Print("[VisualManager] ⚠️ Erro ao remover SuperTrend: ", GetLastError());
+              }
+           }
+         
+         // Remover RSI OMA
+         if(m_rsiWindow >= 0)
+           {
+            if(ChartIndicatorDelete(chartID, m_rsiWindow, RSIOMAIndicator))
+              {
+               Print("[VisualManager] ✅ RSI OMA removido do gráfico");
+              }
+            else
+              {
+               // Tentar remover pelo nome completo
+               string fullName = "NexusConfluenceEA\\" + RSIOMAIndicator;
+               if(ChartIndicatorDelete(chartID, m_rsiWindow, fullName))
+                  Print("[VisualManager] ✅ RSI OMA removido do gráfico (nome completo)");
+               else
+                  Print("[VisualManager] ⚠️ Erro ao remover RSI OMA: ", GetLastError());
+              }
+           }
+         
+         // Remover WAE
+         if(m_waeWindow >= 0)
+           {
+            if(ChartIndicatorDelete(chartID, m_waeWindow, WAEIndicator))
+              {
+               Print("[VisualManager] ✅ WAE removido do gráfico");
+              }
+            else
+              {
+               // Tentar remover pelo nome completo
+               string fullName = "NexusConfluenceEA\\" + WAEIndicator;
+               if(ChartIndicatorDelete(chartID, m_waeWindow, fullName))
+                  Print("[VisualManager] ✅ WAE removido do gráfico (nome completo)");
+               else
+                  Print("[VisualManager] ⚠️ Erro ao remover WAE: ", GetLastError());
+              }
+           }
+         
+         m_indicatorsAttached = false;
+        }
+      
+      // 2. REMOVER OBJETOS VISUAIS DO GG_TRENDBAR
       // Remover headers do EA
       for(int i = 0; i < 9; i++)
         {
@@ -917,7 +996,8 @@ public:
       DeleteOriginalIndicatorObjects();
       
       ChartRedraw(0);
-      Print("[VisualManager] Objetos visuais removidos");
+      Print("[VisualManager] ✅ Todos os objetos visuais e indicadores removidos");
+      Print("============================================================");
      }
 
    // Anexar indicadores ao gráfico usando abordagem correta
@@ -941,6 +1021,8 @@ public:
         {
          // Adicionar ao gráfico principal (window 0)
          int window = ChartIndicatorAdd(chartID, 0, tempHandle);
+         m_superTrendWindow = window;  // Armazenar número da janela
+         
          if(window == 0)
            {
             Print("[VisualManager] ✅ SuperTrend anexado ao gráfico principal (window 0)");
@@ -973,6 +1055,7 @@ public:
          // Forçar nova subjanela usando número de janelas atuais + 1
          long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
          int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
+         m_rsiWindow = window;  // Armazenar número da janela
          
          if(window > 0)
            {
@@ -1006,6 +1089,7 @@ public:
          // Forçar nova subjanela usando número de janelas atuais + 1
          long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
          int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
+         m_waeWindow = window;  // Armazenar número da janela
          
          if(window > 0)
            {
@@ -1022,6 +1106,10 @@ public:
          Print("[VisualManager] ❌ Erro ao criar handle WAE: ", GetLastError());
          allSuccess = false;
         }
+      
+      // Marcar que indicadores foram anexados
+      if(allSuccess || m_superTrendWindow >= 0 || m_rsiWindow >= 0 || m_waeWindow >= 0)
+         m_indicatorsAttached = true;
       
       ChartRedraw(chartID);
       

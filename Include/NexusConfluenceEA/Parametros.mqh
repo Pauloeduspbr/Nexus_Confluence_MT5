@@ -392,6 +392,12 @@ input int    WAE_OPER_Sensitivity     = 150;
 //╚══════════════════════════════════════════════════════════════════╝
 
 input group "=== 📊 GG TRENDBAR - GLOBAL ==="
+input color              GG_UpColor       = clrLime;      // Up Trend Color
+input color              GG_DownColor     = clrRed;       // Down Trend Color
+input color              GG_FlatColor     = clrYellow;    // Flat/Neutral Color
+input color              GG_TextColor     = clrAqua;      // Text Color
+input ENUM_BASE_CORNER   GG_Corner        = CORNER_LEFT_UPPER; // Corner for Display
+input bool               GG_CreateVisualObjects = true;   // Create Visual Objects
 input int                GG_ADX_Period = 14;           // ADX Period
 input ENUM_APPLIED_PRICE GG_ADX_Price  = PRICE_CLOSE;  // Price Type
 input double             GG_Step_Psar  = 0.02;         // PSAR Step

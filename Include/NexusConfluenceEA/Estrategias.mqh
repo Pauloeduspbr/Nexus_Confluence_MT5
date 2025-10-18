@@ -342,7 +342,14 @@ bool InitializeIndicators(string symbol)
    }
    
    //--- GG TRENDBAR (global) ---
+   // IMPORTANTE: Precisa de TODOS os parâmetros visuais + CreateVisualObjects=true
    g_handles.gg_global = iCustom(symbol, PERIOD_CURRENT, path_gg,
+                                  GG_UpColor,              // UpColor
+                                  GG_DownColor,            // DownColor
+                                  GG_FlatColor,            // FlatColor
+                                  GG_TextColor,            // TextColor
+                                  GG_Corner,               // Corner
+                                  GG_CreateVisualObjects,  // CreateVisualObjects = TRUE!
                                   GG_ADX_Period,
                                   GG_ADX_Price,
                                   GG_Step_Psar,
@@ -351,6 +358,18 @@ bool InitializeIndicators(string symbol)
    {
       PrintFormat("❌ Erro ao criar handle GG TrendBar");
       return false;
+   }
+   
+   // IMPORTANTE: Anexar o indicador ao gráfico para visualização
+   int window = ChartIndicatorAdd(0, 0, g_handles.gg_global);
+   if(window >= 0)
+   {
+      PrintFormat("✅ GG TrendBar anexado ao gráfico (window %d)", window);
+   }
+   else
+   {
+      int error = GetLastError();
+      PrintFormat("⚠️ GG TrendBar não anexado visualmente (erro %d) - mas handle criado OK", error);
    }
    
    PrintFormat("✅ Todos os indicadores inicializados com sucesso!");

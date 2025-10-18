@@ -1049,18 +1049,18 @@ public:
          allSuccess = false;
         }
       
-      // 1. SUPERTREND - Usar handle persistente M15 da classe CTraderMagic
+      // 1. SUPERTREND (TrendMagic) - Usar handle persistente M15 da classe CTraderMagic
       int superTrendHandle = traderMagic.GetHandleM15();
       if(superTrendHandle != INVALID_HANDLE)
         {
-         // Tentar anexar ao gráfico principal (window 0)
+         // Anexar no gráfico principal (window 0) junto com GG_TrendBar
          int window = ChartIndicatorAdd(chartID, 0, superTrendHandle);
          
          if(window >= 0)
            {
             m_superTrendWindow = window;
             attached++;
-            Print("[VisualManager] ✅ SuperTrend anexado (window ", window, ")");
+            Print("[VisualManager] ✅ SuperTrend (TrendMagic) anexado no gráfico principal (window ", window, ")");
            }
          else
            {
@@ -1079,15 +1079,14 @@ public:
       int rsiHandle = rsiOMA.GetHandle();
       if(rsiHandle != INVALID_HANDLE)
         {
-         // Anexar em nova subwindow
-         long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int window = ChartIndicatorAdd(chartID, (int)totalWindows, rsiHandle);
+         // Anexar em subwindow 1 (primeira subwindow)
+         int window = ChartIndicatorAdd(chartID, 1, rsiHandle);
          
          if(window >= 0)
            {
             m_rsiWindow = window;
             attached++;
-            Print("[VisualManager] ✅ RSI OMA anexado (window ", window, ")");
+            Print("[VisualManager] ✅ RSI OMA anexado em subwindow ", window);
            }
          else
            {
@@ -1106,15 +1105,14 @@ public:
       int waeHandle = wae.GetHandle();
       if(waeHandle != INVALID_HANDLE)
         {
-         // Anexar em nova subwindow
-         long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int window = ChartIndicatorAdd(chartID, (int)totalWindows, waeHandle);
+         // Anexar em subwindow 2 (segunda subwindow)
+         int window = ChartIndicatorAdd(chartID, 2, waeHandle);
          
          if(window >= 0)
            {
             m_waeWindow = window;
             attached++;
-            Print("[VisualManager] ✅ WAE anexado (window ", window, ")");
+            Print("[VisualManager] ✅ WAE anexado em subwindow ", window);
            }
          else
            {

@@ -37,41 +37,82 @@
 //+------------------------------------------------------------------+
 double FindStructureSL(string symbol, TRADE_DIRECTION direction, int lookbackBars)
 {
-   double high[], low[];
+   double high[], low[], close[];
    
    // Copiar dados de preço do M15
    if(CopyHigh(symbol, PERIOD_M15, 1, lookbackBars, high) != lookbackBars ||
-      CopyLow(symbol, PERIOD_M15, 1, lookbackBars, low) != lookbackBars)
+      CopyLow(symbol, PERIOD_M15, 1, lookbackBars, low) != lookbackBars ||
+      CopyClose(symbol, PERIOD_M15, 0, 1, close) != 1)
    {
       PrintFormat("❌ Erro ao copiar dados de preço para calcular SL");
       return 0;
    }
    
    double slLevel = 0;
+   double currentPrice = close[0];
    
    if(direction == TRADE_DIRECTION_BUY)
    {
-      // Para COMPRA: Procurar último FUNDO significativo
-      // Usar o menor fundo dos últimos 20 candles
-      slLevel = low[ArrayMinimum(low, 0, MathMin(20, lookbackBars))];
+      // Para COMPRA: Procurar último SWING LOW (fundo com confirmação)
+      // Buscar nos últimos 10-15 candles (mais recente = melhor)
+      int maxLookback = MathMin(15, lookbackBars);
       
-      // Adicionar buffer de segurança (3-5 pontos)
-      double buffer = 5 * _Point;
+      // Começar do mais recente
+      for(int i = 2; i < maxLookback; i++)
+      {
+         // Verificar se é um swing low (mínimo local)
+         // Candle i tem low menor que i-1 e i+1
+         if(low[i] < low[i-1] && low[i] < low[i+1] && low[i] <= low[i-2] && low[i] <= low[i+2])
+         {
+            slLevel = low[i];
+            PrintFormat("   📍 SL COMPRA: Swing Low encontrado no candle[%d] = %.5f", i, slLevel);
+            break;
+         }
+      }
+      
+      // Se não encontrou swing, usar mínimo dos últimos 5 candles
+      if(slLevel == 0)
+      {
+         slLevel = low[ArrayMinimum(low, 0, MathMin(5, lookbackBars))];
+         PrintFormat("   📍 SL COMPRA: Usando mínimo recente (5 candles) = %.5f", slLevel);
+      }
+      
+      // Adicionar buffer de segurança (5-10 pontos)
+      double buffer = 10 * _Point;
       slLevel -= buffer;
       
-      PrintFormat("   📍 SL COMPRA: Último fundo = %.5f (com buffer %.5f)", slLevel + buffer, slLevel);
+      PrintFormat("   � SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
+                  slLevel, currentPrice - slLevel, (currentPrice - slLevel)/_Point);
    }
    else if(direction == TRADE_DIRECTION_SELL)
    {
-      // Para VENDA: Procurar último TOPO significativo
-      // Usar o maior topo dos últimos 20 candles
-      slLevel = high[ArrayMaximum(high, 0, MathMin(20, lookbackBars))];
+      // Para VENDA: Procurar último SWING HIGH (topo com confirmação)
+      int maxLookback = MathMin(15, lookbackBars);
       
-      // Adicionar buffer de segurança (3-5 pontos)
-      double buffer = 5 * _Point;
+      for(int i = 2; i < maxLookback; i++)
+      {
+         // Verificar se é um swing high
+         if(high[i] > high[i-1] && high[i] > high[i+1] && high[i] >= high[i-2] && high[i] >= high[i+2])
+         {
+            slLevel = high[i];
+            PrintFormat("   📍 SL VENDA: Swing High encontrado no candle[%d] = %.5f", i, slLevel);
+            break;
+         }
+      }
+      
+      // Se não encontrou swing, usar máximo dos últimos 5 candles
+      if(slLevel == 0)
+      {
+         slLevel = high[ArrayMaximum(high, 0, MathMin(5, lookbackBars))];
+         PrintFormat("   📍 SL VENDA: Usando máximo recente (5 candles) = %.5f", slLevel);
+      }
+      
+      // Adicionar buffer de segurança
+      double buffer = 10 * _Point;
       slLevel += buffer;
       
-      PrintFormat("   📍 SL VENDA: Último topo = %.5f (com buffer %.5f)", slLevel - buffer, slLevel);
+      PrintFormat("   � SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
+                  slLevel, slLevel - currentPrice, (slLevel - currentPrice)/_Point);
    }
    
    return slLevel;
@@ -122,6 +163,18 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       {
          result.errorMessage = "Não foi possível encontrar nível de SL";
          return result;
+      }
+      
+      // ✅ VALIDAR DIREÇÃO DO SL
+      if(direction == TRADE_DIRECTION_BUY && slLevel >= currentPrice)
+      {
+         PrintFormat("   ⚠️ SL COMPRA acima do preço! Usando 0.3%% abaixo");
+         slLevel = currentPrice * 0.997;
+      }
+      else if(direction == TRADE_DIRECTION_SELL && slLevel <= currentPrice)
+      {
+         PrintFormat("   ⚠️ SL VENDA abaixo do preço! Usando 0.3%% acima");
+         slLevel = currentPrice * 1.003;
       }
       
       result.positionSize = FixedLotSize;
@@ -186,6 +239,34 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       result.errorMessage = "Não foi possível encontrar nível de SL";
       PrintFormat("❌ %s", result.errorMessage);
       return result;
+   }
+   
+   // ✅ VALIDAR DIREÇÃO DO SL (CRÍTICO!)
+   if(direction == TRADE_DIRECTION_BUY)
+   {
+      // Para COMPRA: SL DEVE estar ABAIXO do preço de entrada
+      if(slLevel >= currentPrice)
+      {
+         PrintFormat("   ⚠️ ERRO: SL COMPRA está ACIMA do preço de entrada!");
+         PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
+         
+         // Usar SL baseado em percentual (0.3% abaixo)
+         slLevel = currentPrice * 0.997;
+         PrintFormat("      ✅ Usando SL percentual: %.5f (0.3%% abaixo)", slLevel);
+      }
+   }
+   else // SELL
+   {
+      // Para VENDA: SL DEVE estar ACIMA do preço de entrada
+      if(slLevel <= currentPrice)
+      {
+         PrintFormat("   ⚠️ ERRO: SL VENDA está ABAIXO do preço de entrada!");
+         PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
+         
+         // Usar SL baseado em percentual (0.3% acima)
+         slLevel = currentPrice * 1.003;
+         PrintFormat("      ✅ Usando SL percentual: %.5f (0.3%% acima)", slLevel);
+      }
    }
    
    // Calcular distância SL em pontos

@@ -58,6 +58,14 @@ enum ASSET_CLASS
    ASSET_CLASS_TOTAL        = 10  // Total de classes (controle)
 };
 
+//--- Modo de controle de posições
+enum POSITION_CONTROL_MODE
+{
+   POSITION_MODE_SINGLE    = 0,  // Uma posição por vez
+   POSITION_MODE_MULTIPLE  = 1,  // Múltiplas posições permitidas
+   POSITION_MODE_PROTECTED = 2   // Múltiplas após lucro protegido
+};
+
 //+------------------------------------------------------------------+
 //| SEÇÃO 2: ESTRUTURAS DE DADOS (STRUCTS)                           |
 //+------------------------------------------------------------------+
@@ -260,6 +268,11 @@ input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pont
 input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estrutura M15
 input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
 input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
+
+input group "=== 📊 CONTROLE DE POSIÇÕES ==="
+input POSITION_CONTROL_MODE PositionControlMode = POSITION_MODE_SINGLE; // � Modo de controle de posições
+input bool   RequireBreakevenBeforeNew = true;   // �️ Exigir lucro protegido antes de nova posição
+input double BreakevenTriggerRR      = 0.5;      // 📏 RR mínimo para acionar breakeven (0.5 = 50% do TP1)
 
 input group "=== 📁 INDICADORES - Caminhos dos Arquivos ==="
 input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // 📂 Pasta relativa em MQL5/Indicators

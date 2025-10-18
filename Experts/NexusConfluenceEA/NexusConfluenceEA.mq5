@@ -202,9 +202,47 @@ void OnTick()
    if(!ValidateMarketConditions(_Symbol, g_currentAssetClass))
       return;
 
-   // ETAPA 6: Verificar se já não temos trades demais
-   if(CountOpenTrades() >= MaxSimultaneousTrades)
-      return;
+   // ETAPA 6: CONTROLE DE POSIÇÕES - Verificar modo configurado
+   int openPositions = CountOpenTrades();
+   
+   switch(PositionControlMode)
+   {
+      case POSITION_MODE_SINGLE:
+         // ✅ Apenas 1 posição por vez
+         if(openPositions > 0)
+         {
+            PrintFormat("⏸️ Modo SINGLE: Já existe %d posição(ões) aberta(s), aguardando fechamento", openPositions);
+            return;
+         }
+         break;
+         
+      case POSITION_MODE_MULTIPLE:
+         // ✅ Múltiplas posições até limite máximo
+         if(openPositions >= MaxSimultaneousTrades)
+         {
+            PrintFormat("⏸️ Modo MULTIPLE: Limite de %d posições atingido", MaxSimultaneousTrades);
+            return;
+         }
+         break;
+         
+      case POSITION_MODE_PROTECTED:
+         // ✅ Múltiplas posições apenas após lucro protegido
+         if(openPositions > 0)
+         {
+            if(RequireBreakevenBeforeNew && !HasProtectedProfit())
+            {
+               PrintFormat("⏸️ Modo PROTECTED: Aguardando lucro protegido em posição existente (RR >= %.1f)", BreakevenTriggerRR);
+               return;
+            }
+            
+            if(openPositions >= MaxSimultaneousTrades)
+            {
+               PrintFormat("⏸️ Modo PROTECTED: Limite de %d posições atingido", MaxSimultaneousTrades);
+               return;
+            }
+         }
+         break;
+   }
 
    // ETAPA 7: Calcular risco e tamanho da posição
    RiskCalculation risk = CalculateRiskPosition(_Symbol, score, mtf.direction, g_currentAssetClass);
@@ -573,10 +611,65 @@ void PrintConfiguration()
    PrintFormat("   Risco Premium: %.2f%%", MaxRiskPremium);
    PrintFormat("   Drawdown máximo: %.2f%%", MaxDrawdownPercent);
    PrintFormat("   Trades simultâneos: %d", MaxSimultaneousTrades);
+   PrintFormat("   Modo posições: %s", 
+               (PositionControlMode == POSITION_MODE_SINGLE) ? "SINGLE" :
+               (PositionControlMode == POSITION_MODE_MULTIPLE) ? "MULTIPLE" : "PROTECTED");
    PrintFormat("   Lote fixo: %.2f (0 = auto)", FixedLotSize);
    PrintFormat("   Alertas: %s", SendAlerts ? "SIM" : "NÃO");
    PrintFormat("   TP parcial: %s", EnablePartialTP ? "SIM" : "NÃO");
    PrintFormat("   Trailing: %s", EnableTrailing ? "SIM" : "NÃO");
+  }
+
+//+------------------------------------------------------------------+
+//| Verifica se alguma posição tem lucro protegido (breakeven)      |
+//+------------------------------------------------------------------+
+bool HasProtectedProfit()
+  {
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket <= 0) continue;
+      
+      // Verificar se é posição deste EA
+      if(PositionGetString(POSITION_SYMBOL) != _Symbol) continue;
+      if(PositionGetInteger(POSITION_MAGIC) != EA_MAGIC_NUMBER) continue;
+      
+      // Obter dados da posição
+      double entryPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+      double currentSL = PositionGetDouble(POSITION_SL);
+      double currentPrice = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ?
+                            SymbolInfoDouble(_Symbol, SYMBOL_BID) :
+                            SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      
+      // Calcular lucro em termos de RR
+      double slDistance = MathAbs(entryPrice - currentSL);
+      
+      if(slDistance == 0) continue; // Evitar divisão por zero
+      
+      // Calcular distância do lucro atual
+      double profitDistance = 0;
+      if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+        {
+         profitDistance = currentPrice - entryPrice;
+        }
+      else
+        {
+         profitDistance = entryPrice - currentPrice;
+        }
+      
+      // Calcular RR atual
+      double currentRR = profitDistance / slDistance;
+      
+      // Verificar se atingiu o gatilho de breakeven
+      if(currentRR >= BreakevenTriggerRR)
+        {
+         PrintFormat("   ✅ Posição #%I64u tem lucro protegido (RR atual: %.2f >= %.2f)", 
+                     ticket, currentRR, BreakevenTriggerRR);
+         return true;
+        }
+     }
+   
+   return false; // Nenhuma posição com lucro protegido
   }
 
 //+------------------------------------------------------------------+

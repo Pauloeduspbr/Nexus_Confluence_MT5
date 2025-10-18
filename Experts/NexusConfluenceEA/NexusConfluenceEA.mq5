@@ -45,57 +45,27 @@ ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
 // Controle de novo candle para evitar análise redundante
 datetime g_lastCandleTime = 0;
 
-/* ═══════════════════════════════════════════════════════════════
-   BLOCO DE CÓDIGO OBSOLETO - COMENTADO EM 2025
-   
-   Todo o código abaixo (classes antigas) foi substituído pelo
-   novo sistema modular em Include/NexusConfluenceEA/*.mqh
-   
-   Mantido apenas como referência histórica e será removido em
-   versão futura após validação completa do novo sistema.
-   ═══════════════════════════════════════════════════════════════
+//+------------------------------------------------------------------+
+//| FUNÇÕES DO CICLO DE VIDA DO EA                                   |
+//+------------------------------------------------------------------+
 
-//--- Forward declarations de classes
-class CAssetManager;
-class CIndicatorManager;
-class CTimeFrameAnalyzer;
-class CSetupScorer;
-class CRiskManager;
-class CTradeManager;
-class CHoursManager;
-class CStatistics;
-class CProtectionSystem;
-
-//--- Prototipagem de funções auxiliares
-string  BoolToText(const bool value);
-string  ComposeIndicatorPath(const string fileName);
-double  ConvertPipsToPrice(const string symbol,const double pips);
-double  ConvertPriceToPips(const string symbol,const double priceDistance);
-string  SetupClassToString(const SETUP_CLASS cls);
-string  DirectionToString(const TRADE_DIRECTION dir);
-void    CleanupOldLogs();
-void    ValidateSystemIntegrity();
-
-//--- Classes principais
-class CAssetManager
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
+int OnInit()
   {
-private:
-   AssetConfig m_configs[ASSET_CLASS_TOTAL];
-public:
-   CAssetManager()
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("   🎯 INICIANDO %s v%s", EA_NAME, EA_VERSION);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+
+   // 1. Detectar timeframe operacional
+   ENUM_TIMEFRAMES tfOper = Period();
+   PrintFormat("📊 Timeframe Operacional: %s", EnumToString(tfOper));
+
+   // 2. Validar se timeframe é suportado
+   if(!IsSupportedTimeframe(tfOper))
      {
-      InitializeConfigs();
-     }
-
-   ASSET_CLASS ClassifyAsset(const string symbol) const
-     {
-  string sym = symbol;
-  StringToUpper(sym);
-
-      if(sym == "XAUUSD" || sym == "XAGUSD" || StringFind(sym,"XAU") == 0 || StringFind(sym,"XAG") == 0)
-         return ASSET_CLASS_METALS;
-
-      if(StringFind(sym,"WIN") == 0 || StringFind(sym,"IND") == 0)
+      PrintFormat("❌ ERRO: Timeframe %s não é suportado pelo sistema!", EnumToString(tfOper));
          return ASSET_CLASS_INDEX_B3;
 
       if(StringFind(sym,"WDO") == 0 || StringFind(sym,"DOL") == 0)
@@ -2632,12 +2602,9 @@ void DestroyGlobalObjects()
       delete assetManager;
       assetManager = NULL;
      }
-  }
-
-FIM DO BLOCO OBSOLETO - TODO O CÓDIGO ACIMA FOI COMENTADO
-═══════════════════════════════════════════════════════════════ */
-
-//--- Funções do ciclo de vida do EA
+//+------------------------------------------------------------------+
+//| FUNÇÕES DO CICLO DE VIDA DO EA                                   |
+//+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -2973,26 +2940,6 @@ string AssetClassToString(ASSET_CLASS cls)
       case ASSET_CLASS_METALS: return "Metais (Ouro/Prata)";
       case ASSET_CLASS_CRYPTO: return "Criptomoedas";
       default: return "Desconhecido";
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Converter ENUM_TIMEFRAMES para string legível                   |
-//+------------------------------------------------------------------+
-string TimeframeToString(ENUM_TIMEFRAMES tf)
-  {
-   switch(tf)
-     {
-      case PERIOD_M1:  return "M1";
-      case PERIOD_M5:  return "M5";
-      case PERIOD_M15: return "M15";
-      case PERIOD_M30: return "M30";
-      case PERIOD_H1:  return "H1";
-      case PERIOD_H4:  return "H4";
-      case PERIOD_D1:  return "D1";
-      case PERIOD_W1:  return "W1";
-      case PERIOD_MN1: return "MN1";
-      default:         return "UNKNOWN";
      }
   }
 

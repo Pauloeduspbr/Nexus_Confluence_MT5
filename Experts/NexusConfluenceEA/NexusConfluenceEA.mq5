@@ -622,12 +622,19 @@ public:
       m_symbol = symbol;
       string path = ComposeIndicatorPath(GGTrendBarIndicator);
       
-      // IMPORTANTE: Usar PERIOD_M1 em vez de PERIOD_CURRENT
-      // Isso evita que o indicador crie objetos visuais no gráfico atual
-      // O indicador só cria objetos quando está no timeframe do gráfico
+      // IMPORTANTE: Passar CreateVisualObjects=false para evitar duplicação
+      // O EA criará seus próprios objetos visuais no canto direito
       m_handle = iCustom(symbol, PERIOD_M1, path, 
-                         GG_ADX_Period, GG_ADX_Price, 
-                         GG_Step_Psar, GG_Max_Psar);
+                         clrLime,              // UpColor
+                         clrRed,               // DownColor
+                         clrYellow,            // FlatColor
+                         clrAqua,              // TextColor
+                         CORNER_LEFT_UPPER,    // Corner (não usado, mas necessário)
+                         false,                // CreateVisualObjects = FALSE!
+                         GG_ADX_Period,        // ADX_Period
+                         GG_ADX_Price,         // ADX_Price
+                         GG_Step_Psar,         // Step_Psar
+                         GG_Max_Psar);         // Max_Psar
                          
       if(m_handle == INVALID_HANDLE)
         {
@@ -637,7 +644,7 @@ public:
         }
         
       m_initialized = true;
-      Print("[GG_TrendBar] Inicializado com sucesso (dados de M1, sem objetos visuais)");
+      Print("[GG_TrendBar] Inicializado com sucesso - Visual objects disabled");
       return true;
      }
 

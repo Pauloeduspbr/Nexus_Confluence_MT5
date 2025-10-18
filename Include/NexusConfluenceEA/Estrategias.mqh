@@ -474,13 +474,22 @@ TMSignal GetTrendMagicSignal(int handle, ENUM_TIMEFRAMES timeframe)
       return result;
    }
    
-   // Determinar direção atual (qual linha está ativa)
-   bool currentBullish = (bufferUp[0] != EMPTY_VALUE && bufferUp[0] > 0);
-   bool currentBearish = (bufferDown[0] != EMPTY_VALUE && bufferDown[0] > 0);
+   // DEBUG: Mostrar valores dos buffers
+   PrintFormat("📊 Trend Magic %s - Buffers [0]Up=%.5f [0]Down=%.5f [1]Up=%.5f [1]Down=%.5f", 
+               TimeframeToString(timeframe),
+               bufferUp[0], bufferDown[0],
+               bufferUp[1], bufferDown[1]);
+   
+   // CORREÇÃO CRÍTICA: Em Supertrend/TrendMagic, quando o buffer tem valor (não é EMPTY_VALUE),
+   // aquele é o buffer ATIVO. O outro buffer fica em EMPTY_VALUE ou 0.
+   
+   // Determinar direção atual (qual linha tem valor válido)
+   bool currentBullish = (bufferUp[0] != EMPTY_VALUE && bufferUp[0] != 0);
+   bool currentBearish = (bufferDown[0] != EMPTY_VALUE && bufferDown[0] != 0);
    
    // Verificar se mudou de cor recentemente (últimos 2 candles)
-   bool wasBullish = (bufferUp[2] != EMPTY_VALUE && bufferUp[2] > 0);
-   bool wasBearish = (bufferDown[2] != EMPTY_VALUE && bufferDown[2] > 0);
+   bool wasBullish = (bufferUp[2] != EMPTY_VALUE && bufferUp[2] != 0);
+   bool wasBearish = (bufferDown[2] != EMPTY_VALUE && bufferDown[2] != 0);
    
    // Detectar mudança confirmada
    if(currentBullish && !wasBullish)
@@ -493,23 +502,33 @@ TMSignal GetTrendMagicSignal(int handle, ENUM_TIMEFRAMES timeframe)
    }
    
    // Definir direção
-   if(currentBullish)
+   if(currentBullish && !currentBearish)
    {
       result.direction = TRADE_DIRECTION_BUY;
       result.strength = bufferUp[0];
       result.isValid = true;
+      PrintFormat("   ✅ %s = BULLISH (BUY)", TimeframeToString(timeframe));
    }
-   else if(currentBearish)
+   else if(currentBearish && !currentBullish)
    {
       result.direction = TRADE_DIRECTION_SELL;
       result.strength = bufferDown[0];
       result.isValid = true;
+      PrintFormat("   ✅ %s = BEARISH (SELL)", TimeframeToString(timeframe));
+   }
+   else if(currentBullish && currentBearish)
+   {
+      // Ambos têm valor - situação anormal, tratar como indeciso
+      result.direction = TRADE_DIRECTION_NONE;
+      result.isValid = false;
+      PrintFormat("   ⚠️ %s = AMBÍGUO (ambos buffers ativos)", TimeframeToString(timeframe));
    }
    else
    {
-      // Indeciso (amarelo ou sem sinal)
+      // Nenhum tem valor - indeciso (amarelo ou sem sinal)
       result.direction = TRADE_DIRECTION_NONE;
       result.isValid = false;
+      PrintFormat("   ⚠️ %s = NEUTRO/INDECISO", TimeframeToString(timeframe));
    }
    
    return result;

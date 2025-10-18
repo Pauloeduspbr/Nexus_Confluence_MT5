@@ -42,6 +42,9 @@ int    g_lastCleanupDay  = -1;
 double g_pointValueCache = 0.0;
 ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
 
+// Controle de novo candle para evitar análise redundante
+datetime g_lastCandleTime = 0;
+
 /* ═══════════════════════════════════════════════════════════════
    BLOCO DE CÓDIGO OBSOLETO - COMENTADO EM 2025
    
@@ -2815,6 +2818,25 @@ FIM DO BLOCO OnTimer/OnTradeTransaction antigas
 //+------------------------------------------------------------------+
 void OnTick()
   {
+   // ═══════════════════════════════════════════════════════════════
+   // VERIFICAÇÃO CRÍTICA: Só executar em NOVO CANDLE
+   // ═══════════════════════════════════════════════════════════════
+   datetime currentCandleTime = iTime(_Symbol, Period(), 0);
+   
+   // Se ainda é o mesmo candle, NÃO processar (evita logs por segundo)
+   if(currentCandleTime == g_lastCandleTime)
+   {
+      return; // Aguardar próximo candle
+   }
+   
+   // Novo candle detectado! Atualizar timestamp
+   g_lastCandleTime = currentCandleTime;
+   
+   PrintFormat("\n🕐 NOVO CANDLE %s: %s", 
+               EnumToString(Period()), 
+               TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   
    // ETAPA 1: Validações básicas de segurança
    if(!ValidateBasicConditions())
       return;
@@ -2951,6 +2973,26 @@ string AssetClassToString(ASSET_CLASS cls)
       case ASSET_CLASS_METALS: return "Metais (Ouro/Prata)";
       case ASSET_CLASS_CRYPTO: return "Criptomoedas";
       default: return "Desconhecido";
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Converter ENUM_TIMEFRAMES para string legível                   |
+//+------------------------------------------------------------------+
+string TimeframeToString(ENUM_TIMEFRAMES tf)
+  {
+   switch(tf)
+     {
+      case PERIOD_M1:  return "M1";
+      case PERIOD_M5:  return "M5";
+      case PERIOD_M15: return "M15";
+      case PERIOD_M30: return "M30";
+      case PERIOD_H1:  return "H1";
+      case PERIOD_H4:  return "H4";
+      case PERIOD_D1:  return "D1";
+      case PERIOD_W1:  return "W1";
+      case PERIOD_MN1: return "MN1";
+      default:         return "UNKNOWN";
      }
   }
 

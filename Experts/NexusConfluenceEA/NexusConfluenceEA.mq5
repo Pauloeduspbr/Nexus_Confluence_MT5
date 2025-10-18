@@ -736,11 +736,15 @@ public:
 
       return goodSetup;
      }
+
+   // Getter para anexação visual ao gráfico
+   int GetHandle() const { return m_handle; }
   };
 
 //+------------------------------------------------------------------+
 //| Forward declarations para uso em CVisualManager                  |
 //+------------------------------------------------------------------+
+class CGGTrendBar;
 class CTraderMagic;
 class CRSIOMA;
 class CWAE;
@@ -987,7 +991,7 @@ public:
      }
 
    // Anexar indicadores ao gráfico usando handles persistentes das classes
-   bool AttachIndicatorsToChart(CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
+   bool AttachIndicatorsToChart(CGGTrendBar &ggTrendBar, CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
      {
       // No testador de estratégia, não anexar visualmente (não suportado)
       if(MQLInfoInteger(MQL_TESTER))
@@ -1003,6 +1007,31 @@ public:
       
       Print("============================================================");
       Print("[VisualManager] Anexando indicadores ao gráfico...");
+      
+      // 0. GG_TRENDBAR - Usar handle persistente da classe CGGTrendBar
+      int ggHandle = ggTrendBar.GetHandle();
+      if(ggHandle != INVALID_HANDLE)
+        {
+         // Anexar ao gráfico principal (window 0)
+         int window = ChartIndicatorAdd(chartID, 0, ggHandle);
+         
+         if(window >= 0)
+           {
+            attached++;
+            Print("[VisualManager] ✅ GG_TrendBar anexado visualmente ao gráfico (window ", window, ")");
+           }
+         else
+           {
+            int error = GetLastError();
+            Print("[VisualManager] ⚠️ GG_TrendBar não anexado visualmente (erro ", error, ") - objetos visuais do EA funcionam normalmente");
+            allSuccess = false;
+           }
+        }
+      else
+        {
+         Print("[VisualManager] ⚠️ Handle GG_TrendBar inválido");
+         allSuccess = false;
+        }
       
       // 1. SUPERTREND - Usar handle persistente M15 da classe CTraderMagic
       int superTrendHandle = traderMagic.GetHandleM15();
@@ -1088,8 +1117,8 @@ public:
       
       ChartRedraw(chartID);
       
-      Print("[VisualManager] Resultado: ", attached, "/3 indicadores anexados visualmente");
-      Print("[VisualManager] GG_TrendBar: Objetos visuais ativos ✅");
+      Print("[VisualManager] Resultado: ", attached, "/4 indicadores anexados visualmente");
+      Print("[VisualManager] GG_TrendBar: Objetos visuais do EA + indicador visual ativos ✅");
       Print("[VisualManager] Todos indicadores funcionam via handles para cálculos ✅");
       Print("============================================================");
       
@@ -1509,8 +1538,8 @@ public:
       // SEGUNDO: Criar objetos visuais do GG_TrendBar (EA gerencia)
       m_visualManager.CreateGGTrendBarVisuals();
       
-      // TERCEIRO: Anexar outros indicadores ao gráfico usando handles persistentes
-      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_traderMagic, m_rsi, m_wae);
+      // TERCEIRO: Anexar todos os indicadores ao gráfico usando handles persistentes
+      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_ggTrendBar, m_traderMagic, m_rsi, m_wae);
       
       if(!indicatorsAttached)
         {

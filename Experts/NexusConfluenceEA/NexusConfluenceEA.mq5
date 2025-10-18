@@ -1,281 +1,38 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.0 - Sistema Universal de Trading          |
+//| Nexus Confluence EA v4.1 - Sistema Universal Multi-Timeframe     |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |
 //| Descrição: Expert Advisor completo que implementa sistema        |
 //| multi-ativo com gestão de risco baseada em estrutura             |
+//| NOVO v4.1: Suporte a múltiplos timeframes (M1, M5, M15, M30,    |
+//|            H1, H4) com parâmetros independentes                  |
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.0                                                      |
+//| Versão: 4.1 - Multi-Timeframe Universal                         |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
 //| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
-//| DEPENDÊNCIAS: Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.0                                                      |
+//| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
+//|               Indicators/NexusConfluenceEA/*.mq5                 |
+//| VERSÃO: 4.1                                                      |
 //+------------------------------------------------------------------+
 #property strict
 
+//--- Incluir módulos do EA (ORDEM IMPORTANTE!)
 #include <Trade\Trade.mqh>
+#include "..\..\Include\NexusConfluenceEA\Parametros.mqh"
+#include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
 
-//--- Constantes globais
-input group "=== CONFIGURAÇÕES GERAIS ==="
-input double AccountRiskPercent       = 1.5;   // Risco padrão (setup BOM)
-input double MaxRiskPremium           = 2.0;   // Risco máximo setup PREMIUM
-input double MaxDrawdownPercent       = 15.0;  // Drawdown máximo permitido (%)
-input int    MaxSimultaneousTrades    = 3;     // Máximo de trades simultâneos
-input bool   EnableSecondaryHours     = true;  // Habilitar horários secundários Forex
-input bool   EnableMorningB3          = false; // Habilitar sessão da manhã B3
-input bool   AvoidNews                = true;  // Evitar operar em notícias
-input bool   ValidateATRRange         = true;  // Validar ATR por ativo
-input bool   SendAlerts               = true;  // Enviar notificações push
-input bool   EnablePartialTP          = true;  // Habilitar saídas parciais
-input bool   EnableTrailing           = true;  // Habilitar trailing stop
-input double TP1_RR                   = 1.0;   // RR para realização parcial 1
-input double TP2_RR                   = 2.0;   // RR para realização parcial 2
-input double TrailingDistanceMultiplier = 1.0; // Multiplicador distância trailing
-input int    MaxSlippagePoints        = 30;    // Desvio máximo em pontos
-input int    LookbackStructureBars    = 80;    // Candles para buscar estrutura M15
-input int    BrokerGMTOffset          = 2;     // Fuso horário do broker (horário de inverno)
+//--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
+//--- NOTA: Todas as funções de estratégia estão agora em Estrategias.mqh
 
-input group "=== GESTÃO DE LOTE ==="
-input double FixedLotSize             = 0.0;   // Lote Fixo (0 = cálculo automático por risco %)
-                                               // Forex: 0.01 | B3: 1.0 | Índices: 0.1 | etc
 
-input group "=== FILTRO SEMANAL - Dias da Semana ==="
-input bool   TradeOnMonday            = true;  // Operar na Segunda-feira
-input bool   TradeOnTuesday           = true;  // Operar na Terça-feira
-input bool   TradeOnWednesday         = true;  // Operar na Quarta-feira
-input bool   TradeOnThursday          = true;  // Operar na Quinta-feira
-input bool   TradeOnFriday            = true;  // Operar na Sexta-feira
-input bool   TradeOnSaturday          = false; // Operar no Sábado (Cripto 24/7)
-input bool   TradeOnSunday            = false; // Operar no Domingo (Cripto 24/7)
+//--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
+//--- NOTA: Todas as funções de estratégia estão agora em Estrategias.mqh
 
-input group "=== HORÁRIOS CUSTOMIZÁVEIS (para otimização) ==="
-input bool   UseCustomTradingHours    = false; // Usar horários customizados
-input int    CustomStartHour          = 9;     // Horário início (hora)
-input int    CustomStartMinute        = 0;     // Horário início (minuto)
-input int    CustomEndHour            = 17;    // Horário fim (hora)
-input int    CustomEndMinute          = 30;    // Horário fim (minuto)
-
-input group "=== TREND MAGIC - PARÂMETROS ==="
-input int    TM_CCI_Period            = 50;
-input int    TM_ATR_Period            = 5;
-input double TM_ATR_Multiplier        = 1.0;
-
-input group "=== CURRENCY STRENGTH - PARÂMETROS ==="
-input int    CS_CalculationPeriod     = 24;
-input int    CS_SmoothingPeriod       = 5;
-input bool   CS_ShowInPercent         = true;
-
-input group "=== RSI OMA - PARÂMETROS ==="
-input int         RSI_Period          = 14;
-input int         RSI_MA_Period       = 9;
-input ENUM_MA_METHOD RSI_MA_Method    = MODE_SMA;
-input double      RSI_HighLevel       = 70.0;
-input double      RSI_LowLevel        = 30.0;
-input bool        RSI_ShowLevels      = true;
-
-input group "=== WAE - PARÂMETROS ==="
-input int    WAE_FastMA               = 20;
-input int    WAE_SlowMA               = 40;
-input int    WAE_BBLength             = 20;
-input double WAE_BBMultiplier         = 2.0;
-input int    WAE_Sensitivity          = 150;
-
-input group "=== GG TRENDBAR - PARÂMETROS ==="
-input int    GG_ADX_Period            = 14;           // ADX period
-input ENUM_APPLIED_PRICE GG_ADX_Price = PRICE_CLOSE;  // Price for PSAR comparison
-input double GG_Step_Psar             = 0.02;         // PSAR step
-input double GG_Max_Psar              = 0.20;         // PSAR maximum
-
-input group "=== INDICADORES - NOMES DOS ARQUIVOS ==="
-input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // Pasta relativa em MQL5/Indicators
-input string GGTrendBarIndicator      = "GG_TrendBar_Indicator";
-input string TrendMagicIndicator      = "TrendMagic_MT5";
-input string CurrencyStrengthIndicator= "CurrencyStrengthMeter_MT5";
-input string RSIOMAIndicator          = "RSIOMA_v2HHLSX_MT5";
-input string WAEIndicator             = "WaddahAttarExplosion_Professional";
-
-//--- Enumeradores do sistema
-enum TRADE_DIRECTION
-  {
-   TRADE_DIRECTION_NONE = -1,
-   TRADE_DIRECTION_BUY  = 0,
-   TRADE_DIRECTION_SELL = 1
-  };
-
-enum SETUP_CLASS
-  {
-   SETUP_REJECT = 0,
-   SETUP_GOOD   = 1,
-   SETUP_PREMIUM= 2
-  };
-
-enum ASSET_CLASS
-  {
-   ASSET_CLASS_UNKNOWN = 0,
-   ASSET_CLASS_FOREX_MAJOR,
-   ASSET_CLASS_FOREX_MINOR,
-   ASSET_CLASS_FOREX_EXOTIC,
-   ASSET_CLASS_CURRENCY_B3,
-   ASSET_CLASS_INDEX_B3,
-   ASSET_CLASS_INDEX_US,
-   ASSET_CLASS_INDEX_EU,
-   ASSET_CLASS_METALS,
-   ASSET_CLASS_CRYPTO,
-   ASSET_CLASS_TOTAL
-  };
-
-//--- Estruturas de dados
-struct TMSignal
-  {
-   bool            isValid;
-   TRADE_DIRECTION direction;
-   double          strength;
-   ENUM_TIMEFRAMES timeframe;
-   bool            turnedRecently;
-  };
-
-struct CSSignal
-  {
-   bool  isValid;
-   bool  isAligned;
-   double strength;
-  };
-
-struct RSISignal
-  {
-   bool  isValid;
-   bool  isAligned;
-   double strength;
-   double slope;
-  };
-
-struct WAESignal
-  {
-   bool  isValid;
-   bool  isAligned;
-   bool  isExpanding;
-   double strength;
-  };
-
-struct GGTrendBarSignal
-  {
-   bool            isValid;
-   int             m1Value;      // +1 bullish, 0 neutral, -1 bearish
-   int             m5Value;
-   int             m15Value;
-   int             m30Value;
-   int             h1Value;
-   int             h4Value;
-   int             d1Value;
-   int             w1Value;
-   int             mn1Value;
-   bool            h4Bullish;
-   bool            h1Bullish;
-   bool            m30Bullish;
-   bool            m15Bullish;
-   TRADE_DIRECTION overallDirection;
-  };
-
-struct MultiTFResult
-  {
-   bool            isValid;
-   TRADE_DIRECTION direction;
-   bool            h4Aligned;
-   bool            h1Aligned;
-   bool            m30Aligned;
-   bool            structureValid;
-  };
-
-struct SetupScore
-  {
-   SETUP_CLASS classification;
-   int         requiredPoints;
-   int         totalPoints;
-   int         traderMagicPoints;
-   int         currencyStrengthPoints;
-   int         rsiomaPoints;
-   int         waePoints;
-   TRADE_DIRECTION direction;
-  };
-
-struct RiskCalculation
-  {
-   bool            isValid;
-   string          errorMessage;
-   TRADE_DIRECTION direction;
-   SETUP_CLASS     classification;
-   double          entryPrice;
-   double          stopLoss;
-   double          slDistance;
-   double          positionSize;
-   double          riskAmount;
-   double          tp1;
-   double          tp2;
-   double          trailingStart;
-  };
-
-struct AssetConfig
-  {
-   bool   useCurrencyStrength;
-   int    requiredFilters;
-   int    minFiltersForTrade;
-   double idealSLMinPips;
-   double idealSLMaxPips;
-   double slBufferPips;
-   double minATR;
-   double maxATR;
-   double maxSpreadPips;
-   double trailingDistancePips;
-   double pipValueOverride;
-   int    primeHourStart;
-   int    primeHourEnd;
-   double premiumRiskPercent;
-   double goodRiskPercent;
-  };
-
-struct IndicatorHandles
-  {
-   int tm_h4;
-   int tm_h1;
-   int tm_m30;
-   int tm_m15;
-   int cs_m15;
-   int rsi_h4;
-   int rsi_h1;
-   int rsi_m30;
-   int rsi_m15;
-   int wae_h4;
-   int wae_h1;
-   int wae_m30;
-   int wae_m15;
-  };
-
-struct TradeRecord
-  {
-   datetime        openTime;
-   datetime        closeTime;
-   string          symbol;
-   TRADE_DIRECTION direction;
-   double          openPrice;
-   double          closePrice;
-   double          profit;
-   double          riskAmount;
-   double          rr;
-   SETUP_CLASS     setupClass;
-   string          closeReason;
-   bool            tp1Hit;
-   bool            tp2Hit;
-  };
-
-//--- Variáveis globais
-const int    EA_MAGIC_NUMBER = 20241015;
-const string EA_VERSION      = "4.0";
-const string EA_NAME         = "Nexus Confluence Universal";
-
+//--- Variáveis globais do EA principal
 CTrade g_trade;
 double g_initialBalance = 0.0;
 bool   g_tradingPaused  = false;
@@ -283,6 +40,17 @@ int    g_lastReportMonth = -1;
 int    g_lastCleanupDay  = -1;
 
 double g_pointValueCache = 0.0;
+ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
+
+/* ═══════════════════════════════════════════════════════════════
+   BLOCO DE CÓDIGO OBSOLETO - COMENTADO EM 2025
+   
+   Todo o código abaixo (classes antigas) foi substituído pelo
+   novo sistema modular em Include/NexusConfluenceEA/*.mqh
+   
+   Mantido apenas como referência histórica e será removido em
+   versão futura após validação completa do novo sistema.
+   ═══════════════════════════════════════════════════════════════
 
 //--- Forward declarations de classes
 class CAssetManager;
@@ -2863,49 +2631,120 @@ void DestroyGlobalObjects()
      }
   }
 
+FIM DO BLOCO OBSOLETO - TODO O CÓDIGO ACIMA FOI COMENTADO
+═══════════════════════════════════════════════════════════════ */
+
 //--- Funções do ciclo de vida do EA
+//+------------------------------------------------------------------+
+//| Expert initialization function                                   |
+//+------------------------------------------------------------------+
 int OnInit()
   {
-   PrintFormat("=== INICIANDO %s v%s ===",EA_NAME,EA_VERSION);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("   🎯 INICIANDO %s v%s", EA_NAME, EA_VERSION);
+   PrintFormat("════════════════════════════════════════════════════════════════");
 
+   // 1. Detectar timeframe operacional
+   ENUM_TIMEFRAMES tfOper = Period();
+   PrintFormat("📊 Timeframe Operacional: %s", EnumToString(tfOper));
+
+   // 2. Validar se timeframe é suportado
+   if(!IsSupportedTimeframe(tfOper))
+     {
+      PrintFormat("❌ ERRO: Timeframe %s não é suportado pelo sistema!", EnumToString(tfOper));
+      PrintFormat("   Timeframes suportados: M1, M5, M15, M30, H1, H4");
+      Alert("Nexus Confluence: Timeframe não suportado! Use M1, M5, M15, M30, H1 ou H4.");
+      return INIT_FAILED;
+     }
+
+   // 3. Definir timeframes macro conforme TF operacional
+   DefineMultiTimeframes(tfOper, g_tfMacro1, g_tfMacro2, g_tfMacro3, g_numNiveisMacro);
+   
+   PrintFormat("🎯 Sistema Multi-Timeframe definido:");
+   PrintFormat("   MACRO-1: %s", EnumToString(g_tfMacro1));
+   PrintFormat("   MACRO-2: %s", EnumToString(g_tfMacro2));
+   if(g_numNiveisMacro == 3)
+      PrintFormat("   MACRO-3: %s", EnumToString(g_tfMacro3));
+   else
+      PrintFormat("   MACRO-3: N/A (sistema de 2 níveis)");
+   PrintFormat("   OPERACIONAL: %s", EnumToString(tfOper));
+
+   // 4. Classificar ativo atual
+   g_currentAssetClass = ClassifyAsset(_Symbol);
+   PrintFormat("📈 Ativo %s classificado como: %s", _Symbol, AssetClassToString(g_currentAssetClass));
+
+   if(g_currentAssetClass == ASSET_CLASS_UNKNOWN)
+     {
+      PrintFormat("❌ ERRO: Ativo %s não pôde ser classificado!", _Symbol);
+      Alert("Nexus Confluence: Ativo desconhecido!");
+      return INIT_FAILED;
+     }
+
+   // 5. Validar parâmetros de entrada
    if(!ValidateInputParameters())
+     {
+      PrintFormat("❌ ERRO: Parâmetros inválidos!");
       return INIT_PARAMETERS_INCORRECT;
+     }
 
-   SetupGlobalObjects();
-
-  if(indicatorManager == NULL || !(*indicatorManager).Initialize(_Symbol))
+   // 6. Inicializar todos os indicadores
+   if(!InitializeIndicators(_Symbol))
      {
-      Print("Falha ao inicializar indicadores");
+      PrintFormat("❌ ERRO: Falha ao inicializar indicadores!");
+      Alert("Nexus Confluence: Erro ao inicializar indicadores. Verifique os logs.");
       return INIT_FAILED;
      }
 
-   if(assetManager == NULL)
-     {
-      Print("Asset manager não disponível");
-      return INIT_FAILED;
-     }
-  ASSET_CLASS currentAsset = (*assetManager).ClassifyAsset(_Symbol);
-  if(!(*assetManager).IsAssetSupported(currentAsset))
-     {
-      Print("Ativo não suportado");
-      return INIT_FAILED;
-     }
+   // 7. Configurar trade object
+   g_trade.SetExpertMagicNumber(EA_MAGIC_NUMBER);
+   g_trade.SetDeviationInPoints(MaxSlippagePoints);
+   g_trade.SetTypeFilling(ORDER_FILLING_FOK);
+   g_trade.SetAsyncMode(false);
 
+   // 8. Salvar saldo inicial
    g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-   PrintConfiguration(currentAsset);
+   PrintFormat("💰 Saldo inicial: %.2f", g_initialBalance);
 
+   // 9. Configurar timer (1 hora)
    EventSetTimer(3600);
+
+   // 10. Exibir configuração final
+   PrintConfiguration();
+
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("   ✅ EA INICIALIZADO COM SUCESSO!");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+
    return INIT_SUCCEEDED;
   }
 
+
+//+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
-   Print("=== FINALIZANDO NEXUS CONFLUENCE EA ===");
-   PrintFormat("Razão: %d",reason);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("   🔴 FINALIZANDO %s v%s", EA_NAME, EA_VERSION);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📋 Razão: %s", GetDeinitReasonText(reason));
 
+   // Liberar todos os handles dos indicadores
+   ReleaseIndicators();
+
+   // Cancelar timer
    EventKillTimer();
-   DestroyGlobalObjects();
+
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("   ✅ EA FINALIZADO COM SUCESSO");
+   PrintFormat("════════════════════════════════════════════════════════════════");
   }
+
+/* ═══════════════════════════════════════════════════════════════
+   OnTimer e OnTradeTransaction antigas - COMENTADAS
+   Essas funções usavam as classes antigas. Serão reimplementadas
+   na próxima fase do desenvolvimento.
+   ═══════════════════════════════════════════════════════════════
 
 void OnTimer()
   {
@@ -2968,57 +2807,436 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
      }
   }
 
-void ProcessNewSetup(const ASSET_CLASS assetClass)
-  {
-  if(tfAnalyzer == NULL || setupScorer == NULL || protectionSystem == NULL || riskManager == NULL || tradeManager == NULL)
-    return;
+FIM DO BLOCO OnTimer/OnTradeTransaction antigas
+═══════════════════════════════════════════════════════════════ */
 
-  MultiTFResult mtf = (*tfAnalyzer).Analyze(_Symbol,assetClass);
-  if(!mtf.isValid)
-    return;
-
-  SetupScore score = (*setupScorer).Evaluate(_Symbol,assetClass,mtf.direction);
-  if(score.classification == SETUP_REJECT)
-    return;
-
-  if(!(*protectionSystem).ValidateMarketConditions(_Symbol,assetClass))
-    return;
-
-  RiskCalculation risk = (*riskManager).Calculate(_Symbol,score,assetClass);
-  if(!risk.isValid)
-    {
-    if(risk.errorMessage != "")
-      Print("[RiskManager] ",risk.errorMessage);
-    return;
-    }
-
-  (*tradeManager).ExecuteTrade(_Symbol,risk,assetClass);
-  }
-
+//+------------------------------------------------------------------+
+//| Expert tick function                                             |
+//+------------------------------------------------------------------+
 void OnTick()
   {
-  if(assetManager == NULL || protectionSystem == NULL)
-    return;
+   // ETAPA 1: Validações básicas de segurança
+   if(!ValidateBasicConditions())
+      return;
 
-  // Atualizar visualização do GG_TrendBar
-  if(indicatorManager != NULL)
-    {
-    GGTrendBarSignal ggSignal;
-    if((*indicatorManager).GetGGTrendBarSignal(ggSignal) && ggSignal.isValid)
-      {
-      (*indicatorManager).UpdateVisuals(ggSignal);
-      }
-    }
+   // ETAPA 2: Análise multi-timeframe OBRIGATÓRIA
+   MultiTFResult mtf = AnalyzeMultiTimeframeAlignment();
+   if(!mtf.isValid)
+     {
+      // MACRO-1 e MACRO-2 não alinhados ou indecisos
+      return;
+     }
 
-  ASSET_CLASS assetClass = (*assetManager).ClassifyAsset(_Symbol);
-  if(!(*protectionSystem).ValidateBasicConditions(assetClass))
-    {
-    if(tradeManager != NULL)
-      (*tradeManager).ManageOpenTrades();
-    return;
-    }
+   // ETAPA 3: Calcular pontuação dos filtros micro
+   SetupScore score = CalculateSetupScore(_Symbol, g_currentAssetClass, mtf.direction, mtf.m30Aligned);
 
-  ProcessNewSetup(assetClass);
-  if(tradeManager != NULL)
-    (*tradeManager).ManageOpenTrades();
+   // ETAPA 4: Validar classificação do setup
+   if(score.classification == SETUP_REJECT)
+     {
+      // Não atingiu confluência mínima
+      return;
+     }
+
+   // ETAPA 5: Validar condições de mercado (spread, ATR, etc)
+   if(!ValidateMarketConditions(_Symbol, g_currentAssetClass))
+      return;
+
+   // ETAPA 6: Verificar se já não temos trades demais
+   if(CountOpenTrades() >= MaxSimultaneousTrades)
+      return;
+
+   // ETAPA 7: Calcular risco e tamanho da posição
+   RiskCalculation risk = CalculateRiskPosition(_Symbol, score, mtf.direction, g_currentAssetClass);
+   if(!risk.isValid)
+     {
+      if(risk.errorMessage != "")
+         PrintFormat("⚠️ Risco inválido: %s", risk.errorMessage);
+      return;
+     }
+
+   // ETAPA 8: Executar trade
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("🎯 SETUP %s DETECTADO!", (score.classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
+   PrintFormat("   Símbolo: %s", _Symbol);
+   PrintFormat("   Direção: %s", (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA");
+   PrintFormat("   Pontuação: %d/%d", score.totalPoints, score.requiredPoints);
+   PrintFormat("   Risco: %.2f%% (%.2f)", 
+               (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent,
+               risk.riskAmount);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+
+   ExecuteTrade(_Symbol, mtf.direction, risk, score.classification);
   }
+
+//+------------------------------------------------------------------+
+//| FUNÇÕES AUXILIARES DO EA PRINCIPAL                              |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Verifica se o timeframe é suportado                             |
+//+------------------------------------------------------------------+
+bool IsSupportedTimeframe(ENUM_TIMEFRAMES tf)
+  {
+   return (tf == PERIOD_M1 || tf == PERIOD_M5 || tf == PERIOD_M15 ||
+           tf == PERIOD_M30 || tf == PERIOD_H1 || tf == PERIOD_H4);
+  }
+
+//+------------------------------------------------------------------+
+//| Classifica o ativo atual                                        |
+//+------------------------------------------------------------------+
+ASSET_CLASS ClassifyAsset(const string symbol)
+  {
+   string sym = symbol;
+   StringToUpper(sym);
+
+   // Metais
+   if(sym == "XAUUSD" || sym == "XAGUSD" || StringFind(sym,"XAU") == 0 || StringFind(sym,"XAG") == 0)
+      return ASSET_CLASS_METALS;
+
+   // B3 Brasil
+   if(StringFind(sym,"WIN") == 0 || StringFind(sym,"IND") == 0)
+      return ASSET_CLASS_INDEX_B3;
+   if(StringFind(sym,"WDO") == 0 || StringFind(sym,"DOL") == 0)
+      return ASSET_CLASS_CURRENCY_B3;
+
+   // Índices US
+   if(StringFind(sym,"US500") == 0 || StringFind(sym,"NAS100") == 0 || StringFind(sym,"US30") == 0)
+      return ASSET_CLASS_INDEX_US;
+
+   // Índices Europa
+   if(StringFind(sym,"GER") == 0 || StringFind(sym,"UK") == 0 || StringFind(sym,"FRA") == 0)
+      return ASSET_CLASS_INDEX_EU;
+
+   // Crypto
+   if(StringFind(sym,"BTC") == 0 || StringFind(sym,"ETH") == 0)
+      return ASSET_CLASS_CRYPTO;
+
+   // Forex
+   if(StringLen(sym) >= 6)
+     {
+      if(StringFind(sym,"USD") >= 0)
+        {
+         if(sym == "EURUSD" || sym == "GBPUSD" || sym == "USDJPY" ||
+            sym == "AUDUSD" || sym == "NZDUSD" || sym == "USDCHF" || sym == "USDCAD")
+            return ASSET_CLASS_FOREX_MAJOR;
+
+         if(StringFind(sym,"BRL") >= 0 || StringFind(sym,"MXN") >= 0 || StringFind(sym,"ZAR") >= 0)
+            return ASSET_CLASS_FOREX_EXOTIC;
+
+         return ASSET_CLASS_FOREX_MINOR;
+        }
+      else
+        {
+         return ASSET_CLASS_FOREX_MINOR;
+        }
+     }
+
+   return ASSET_CLASS_UNKNOWN;
+  }
+
+//+------------------------------------------------------------------+
+//| Converter classe de ativo para string                           |
+//+------------------------------------------------------------------+
+string AssetClassToString(ASSET_CLASS cls)
+  {
+   switch(cls)
+     {
+      case ASSET_CLASS_FOREX_MAJOR: return "Forex Major";
+      case ASSET_CLASS_FOREX_MINOR: return "Forex Minor";
+      case ASSET_CLASS_FOREX_EXOTIC: return "Forex Exotic";
+      case ASSET_CLASS_CURRENCY_B3: return "WDO (Mini Dólar B3)";
+      case ASSET_CLASS_INDEX_B3: return "WIN (Mini Índice B3)";
+      case ASSET_CLASS_INDEX_US: return "Índice US";
+      case ASSET_CLASS_INDEX_EU: return "Índice Europa";
+      case ASSET_CLASS_METALS: return "Metais (Ouro/Prata)";
+      case ASSET_CLASS_CRYPTO: return "Criptomoedas";
+      default: return "Desconhecido";
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Validações básicas antes de cada tick                           |
+//+------------------------------------------------------------------+
+bool ValidateBasicConditions()
+  {
+   // 1. Verificar se trading está habilitado
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+      return false;
+
+   // 2. Verificar conexão
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+      return false;
+
+   // 3. Verificar se está em horário de trading
+   if(!IsValidTradingTime())
+      return false;
+
+   // 4. Verificar drawdown máximo
+   if(g_tradingPaused)
+      return false;
+
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double currentDrawdown = (g_initialBalance - equity) / g_initialBalance * 100.0;
+   if(currentDrawdown >= MaxDrawdownPercent)
+     {
+      g_tradingPaused = true;
+      PrintFormat("❌ TRADING PAUSADO: Drawdown %.2f%% >= %.2f%%", currentDrawdown, MaxDrawdownPercent);
+      Alert("Nexus Confluence: Drawdown máximo atingido! Trading pausado.");
+      return false;
+     }
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Verifica se está em horário de trading                          |
+//+------------------------------------------------------------------+
+bool IsValidTradingTime()
+  {
+   // Verificar dia da semana
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+
+   switch(dt.day_of_week)
+     {
+      case 1: if(!TradeOnMonday) return false; break;
+      case 2: if(!TradeOnTuesday) return false; break;
+      case 3: if(!TradeOnWednesday) return false; break;
+      case 4: if(!TradeOnThursday) return false; break;
+      case 5: if(!TradeOnFriday) return false; break;
+      case 6: if(!TradeOnSaturday) return false; break;
+      case 0: if(!TradeOnSunday) return false; break;
+     }
+
+   // Se usar horários customizados
+   if(UseCustomTradingHours)
+     {
+      int currentMinutes = dt.hour * 60 + dt.min;
+      int startMinutes = CustomStartHour * 60 + CustomStartMinute;
+      int endMinutes = CustomEndHour * 60 + CustomEndMinute;
+      return (currentMinutes >= startMinutes && currentMinutes <= endMinutes);
+     }
+
+   // TODO: Implementar validação de horários por classe de ativo
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Valida condições de mercado (spread, ATR, etc)                  |
+//+------------------------------------------------------------------+
+bool ValidateMarketConditions(const string symbol, ASSET_CLASS assetClass)
+  {
+   // Verificar spread
+   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double maxSpread = GetMaxSpread(assetClass);
+
+   if(spread > maxSpread)
+     {
+      PrintFormat("⚠️ Spread muito alto: %.5f > %.5f", spread, maxSpread);
+      return false;
+     }
+
+   // TODO: Validar ATR se ValidateATRRange = true
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Retorna spread máximo permitido por classe                      |
+//+------------------------------------------------------------------+
+double GetMaxSpread(ASSET_CLASS assetClass)
+  {
+   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+
+   switch(assetClass)
+     {
+      case ASSET_CLASS_FOREX_MAJOR: return 2.0 * point * 10;    // 2 pips
+      case ASSET_CLASS_FOREX_MINOR: return 3.0 * point * 10;    // 3 pips
+      case ASSET_CLASS_FOREX_EXOTIC: return 15.0 * point * 10;  // 15 pips
+      case ASSET_CLASS_INDEX_B3: return 15.0 * point;           // 15 pontos
+      case ASSET_CLASS_CURRENCY_B3: return 3.0 * point;         // 3 pontos
+      case ASSET_CLASS_METALS: return 1.0 * point;              // $1
+      default: return 5.0 * point * 10;
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Conta trades abertos do EA                                      |
+//+------------------------------------------------------------------+
+int CountOpenTrades()
+  {
+   int count = 0;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      if(PositionGetSymbol(i) == _Symbol)
+        {
+         if(PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
+            count++;
+        }
+     }
+   return count;
+  }
+
+//+------------------------------------------------------------------+
+//| Calcula risco e tamanho da posição                              |
+//+------------------------------------------------------------------+
+RiskCalculation CalculateRiskPosition(string symbol, const SetupScore &score, TRADE_DIRECTION direction, ASSET_CLASS assetClass)
+  {
+   RiskCalculation result;
+   result.isValid = false;
+   result.errorMessage = "";
+   result.direction = direction;
+   result.classification = score.classification;
+
+   // 1. Determinar percentual de risco
+   double riskPercent = (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent;
+
+   // 2. Se lote fixo está configurado, usar ele
+   if(FixedLotSize > 0)
+     {
+      result.positionSize = FixedLotSize;
+      result.entryPrice = (direction == TRADE_DIRECTION_BUY) ?
+                          SymbolInfoDouble(symbol, SYMBOL_ASK) :
+                          SymbolInfoDouble(symbol, SYMBOL_BID);
+
+      // TODO: Calcular SL baseado em estrutura
+      result.stopLoss = result.entryPrice; // Temporário
+      result.slDistance = 0;
+      result.riskAmount = 0;
+      result.isValid = true;
+      return result;
+     }
+
+   // TODO: Implementar cálculo completo de risco baseado em estrutura
+   result.errorMessage = "Cálculo de risco automático ainda não implementado. Use FixedLotSize.";
+   return result;
+  }
+
+//+------------------------------------------------------------------+
+//| Executa trade                                                    |
+//+------------------------------------------------------------------+
+void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculation &risk, SETUP_CLASS classification)
+  {
+   MqlTradeRequest request;
+   MqlTradeResult result;
+
+   ZeroMemory(request);
+
+   request.action = TRADE_ACTION_DEAL;
+   request.symbol = symbol;
+   request.volume = risk.positionSize;
+   request.type = (direction == TRADE_DIRECTION_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
+   request.price = (direction == TRADE_DIRECTION_BUY) ?
+                   SymbolInfoDouble(symbol, SYMBOL_ASK) :
+                   SymbolInfoDouble(symbol, SYMBOL_BID);
+   request.sl = 0; // Será definido após abertura
+   request.tp = 0; // Gestão manual
+   request.deviation = MaxSlippagePoints;
+   request.magic = EA_MAGIC_NUMBER;
+   request.comment = StringFormat("Nexus_%s_%s",
+                                   (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL",
+                                   (classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
+
+   if(!OrderSend(request, result))
+     {
+      PrintFormat("❌ Erro ao abrir trade: %d - %s", result.retcode, result.comment);
+      return;
+     }
+
+   PrintFormat("✅ Trade aberto com sucesso! Ticket: %I64u", result.order);
+
+   if(SendAlerts)
+     {
+      SendNotification(StringFormat("Nexus: %s %s aberto em %.5f",
+                                     (direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA",
+                                     symbol,
+                                     request.price));
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Validar parâmetros de entrada                                   |
+//+------------------------------------------------------------------+
+bool ValidateInputParameters()
+  {
+   if(AccountRiskPercent <= 0 || AccountRiskPercent > 10)
+     {
+      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0-10%%)", AccountRiskPercent);
+      return false;
+     }
+
+   if(MaxRiskPremium <= 0 || MaxRiskPremium > 10)
+     {
+      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0-10%%)", MaxRiskPremium);
+      return false;
+     }
+
+   if(MaxDrawdownPercent <= 0 || MaxDrawdownPercent > 50)
+     {
+      PrintFormat("❌ MaxDrawdownPercent inválido: %.2f (deve ser 0-50%%)", MaxDrawdownPercent);
+      return false;
+     }
+
+   if(MaxSimultaneousTrades <= 0 || MaxSimultaneousTrades > 10)
+     {
+      PrintFormat("❌ MaxSimultaneousTrades inválido: %d (deve ser 1-10)", MaxSimultaneousTrades);
+      return false;
+     }
+
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| Exibir configuração final                                       |
+//+------------------------------------------------------------------+
+void PrintConfiguration()
+  {
+   PrintFormat("📋 Configuração do EA:");
+   PrintFormat("   Risco padrão: %.2f%%", AccountRiskPercent);
+   PrintFormat("   Risco Premium: %.2f%%", MaxRiskPremium);
+   PrintFormat("   Drawdown máximo: %.2f%%", MaxDrawdownPercent);
+   PrintFormat("   Trades simultâneos: %d", MaxSimultaneousTrades);
+   PrintFormat("   Lote fixo: %.2f (0 = auto)", FixedLotSize);
+   PrintFormat("   Alertas: %s", SendAlerts ? "SIM" : "NÃO");
+   PrintFormat("   TP parcial: %s", EnablePartialTP ? "SIM" : "NÃO");
+   PrintFormat("   Trailing: %s", EnableTrailing ? "SIM" : "NÃO");
+  }
+
+//+------------------------------------------------------------------+
+//| Retorna texto descritivo da razão de deinit                     |
+//+------------------------------------------------------------------+
+string GetDeinitReasonText(int reason)
+  {
+   switch(reason)
+     {
+      case REASON_PROGRAM: return "EA foi parado manualmente";
+      case REASON_REMOVE: return "EA foi removido do gráfico";
+      case REASON_RECOMPILE: return "EA foi recompilado";
+      case REASON_CHARTCHANGE: return "Símbolo ou período mudou";
+      case REASON_CHARTCLOSE: return "Gráfico foi fechado";
+      case REASON_PARAMETERS: return "Parâmetros foram alterados";
+      case REASON_ACCOUNT: return "Conta foi alterada";
+      case REASON_TEMPLATE: return "Template foi aplicado";
+      case REASON_INITFAILED: return "OnInit() retornou erro";
+      case REASON_CLOSE: return "Terminal foi fechado";
+      default: return StringFormat("Razão desconhecida (%d)", reason);
+     }
+  }
+
+//+------------------------------------------------------------------+
+//| Limpeza de logs antigos (placeholder)                           |
+//+------------------------------------------------------------------+
+void CleanupOldLogs()
+  {
+   // TODO: Implementar limpeza de logs
+  }
+
+//+------------------------------------------------------------------+
+//| Validação de integridade do sistema (placeholder)               |
+//+------------------------------------------------------------------+
+void ValidateSystemIntegrity()
+  {
+   // TODO: Implementar validações periódicas
+  }
+
+//+------------------------------------------------------------------+

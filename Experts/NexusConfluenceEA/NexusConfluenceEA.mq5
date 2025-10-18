@@ -39,12 +39,9 @@ input int    MaxSlippagePoints        = 30;    // Desvio máximo em pontos
 input int    LookbackStructureBars    = 80;    // Candles para buscar estrutura M15
 input int    BrokerGMTOffset          = 2;     // Fuso horário do broker (horário de inverno)
 
-input group "=== LOTE FIXO POR MERCADO (0 = Usa cálculo automático) ==="
-input double FixedLotForex            = 0.0;   // Lote fixo Forex (ex: 0.01)
-input double FixedLotB3               = 0.0;   // Lote fixo B3 (ex: 1.0 = 1 contrato)
-input double FixedLotIndices          = 0.0;   // Lote fixo Índices Internacionais
-input double FixedLotMetals           = 0.0;   // Lote fixo Metais (ex: 0.01)
-input double FixedLotCrypto           = 0.0;   // Lote fixo Criptomoedas
+input group "=== GESTÃO DE LOTE ==="
+input double FixedLotSize             = 0.0;   // Lote Fixo (0 = cálculo automático por risco %)
+                                               // Forex: 0.01 | B3: 1.0 | Índices: 0.1 | etc
 
 input group "=== FILTRO SEMANAL - Dias da Semana ==="
 input bool   TradeOnMonday            = true;  // Operar na Segunda-feira
@@ -1940,20 +1937,19 @@ public:
         }
 
       // ==========================================
-      // NOVO: VERIFICAR SE HÁ LOTE FIXO CONFIGURADO
+      // GESTÃO DE LOTE: FIXO OU AUTO-CALCULADO
       // ==========================================
-      double fixedLot = GetFixedLotForAssetClass(assetClass);
       double positionSize = 0.0;
       
-      if(fixedLot > 0.0)
+      if(FixedLotSize > 0.0)
         {
-         // USAR LOTE FIXO
-         positionSize = fixedLot;
-         PrintFormat("[RiskManager] Usando LOTE FIXO: %.2f para classe %d", fixedLot, assetClass);
+         // USAR LOTE FIXO UNIVERSAL (funciona para todos os mercados)
+         positionSize = FixedLotSize;
+         PrintFormat("[RiskManager] 💰 Usando LOTE FIXO: %.2f", FixedLotSize);
         }
       else
         {
-         // CALCULAR LOTE DINAMICAMENTE (método original)
+         // CALCULAR LOTE DINAMICAMENTE baseado em % de risco
          double riskPercent = (score.classification == SETUP_PREMIUM) ? config.premiumRiskPercent : config.goodRiskPercent;
          double balance = AccountInfoDouble(ACCOUNT_BALANCE);
          double riskAmount = balance * (riskPercent/100.0);
@@ -1986,6 +1982,7 @@ public:
          positionSize = NormalizeLot(symbol,positionSize,lotStep);
          
          calc.riskAmount = riskAmount;
+         PrintFormat("[RiskManager] 📊 Lote AUTO-CALCULADO: %.2f (risco %.2f%%)", positionSize, riskPercent);
         }
       
       // Normalizar lote (fixo ou calculado)
@@ -2025,36 +2022,6 @@ public:
      }
 
 private:
-   // ==========================================
-   // NOVA FUNÇÃO: Obter lote fixo por classe de ativo
-   // ==========================================
-   static double GetFixedLotForAssetClass(const ASSET_CLASS assetClass)
-     {
-      switch(assetClass)
-        {
-         case ASSET_CLASS_FOREX_MAJOR:
-         case ASSET_CLASS_FOREX_MINOR:
-         case ASSET_CLASS_FOREX_EXOTIC:
-            return FixedLotForex;  // 0 = auto, >0 = fixo
-         
-         case ASSET_CLASS_INDEX_B3:
-         case ASSET_CLASS_CURRENCY_B3:
-            return FixedLotB3;     // 0 = auto, >0 = fixo (ex: 1.0 = 1 contrato)
-         
-         case ASSET_CLASS_INDEX_US:
-         case ASSET_CLASS_INDEX_EU:
-            return FixedLotIndices; // 0 = auto, >0 = fixo
-         
-         case ASSET_CLASS_METALS:
-            return FixedLotMetals;  // 0 = auto, >0 = fixo
-         
-         case ASSET_CLASS_CRYPTO:
-            return FixedLotCrypto;  // 0 = auto, >0 = fixo
-         
-         default:
-            return 0.0; // Auto-cálculo
-        }
-     }
    static double NormalizeLot(const string symbol,double lot,const double step)
      {
       double normalized = MathFloor(lot/step + 0.5) * step;
@@ -2751,18 +2718,30 @@ bool ValidateInputParameters()
 
 void PrintConfiguration(const ASSET_CLASS asset)
   {
-   Print("=== Configurações Ativas ===");
-   PrintFormat("Conta: Bal %.2f Equity %.2f",AccountInfoDouble(ACCOUNT_BALANCE),AccountInfoDouble(ACCOUNT_EQUITY));
-   PrintFormat("Risco BOM: %.2f%% | Risco PREMIUM: %.2f%%",AccountRiskPercent,MaxRiskPremium);
-   PrintFormat("Asset class: %d",asset);
+   Print("========================================");
+   Print("=== NEXUS CONFLUENCE EA v4.0 ===");
+   Print("========================================");
+   PrintFormat("💰 Conta: Saldo %.2f | Equity %.2f", AccountInfoDouble(ACCOUNT_BALANCE), AccountInfoDouble(ACCOUNT_EQUITY));
+   PrintFormat("📊 Risco: BOM %.2f%% | PREMIUM %.2f%%", AccountRiskPercent, MaxRiskPremium);
+   PrintFormat("🎯 Asset Class: %d", asset);
    
    Print("");
-   Print("=== LOTE FIXO POR MERCADO ===");
-   PrintFormat("Forex: %s", (FixedLotForex > 0) ? StringFormat("FIXO %.2f", FixedLotForex) : "AUTO-CALCULADO");
-   PrintFormat("B3 (WIN/WDO): %s", (FixedLotB3 > 0) ? StringFormat("FIXO %.2f contratos", FixedLotB3) : "AUTO-CALCULADO");
-   PrintFormat("Índices Internacionais: %s", (FixedLotIndices > 0) ? StringFormat("FIXO %.2f", FixedLotIndices) : "AUTO-CALCULADO");
-   PrintFormat("Metais (Ouro/Prata): %s", (FixedLotMetals > 0) ? StringFormat("FIXO %.2f", FixedLotMetals) : "AUTO-CALCULADO");
-   PrintFormat("Criptomoedas: %s", (FixedLotCrypto > 0) ? StringFormat("FIXO %.2f", FixedLotCrypto) : "AUTO-CALCULADO");
+   Print("=== GESTÃO DE LOTE ===");
+   if(FixedLotSize > 0.0)
+     {
+      PrintFormat("💰 LOTE FIXO: %.2f (universal para todos os mercados)", FixedLotSize);
+      Print("   ✅ Forex: usa este lote");
+      Print("   ✅ B3 (WIN/WDO): usa este lote");
+      Print("   ✅ Índices: usa este lote");
+      Print("   ✅ Metais: usa este lote");
+      Print("   ℹ️ MT5 normaliza automaticamente conforme o ativo");
+     }
+   else
+     {
+      Print("📊 AUTO-CALCULADO baseado em % de risco da conta");
+      PrintFormat("   Setup BOM: %.2f%% de risco", AccountRiskPercent);
+      PrintFormat("   Setup PREMIUM: %.2f%% de risco", MaxRiskPremium);
+     }
    
    Print("");
    Print("=== FILTRO SEMANAL ===");
@@ -2776,28 +2755,30 @@ void PrintConfiguration(const ASSET_CLASS asset)
    if(TradeOnSunday) activeDays += "DOM ";
    
    if(activeDays == "")
-      activeDays = "NENHUM DIA HABILITADO!";
+      activeDays = "⚠️ NENHUM DIA HABILITADO!";
    
-   PrintFormat("Dias de operação: %s", activeDays);
+   PrintFormat("📅 Dias de operação: %s", activeDays);
    
    Print("");
    Print("=== HORÁRIOS DE OPERAÇÃO ===");
    if(UseCustomTradingHours)
      {
-      PrintFormat("⏰ HORÁRIOS CUSTOMIZADOS ATIVOS");
+      Print("⏰ HORÁRIOS CUSTOMIZADOS ATIVOS");
       PrintFormat("   Início: %02d:%02d", CustomStartHour, CustomStartMinute);
       PrintFormat("   Fim: %02d:%02d", CustomEndHour, CustomEndMinute);
-      Print("   (Ideal para otimização em backtests)");
+      Print("   ℹ️ Ideal para otimização em backtests");
      }
    else
      {
-      Print("✓ Usando horários padrão por tipo de ativo");
+      Print("✅ Horários padrão por tipo de ativo:");
       Print("   Forex: 10:00-14:00 BR (overlap Londres/NY)");
       Print("   B3: 14:00-16:00 BR (overlap B3/NY)");
       Print("   Índices US: 11:30-18:00 BR");
+      Print("   Índices EU: 05:00-09:00 + 11:30-13:30 BR");
+      Print("   Cripto: 24/7");
      }
    
-   Print("=============================");
+   Print("========================================");
   }
 
 void SetupGlobalObjects()

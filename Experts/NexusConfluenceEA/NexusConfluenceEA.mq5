@@ -24,9 +24,11 @@
 #include <Trade\Trade.mqh>
 #include "..\..\Include\NexusConfluenceEA\Parametros.mqh"
 #include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
+#include "..\..\Include\NexusConfluenceEA\RiskManagement.mqh"
 
 //--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
 //--- NOTA: Todas as funções de estratégia estão agora em Estrategias.mqh
+//--- NOTA: Gestão de risco, SL, TP, Trailing em RiskManagement.mqh
 
 
 //--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
@@ -383,15 +385,19 @@ bool IsValidTradingTime()
 //+------------------------------------------------------------------+
 bool ValidateMarketConditions(const string symbol, ASSET_CLASS assetClass)
   {
-   // Verificar spread
+   // Verificar spread com multiplicador configurável
    double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double maxSpread = GetMaxSpread(assetClass);
+   double baseMaxSpread = GetMaxSpread(assetClass);
+   double maxSpread = baseMaxSpread * MaxSpreadMultiplier; // Aplicar multiplicador
 
    if(spread > maxSpread)
      {
-      PrintFormat("⚠️ Spread muito alto: %.5f > %.5f", spread, maxSpread);
+      PrintFormat("⚠️ Spread muito alto: %.5f > %.5f (base: %.5f x multiplicador: %.1f)", 
+                  spread, maxSpread, baseMaxSpread, MaxSpreadMultiplier);
       return false;
      }
+   
+   PrintFormat("   ✅ Spread OK: %.5f <= %.5f", spread, maxSpread);
 
    // TODO: Validar ATR se ValidateATRRange = true
 
@@ -439,33 +445,22 @@ int CountOpenTrades()
 //+------------------------------------------------------------------+
 RiskCalculation CalculateRiskPosition(string symbol, const SetupScore &score, TRADE_DIRECTION direction, ASSET_CLASS assetClass)
   {
-   RiskCalculation result;
-   result.isValid = false;
-   result.errorMessage = "";
-   result.direction = direction;
-   result.classification = score.classification;
-
-   // 1. Determinar percentual de risco
-   double riskPercent = (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent;
-
-   // 2. Se lote fixo está configurado, usar ele
-   if(FixedLotSize > 0)
-     {
-      result.positionSize = FixedLotSize;
-      result.entryPrice = (direction == TRADE_DIRECTION_BUY) ?
-                          SymbolInfoDouble(symbol, SYMBOL_ASK) :
-                          SymbolInfoDouble(symbol, SYMBOL_BID);
-
-      // TODO: Calcular SL baseado em estrutura
-      result.stopLoss = result.entryPrice; // Temporário
-      result.slDistance = 0;
-      result.riskAmount = 0;
-      result.isValid = true;
+   // USAR NOVO MÓDULO DE GESTÃO DE RISCO
+   RiskCalculation result = CalculatePositionSize(symbol, direction, score.classification);
+   
+   if(!result.isValid)
+   {
       return result;
-     }
-
-   // TODO: Implementar cálculo completo de risco baseado em estrutura
-   result.errorMessage = "Cálculo de risco automático ainda não implementado. Use FixedLotSize.";
+   }
+   
+   // Validar cálculo
+   if(!ValidateRiskCalculation(result, symbol))
+   {
+      result.isValid = false;
+      result.errorMessage = "Validação de risco falhou";
+      return result;
+   }
+   
    return result;
   }
 
@@ -486,28 +481,53 @@ void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculatio
    request.price = (direction == TRADE_DIRECTION_BUY) ?
                    SymbolInfoDouble(symbol, SYMBOL_ASK) :
                    SymbolInfoDouble(symbol, SYMBOL_BID);
-   request.sl = 0; // Será definido após abertura
-   request.tp = 0; // Gestão manual
+   request.sl = risk.stopLoss;       // ✅ Usar SL calculado
+   request.tp = risk.takeProfit1;    // ✅ Usar TP1 inicialmente
    request.deviation = MaxSlippagePoints;
    request.magic = EA_MAGIC_NUMBER;
    request.comment = StringFormat("Nexus_%s_%s",
                                    (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL",
                                    (classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
 
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📤 ENVIANDO ORDEM AO MERCADO");
+   PrintFormat("   Tipo: %s", (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
+   PrintFormat("   Volume: %.2f lotes", request.volume);
+   PrintFormat("   Preço: %.5f", request.price);
+   PrintFormat("   Stop Loss: %.5f", request.sl);
+   PrintFormat("   Take Profit: %.5f", request.tp);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+
    if(!OrderSend(request, result))
      {
       PrintFormat("❌ Erro ao abrir trade: %d - %s", result.retcode, result.comment);
+      PrintFormat("   Detalhes do erro:");
+      PrintFormat("   - Retcode: %d", result.retcode);
+      PrintFormat("   - Deal: %I64u", result.deal);
+      PrintFormat("   - Order: %I64u", result.order);
+      PrintFormat("   - Volume: %.2f", result.volume);
+      PrintFormat("   - Price: %.5f", result.price);
+      PrintFormat("   - Bid: %.5f", result.bid);
+      PrintFormat("   - Ask: %.5f", result.ask);
       return;
      }
 
-   PrintFormat("✅ Trade aberto com sucesso! Ticket: %I64u", result.order);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("✅ TRADE ABERTO COM SUCESSO!");
+   PrintFormat("   Ticket: %I64u", result.order);
+   PrintFormat("   Deal: %I64u", result.deal);
+   PrintFormat("   Volume: %.2f lotes", result.volume);
+   PrintFormat("   Preço executado: %.5f", result.price);
+   PrintFormat("   Classificação: %s", (classification == SETUP_PREMIUM) ? "🏆 PREMIUM" : "⭐ GOOD");
+   PrintFormat("════════════════════════════════════════════════════════════════");
 
    if(SendAlerts)
      {
-      SendNotification(StringFormat("Nexus: %s %s aberto em %.5f",
+      SendNotification(StringFormat("Nexus: %s %s aberto em %.5f (Ticket: %I64u)",
                                      (direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA",
                                      symbol,
-                                     request.price));
+                                     result.price,
+                                     result.order));
      }
   }
 

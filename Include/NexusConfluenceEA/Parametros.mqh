@@ -145,18 +145,16 @@ struct SetupScore
 //--- Cálculo de risco
 struct RiskCalculation
 {
-   bool            isValid;         // Cálculo válido?
-   string          errorMessage;    // Mensagem de erro (se houver)
-   TRADE_DIRECTION direction;       // Direção do trade
-   SETUP_CLASS     classification;  // Classificação do setup
-   double          entryPrice;      // Preço de entrada
-   double          stopLoss;        // Stop Loss
-   double          slDistance;      // Distância até SL
-   double          positionSize;    // Tamanho da posição (lotes)
-   double          riskAmount;      // Valor em risco (moeda da conta)
-   double          tp1;             // Take Profit 1
-   double          tp2;             // Take Profit 2
-   double          trailingStart;   // Preço inicial para trailing
+   bool            isValid;            // Cálculo válido?
+   string          errorMessage;       // Mensagem de erro (se houver)
+   double          positionSize;       // Tamanho da posição (lotes)
+   double          stopLoss;           // Stop Loss
+   double          takeProfit1;        // Take Profit 1 (TP1)
+   double          takeProfit2;        // Take Profit 2 (TP2)
+   double          slDistance;         // Distância até SL
+   double          riskAmount;         // Valor em risco (moeda da conta)
+   double          potentialProfit1;   // Lucro potencial TP1
+   double          potentialProfit2;   // Lucro potencial TP2
 };
 
 //--- Configuração por classe de ativo
@@ -261,6 +259,7 @@ input group "=== 🛡️ PROTEÇÕES ==="
 input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
 input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estrutura M15
 input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
+input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
 
 input group "=== 📁 INDICADORES - Caminhos dos Arquivos ==="
 input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // 📂 Pasta relativa em MQL5/Indicators

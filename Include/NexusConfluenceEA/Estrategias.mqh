@@ -372,12 +372,70 @@ bool InitializeIndicators(string symbol)
       PrintFormat("⚠️ GG TrendBar não anexado visualmente (erro %d) - mas handle criado OK", error);
    }
    
-   PrintFormat("✅ Todos os indicadores inicializados com sucesso!");
+   //--- ANEXAR DEMAIS INDICADORES AO GRÁFICO ---
+   PrintFormat("📌 Anexando indicadores ao gráfico...");
+   
+   // 1. SUPERTREND (Trend Magic OPERACIONAL) - GRÁFICO PRINCIPAL (window 0)
+   window = ChartIndicatorAdd(0, 0, g_handles.tm_oper);
+   if(window >= 0)
+   {
+      PrintFormat("✅ Supertrend (%s) anexado ao gráfico principal", EnumToString(g_tfOperacional));
+   }
+   else
+   {
+      PrintFormat("⚠️ Supertrend não anexado (erro %d)", GetLastError());
+   }
+   
+   // 2. CURRENCY STRENGTH - SUBJANELA 1
+   window = ChartIndicatorAdd(0, 1, g_handles.cs_oper);
+   if(window >= 0)
+   {
+      PrintFormat("✅ Currency Strength anexado à subjanela %d", window);
+   }
+   else
+   {
+      PrintFormat("⚠️ Currency Strength não anexado (erro %d)", GetLastError());
+   }
+   
+   // 3. RSI OMA (OPERACIONAL) - SUBJANELA 2
+   window = ChartIndicatorAdd(0, 2, g_handles.rsi_oper);
+   if(window >= 0)
+   {
+      PrintFormat("✅ RSI OMA anexado à subjanela %d", window);
+   }
+   else
+   {
+      PrintFormat("⚠️ RSI OMA não anexado (erro %d)", GetLastError());
+   }
+   
+   // 4. WAE (OPERACIONAL) - SUBJANELA 3
+   window = ChartIndicatorAdd(0, 3, g_handles.wae_oper);
+   if(window >= 0)
+   {
+      PrintFormat("✅ WAE anexado à subjanela %d", window);
+   }
+   else
+   {
+      PrintFormat("⚠️ WAE não anexado (erro %d)", GetLastError());
+   }
+   
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("✅ Todos os indicadores inicializados e anexados com sucesso!");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📊 CONFIGURAÇÃO MULTI-TIMEFRAME:");
    PrintFormat("   MACRO-1: %s | MACRO-2: %s | MACRO-3: %s | OPER: %s",
                EnumToString(g_tfMacro1),
                EnumToString(g_tfMacro2),
                (g_numNiveisMacro == 3) ? EnumToString(g_tfMacro3) : "N/A",
                EnumToString(g_tfOperacional));
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📌 INDICADORES ANEXADOS:");
+   PrintFormat("   ✅ GG TrendBar     → Gráfico Principal (Multi-TF)");
+   PrintFormat("   ✅ Supertrend      → Gráfico Principal (%s)", EnumToString(g_tfOperacional));
+   PrintFormat("   ✅ Currency Strength → Subjanela 1");
+   PrintFormat("   ✅ RSI OMA         → Subjanela 2");
+   PrintFormat("   ✅ WAE             → Subjanela 3");
+   PrintFormat("════════════════════════════════════════════════════════════════");
    
    return true;
 }

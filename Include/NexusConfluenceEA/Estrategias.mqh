@@ -277,8 +277,11 @@ bool InitializeIndicators(string symbol)
 }
 
 //+------------------------------------------------------------------+
-//| FUNÇÃO: GetTrendMagicSignal                                      |
-//| Lê sinal do Trend Magic para um handle específico               |
+//| FUNÇÃO: GetSupertrendSignal                                      |
+//| Lê sinal do Supertrend (antigo Trend Magic) operacional         |
+//|                                                                  |
+//| NOTA v4.2: Esta função agora é usada APENAS para o timeframe    |
+//|            operacional (st_oper). Multi-TF é feito por GG Bar.  |
 //|                                                                  |
 //| PARÂMETROS:                                                      |
 //|   - handle: Handle do indicador                                 |
@@ -286,7 +289,7 @@ bool InitializeIndicators(string symbol)
 //|                                                                  |
 //| RETORNO: TMSignal (struct com direção e força)                  |
 //+------------------------------------------------------------------+
-TMSignal GetTrendMagicSignal(int handle, ENUM_TIMEFRAMES timeframe)
+TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
 {
    TMSignal result;
    result.isValid = false;
@@ -306,12 +309,12 @@ TMSignal GetTrendMagicSignal(int handle, ENUM_TIMEFRAMES timeframe)
    if(CopyBuffer(handle, 0, 0, 3, bufferUp) != 3 ||
       CopyBuffer(handle, 1, 0, 3, bufferDown) != 3)
    {
-      PrintFormat("❌ Erro ao copiar buffer Trend Magic (%s)", EnumToString(timeframe));
+      PrintFormat("❌ Erro ao copiar buffer Supertrend (%s)", EnumToString(timeframe));
       return result;
    }
    
    // DEBUG: Mostrar valores dos buffers
-   PrintFormat("📊 Trend Magic %s - Buffers [0]Up=%.5f [0]Down=%.5f [1]Up=%.5f [1]Down=%.5f", 
+   PrintFormat("📊 Supertrend %s - Buffers [0]Up=%.5f [0]Down=%.5f [1]Up=%.5f [1]Down=%.5f", 
                TimeframeToString(timeframe),
                bufferUp[0], bufferDown[0],
                bufferUp[1], bufferDown[1]);

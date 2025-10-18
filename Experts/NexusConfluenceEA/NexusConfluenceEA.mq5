@@ -39,6 +39,29 @@ input int    MaxSlippagePoints        = 30;    // Desvio máximo em pontos
 input int    LookbackStructureBars    = 80;    // Candles para buscar estrutura M15
 input int    BrokerGMTOffset          = 2;     // Fuso horário do broker (horário de inverno)
 
+input group "=== LOTE FIXO POR MERCADO (0 = Usa cálculo automático) ==="
+input double FixedLotForex            = 0.0;   // Lote fixo Forex (ex: 0.01)
+input double FixedLotB3               = 0.0;   // Lote fixo B3 (ex: 1.0 = 1 contrato)
+input double FixedLotIndices          = 0.0;   // Lote fixo Índices Internacionais
+input double FixedLotMetals           = 0.0;   // Lote fixo Metais (ex: 0.01)
+input double FixedLotCrypto           = 0.0;   // Lote fixo Criptomoedas
+
+input group "=== FILTRO SEMANAL - Dias da Semana ==="
+input bool   TradeOnMonday            = true;  // Operar na Segunda-feira
+input bool   TradeOnTuesday           = true;  // Operar na Terça-feira
+input bool   TradeOnWednesday         = true;  // Operar na Quarta-feira
+input bool   TradeOnThursday          = true;  // Operar na Quinta-feira
+input bool   TradeOnFriday            = true;  // Operar na Sexta-feira
+input bool   TradeOnSaturday          = false; // Operar no Sábado (Cripto 24/7)
+input bool   TradeOnSunday            = false; // Operar no Domingo (Cripto 24/7)
+
+input group "=== HORÁRIOS CUSTOMIZÁVEIS (para otimização) ==="
+input bool   UseCustomTradingHours    = false; // Usar horários customizados
+input int    CustomStartHour          = 9;     // Horário início (hora)
+input int    CustomStartMinute        = 0;     // Horário início (minuto)
+input int    CustomEndHour            = 17;    // Horário fim (hora)
+input int    CustomEndMinute          = 30;    // Horário fim (minuto)
+
 input group "=== TREND MAGIC - PARÂMETROS ==="
 input int    TM_CCI_Period            = 50;
 input int    TM_ATR_Period            = 5;
@@ -519,6 +542,20 @@ class CHoursManager
 public:
    bool IsValidTradingTime(const ASSET_CLASS assetClass) const
      {
+      // 1. VERIFICAR FILTRO DE DIA DA SEMANA
+      if(!IsAllowedWeekDay())
+        {
+         //Print("[HoursManager] Dia da semana não permitido");
+         return false;
+        }
+      
+      // 2. VERIFICAR HORÁRIOS CUSTOMIZADOS (se habilitado)
+      if(UseCustomTradingHours)
+        {
+         return IsInCustomTimeRange();
+        }
+      
+      // 3. HORÁRIOS PADRÃO POR TIPO DE ATIVO
       MqlDateTime serverTime;
       TimeToStruct(TimeCurrent(),serverTime);
       int brazilTime = ConvertToBrazilTime(serverTime);
@@ -550,6 +587,48 @@ public:
      }
 
 private:
+   // NOVA FUNÇÃO: Verificar se o dia da semana é permitido
+   static bool IsAllowedWeekDay()
+     {
+      MqlDateTime dt;
+      TimeToStruct(TimeCurrent(), dt);
+      
+      switch(dt.day_of_week)
+        {
+         case 1: return TradeOnMonday;    // Segunda
+         case 2: return TradeOnTuesday;   // Terça
+         case 3: return TradeOnWednesday; // Quarta
+         case 4: return TradeOnThursday;  // Quinta
+         case 5: return TradeOnFriday;    // Sexta
+         case 6: return TradeOnSaturday;  // Sábado
+         case 0: return TradeOnSunday;    // Domingo
+         default: return false;
+        }
+     }
+   
+   // NOVA FUNÇÃO: Verificar se está dentro do horário customizado
+   static bool IsInCustomTimeRange()
+     {
+      MqlDateTime dt;
+      TimeToStruct(TimeCurrent(), dt);
+      
+      int currentTimeMinutes = dt.hour * 60 + dt.min;
+      int startTimeMinutes = CustomStartHour * 60 + CustomStartMinute;
+      int endTimeMinutes = CustomEndHour * 60 + CustomEndMinute;
+      
+      // Verificar se o horário está no range
+      if(startTimeMinutes <= endTimeMinutes)
+        {
+         // Range normal (ex: 09:00 - 17:30)
+         return (currentTimeMinutes >= startTimeMinutes && currentTimeMinutes <= endTimeMinutes);
+        }
+      else
+        {
+         // Range que cruza meia-noite (ex: 22:00 - 02:00)
+         return (currentTimeMinutes >= startTimeMinutes || currentTimeMinutes <= endTimeMinutes);
+        }
+     }
+
    static int ConvertToBrazilTime(const MqlDateTime &serverTime)
      {
       int offset = BrokerGMTOffset;
@@ -1860,36 +1939,63 @@ public:
          return calc;
         }
 
-      double riskPercent = (score.classification == SETUP_PREMIUM) ? config.premiumRiskPercent : config.goodRiskPercent;
-      double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-      double riskAmount = balance * (riskPercent/100.0);
-
-      double lotStep   = SymbolInfoDouble(symbol,SYMBOL_VOLUME_STEP);
-      double lotMin    = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MIN);
-      double lotMax    = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MAX);
-      double tickVal   = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE);
-      double tickSize  = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE);
-      double pipValue  = (tickSize > 0.0) ? (tickVal * point / tickSize) : tickVal;
-    if(config.pipValueOverride > 0)
-      pipValue = config.pipValueOverride;
-
-      if(pipValue <= 0.0)
+      // ==========================================
+      // NOVO: VERIFICAR SE HÁ LOTE FIXO CONFIGURADO
+      // ==========================================
+      double fixedLot = GetFixedLotForAssetClass(assetClass);
+      double positionSize = 0.0;
+      
+      if(fixedLot > 0.0)
         {
-         calc.errorMessage = "Pip value inválido";
-         return calc;
+         // USAR LOTE FIXO
+         positionSize = fixedLot;
+         PrintFormat("[RiskManager] Usando LOTE FIXO: %.2f para classe %d", fixedLot, assetClass);
         }
-
-      double riskPerLot = (calc.slDistance/point) * pipValue;
-      if(riskPerLot <= 0.0)
+      else
         {
-         calc.errorMessage = "Risco por lote inválido";
-         return calc;
-        }
+         // CALCULAR LOTE DINAMICAMENTE (método original)
+         double riskPercent = (score.classification == SETUP_PREMIUM) ? config.premiumRiskPercent : config.goodRiskPercent;
+         double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+         double riskAmount = balance * (riskPercent/100.0);
 
-      double positionSize = riskAmount / riskPerLot;
-      positionSize = MathMax(positionSize,lotMin);
-      positionSize = MathMin(positionSize,lotMax);
-      positionSize = NormalizeLot(symbol,positionSize,lotStep);
+         double lotStep   = SymbolInfoDouble(symbol,SYMBOL_VOLUME_STEP);
+         double lotMin    = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MIN);
+         double lotMax    = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MAX);
+         double tickVal   = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_VALUE);
+         double tickSize  = SymbolInfoDouble(symbol,SYMBOL_TRADE_TICK_SIZE);
+         double pipValue  = (tickSize > 0.0) ? (tickVal * point / tickSize) : tickVal;
+         if(config.pipValueOverride > 0)
+            pipValue = config.pipValueOverride;
+
+         if(pipValue <= 0.0)
+           {
+            calc.errorMessage = "Pip value inválido";
+            return calc;
+           }
+
+         double riskPerLot = (calc.slDistance/point) * pipValue;
+         if(riskPerLot <= 0.0)
+           {
+            calc.errorMessage = "Risco por lote inválido";
+            return calc;
+           }
+
+         positionSize = riskAmount / riskPerLot;
+         positionSize = MathMax(positionSize,lotMin);
+         positionSize = MathMin(positionSize,lotMax);
+         positionSize = NormalizeLot(symbol,positionSize,lotStep);
+         
+         calc.riskAmount = riskAmount;
+        }
+      
+      // Normalizar lote (fixo ou calculado)
+      double lotMin = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MIN);
+      double lotMax = SymbolInfoDouble(symbol,SYMBOL_VOLUME_MAX);
+      double lotStep = SymbolInfoDouble(symbol,SYMBOL_VOLUME_STEP);
+      
+      positionSize = NormalizeLot(symbol, positionSize, lotStep);
+      positionSize = MathMax(positionSize, lotMin);
+      positionSize = MathMin(positionSize, lotMax);
 
       if(positionSize < lotMin - 1e-6)
         {
@@ -1904,7 +2010,6 @@ public:
         }
 
       calc.positionSize = positionSize;
-      calc.riskAmount   = riskAmount;
       calc.isValid      = true;
 
       if(EnablePartialTP)
@@ -1920,6 +2025,36 @@ public:
      }
 
 private:
+   // ==========================================
+   // NOVA FUNÇÃO: Obter lote fixo por classe de ativo
+   // ==========================================
+   static double GetFixedLotForAssetClass(const ASSET_CLASS assetClass)
+     {
+      switch(assetClass)
+        {
+         case ASSET_CLASS_FOREX_MAJOR:
+         case ASSET_CLASS_FOREX_MINOR:
+         case ASSET_CLASS_FOREX_EXOTIC:
+            return FixedLotForex;  // 0 = auto, >0 = fixo
+         
+         case ASSET_CLASS_INDEX_B3:
+         case ASSET_CLASS_CURRENCY_B3:
+            return FixedLotB3;     // 0 = auto, >0 = fixo (ex: 1.0 = 1 contrato)
+         
+         case ASSET_CLASS_INDEX_US:
+         case ASSET_CLASS_INDEX_EU:
+            return FixedLotIndices; // 0 = auto, >0 = fixo
+         
+         case ASSET_CLASS_METALS:
+            return FixedLotMetals;  // 0 = auto, >0 = fixo
+         
+         case ASSET_CLASS_CRYPTO:
+            return FixedLotCrypto;  // 0 = auto, >0 = fixo
+         
+         default:
+            return 0.0; // Auto-cálculo
+        }
+     }
    static double NormalizeLot(const string symbol,double lot,const double step)
      {
       double normalized = MathFloor(lot/step + 0.5) * step;
@@ -2620,6 +2755,49 @@ void PrintConfiguration(const ASSET_CLASS asset)
    PrintFormat("Conta: Bal %.2f Equity %.2f",AccountInfoDouble(ACCOUNT_BALANCE),AccountInfoDouble(ACCOUNT_EQUITY));
    PrintFormat("Risco BOM: %.2f%% | Risco PREMIUM: %.2f%%",AccountRiskPercent,MaxRiskPremium);
    PrintFormat("Asset class: %d",asset);
+   
+   Print("");
+   Print("=== LOTE FIXO POR MERCADO ===");
+   PrintFormat("Forex: %s", (FixedLotForex > 0) ? StringFormat("FIXO %.2f", FixedLotForex) : "AUTO-CALCULADO");
+   PrintFormat("B3 (WIN/WDO): %s", (FixedLotB3 > 0) ? StringFormat("FIXO %.2f contratos", FixedLotB3) : "AUTO-CALCULADO");
+   PrintFormat("Índices Internacionais: %s", (FixedLotIndices > 0) ? StringFormat("FIXO %.2f", FixedLotIndices) : "AUTO-CALCULADO");
+   PrintFormat("Metais (Ouro/Prata): %s", (FixedLotMetals > 0) ? StringFormat("FIXO %.2f", FixedLotMetals) : "AUTO-CALCULADO");
+   PrintFormat("Criptomoedas: %s", (FixedLotCrypto > 0) ? StringFormat("FIXO %.2f", FixedLotCrypto) : "AUTO-CALCULADO");
+   
+   Print("");
+   Print("=== FILTRO SEMANAL ===");
+   string activeDays = "";
+   if(TradeOnMonday) activeDays += "SEG ";
+   if(TradeOnTuesday) activeDays += "TER ";
+   if(TradeOnWednesday) activeDays += "QUA ";
+   if(TradeOnThursday) activeDays += "QUI ";
+   if(TradeOnFriday) activeDays += "SEX ";
+   if(TradeOnSaturday) activeDays += "SAB ";
+   if(TradeOnSunday) activeDays += "DOM ";
+   
+   if(activeDays == "")
+      activeDays = "NENHUM DIA HABILITADO!";
+   
+   PrintFormat("Dias de operação: %s", activeDays);
+   
+   Print("");
+   Print("=== HORÁRIOS DE OPERAÇÃO ===");
+   if(UseCustomTradingHours)
+     {
+      PrintFormat("⏰ HORÁRIOS CUSTOMIZADOS ATIVOS");
+      PrintFormat("   Início: %02d:%02d", CustomStartHour, CustomStartMinute);
+      PrintFormat("   Fim: %02d:%02d", CustomEndHour, CustomEndMinute);
+      Print("   (Ideal para otimização em backtests)");
+     }
+   else
+     {
+      Print("✓ Usando horários padrão por tipo de ativo");
+      Print("   Forex: 10:00-14:00 BR (overlap Londres/NY)");
+      Print("   B3: 14:00-16:00 BR (overlap B3/NY)");
+      Print("   Índices US: 11:30-18:00 BR");
+     }
+   
+   Print("=============================");
   }
 
 void SetupGlobalObjects()

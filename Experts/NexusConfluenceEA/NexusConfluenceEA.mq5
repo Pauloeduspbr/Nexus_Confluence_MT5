@@ -759,6 +759,30 @@ private:
    int    m_waeWindow;
    bool   m_indicatorsAttached;
 
+  int DetermineIndicatorWindow(const long chartID,const int indicatorHandle,const int fallbackWindow) const
+    {
+    if(indicatorHandle == INVALID_HANDLE)
+      return fallbackWindow;
+
+    string shortName = "";
+    if(IndicatorGetString(indicatorHandle,INDICATOR_SHORTNAME,shortName))
+      {
+      int detected = ChartWindowFind(chartID,shortName);
+      if(detected >= 0)
+        return detected;
+      }
+
+    return fallbackWindow;
+    }
+
+  void LogAttachmentSuccess(const string name,const int windowIndex) const
+    {
+    if(windowIndex <= 0)
+      Print("[VisualManager] ✅ ",name," anexado ao gráfico (window ",windowIndex,")");
+    else
+      Print("[VisualManager] ✅ ",name," anexado em subwindow ",windowIndex);
+    }
+
 public:
    CVisualManager()
      {
@@ -1018,23 +1042,23 @@ public:
       
       if(ggVisualHandle != INVALID_HANDLE)
         {
-         // Anexar ao gráfico principal (window 0)
-         int window = ChartIndicatorAdd(chartID, 0, ggVisualHandle);
-         
+         int requestedWindow = 0;
+         int window = ChartIndicatorAdd(chartID, requestedWindow, ggVisualHandle);
+
          if(window >= 0)
            {
+            int actualWindow = DetermineIndicatorWindow(chartID, ggVisualHandle, requestedWindow);
+            LogAttachmentSuccess("GG_TrendBar", actualWindow);
             attached++;
-            Print("[VisualManager] ✅ GG_TrendBar anexado visualmente ao gráfico (window ", window, ")");
-            // Liberar handle visual - o indicador já está anexado
-            IndicatorRelease(ggVisualHandle);
            }
          else
            {
             int error = GetLastError();
-            Print("[VisualManager] ⚠️ GG_TrendBar não anexado visualmente (erro ", error, ") - objetos visuais do EA funcionam normalmente");
-            IndicatorRelease(ggVisualHandle);
+            Print("[VisualManager] ⚠️ GG_TrendBar não anexado (erro ", error, ") - objetos visuais do EA funcionam normalmente");
             allSuccess = false;
            }
+
+         IndicatorRelease(ggVisualHandle);
         }
       else
         {
@@ -1049,14 +1073,15 @@ public:
       
       if(superTrendHandle != INVALID_HANDLE)
         {
-         // Anexar no gráfico principal (window 0) junto com GG_TrendBar
-         int window = ChartIndicatorAdd(chartID, 0, superTrendHandle);
-         
+         int requestedWindow = 0;
+         int window = ChartIndicatorAdd(chartID, requestedWindow, superTrendHandle);
+
          if(window >= 0)
            {
-            m_superTrendWindow = window;
+            int actualWindow = DetermineIndicatorWindow(chartID, superTrendHandle, requestedWindow);
+            m_superTrendWindow = actualWindow;
+            LogAttachmentSuccess("SuperTrend (TrendMagic)", actualWindow);
             attached++;
-            Print("[VisualManager] ✅ SuperTrend (TrendMagic) anexado no gráfico principal (window ", window, ")");
            }
          else
            {
@@ -1064,8 +1089,7 @@ public:
             Print("[VisualManager] ⚠️ SuperTrend não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
-         
-         // Liberar handle temporário
+
          IndicatorRelease(superTrendHandle);
         }
       else
@@ -1074,20 +1098,27 @@ public:
          allSuccess = false;
         }
       
+      ChartRedraw(chartID);
+
       // 2. RSI OMA - Criar handle para o timeframe do gráfico atual
       string rsiPath = ComposeIndicatorPath("RSIOMA_v2HHLSX_MT5");
       int rsiHandle = iCustom(_Symbol, currentTF, rsiPath, 21, 5, 21, 5); // Period=21, MA Period=5
       
       if(rsiHandle != INVALID_HANDLE)
         {
-         // Anexar em subwindow 1 (primeira subwindow)
-         int window = ChartIndicatorAdd(chartID, 1, rsiHandle);
-         
+         int totalWindows = (int)ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
+         int requestedWindow = (totalWindows > 0) ? totalWindows : 1;
+         if(requestedWindow < 1)
+            requestedWindow = 1;
+
+         int window = ChartIndicatorAdd(chartID, requestedWindow, rsiHandle);
+
          if(window >= 0)
            {
-            m_rsiWindow = window;
+            int actualWindow = DetermineIndicatorWindow(chartID, rsiHandle, requestedWindow);
+            m_rsiWindow = actualWindow;
+            LogAttachmentSuccess("RSI OMA", actualWindow);
             attached++;
-            Print("[VisualManager] ✅ RSI OMA anexado em subwindow ", window);
            }
          else
            {
@@ -1095,8 +1126,7 @@ public:
             Print("[VisualManager] ⚠️ RSI OMA não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
-         
-         // Liberar handle temporário
+
          IndicatorRelease(rsiHandle);
         }
       else
@@ -1105,6 +1135,8 @@ public:
          allSuccess = false;
         }
       
+      ChartRedraw(chartID);
+
       // 3. WAE - Criar handle para o timeframe do gráfico atual
       string waePath = ComposeIndicatorPath("WaddahAttarExplosion_Professional");
       int waeHandle = iCustom(_Symbol, currentTF, waePath, 
@@ -1117,14 +1149,21 @@ public:
       
       if(waeHandle != INVALID_HANDLE)
         {
-         // Anexar em subwindow 2 (segunda subwindow)
-         int window = ChartIndicatorAdd(chartID, 2, waeHandle);
-         
+         int totalWindows = (int)ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
+         int requestedWindow = (totalWindows > 0) ? totalWindows : 1;
+         if(requestedWindow <= m_rsiWindow)
+            requestedWindow = m_rsiWindow + 1;
+         if(requestedWindow < 1)
+            requestedWindow = 1;
+
+         int window = ChartIndicatorAdd(chartID, requestedWindow, waeHandle);
+
          if(window >= 0)
            {
-            m_waeWindow = window;
+            int actualWindow = DetermineIndicatorWindow(chartID, waeHandle, requestedWindow);
+            m_waeWindow = actualWindow;
+            LogAttachmentSuccess("WAE", actualWindow);
             attached++;
-            Print("[VisualManager] ✅ WAE anexado em subwindow ", window);
            }
          else
            {
@@ -1132,8 +1171,7 @@ public:
             Print("[VisualManager] ⚠️ WAE não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
-         
-         // Liberar handle temporário
+
          IndicatorRelease(waeHandle);
         }
       else

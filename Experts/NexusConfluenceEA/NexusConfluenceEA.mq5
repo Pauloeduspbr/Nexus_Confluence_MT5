@@ -742,6 +742,13 @@ public:
   };
 
 //+------------------------------------------------------------------+
+//| Forward declarations para uso em CVisualManager                  |
+//+------------------------------------------------------------------+
+class CTraderMagic;
+class CRSIOMA;
+class CWAE;
+
+//+------------------------------------------------------------------+
 //| Classe para gerenciar objetos visuais do GG_TrendBar             |
 //+------------------------------------------------------------------+
 class CVisualManager
@@ -756,8 +763,8 @@ private:
    // Armazenar informações dos indicadores anexados para remoção posterior
    int    m_superTrendWindow;
    int    m_rsiWindow;
-  int    m_waeWindow;
-  bool   m_indicatorsAttached;
+   int    m_waeWindow;
+   bool   m_indicatorsAttached;
 
 public:
    CVisualManager()
@@ -983,7 +990,7 @@ public:
      }
 
    // Anexar indicadores ao gráfico usando handles persistentes das classes
-   bool AttachIndicatorsToChart()
+   bool AttachIndicatorsToChart(CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
      {
       // No testador de estratégia, não anexar visualmente (não suportado)
       if(MQLInfoInteger(MQL_TESTER))
@@ -1018,18 +1025,17 @@ public:
       
       if(ggVisualHandle != INVALID_HANDLE)
         {
-         int requestedWindow = 0;
-         int window = ChartIndicatorAdd(chartID, requestedWindow, ggVisualHandle);
+         int window = ChartIndicatorAdd(chartID, 0, ggVisualHandle);
 
          if(window >= 0)
            {
-            Print("[VisualManager] ✅ GG_TrendBar anexado ao gráfico (window ", window, ")");
             attached++;
+            Print("[VisualManager] ✅ GG_TrendBar anexado ao gráfico (window ", window, ")");
            }
          else
            {
             int error = GetLastError();
-            Print("[VisualManager] ⚠️ GG_TrendBar não anexado (erro ", error, ") - objetos visuais do EA funcionam normalmente");
+            Print("[VisualManager] ⚠️ GG_TrendBar não anexado (erro ", error, ")");
             allSuccess = false;
            }
 
@@ -1041,114 +1047,80 @@ public:
          allSuccess = false;
         }
       
-      // 1. SUPERTREND (TrendMagic) - Criar handle para o timeframe do gráfico atual
-      ENUM_TIMEFRAMES currentTF = Period();
-      string tmPath = ComposeIndicatorPath("TrendMagic_MT5");
-      int superTrendHandle = iCustom(_Symbol, currentTF, tmPath, 50, 5, 1.0); // CCI=50, ATR=5, Mult=1.0
-      
+      // 1. SUPERTREND (TrendMagic) - Usar handle persistente M15 da classe CTraderMagic
+      int superTrendHandle = traderMagic.GetHandleM15();
       if(superTrendHandle != INVALID_HANDLE)
         {
-         int requestedWindow = 0;
-         int window = ChartIndicatorAdd(chartID, requestedWindow, superTrendHandle);
+         int window = ChartIndicatorAdd(chartID, 0, superTrendHandle);
 
-         if(window >= 0)
+         if(window == 0)
            {
             m_superTrendWindow = window;
-            Print("[VisualManager] ✅ SuperTrend (TrendMagic) anexado ao gráfico (window ", window, ")");
             attached++;
+            Print("[VisualManager] ✅ SuperTrend (TrendMagic) anexado ao gráfico principal (window ", window, ")");
            }
          else
            {
             int error = GetLastError();
-            Print("[VisualManager] ⚠️ SuperTrend não anexado (erro ", error, ") - cálculos funcionam normalmente");
+            Print("[VisualManager] ⚠️ SuperTrend anexado na window ", window, " (esperado: 0) - erro ", error);
             allSuccess = false;
            }
-
-         IndicatorRelease(superTrendHandle);
         }
       else
         {
-         Print("[VisualManager] ⚠️ Erro ao criar handle SuperTrend para timeframe ", EnumToString(currentTF));
+         Print("[VisualManager] ⚠️ Handle SuperTrend inválido");
          allSuccess = false;
         }
       
-      ChartRedraw(chartID);
-
-      // 2. RSI OMA - Criar handle para o timeframe do gráfico atual
-      string rsiPath = ComposeIndicatorPath("RSIOMA_v2HHLSX_MT5");
-      int rsiHandle = iCustom(_Symbol, currentTF, rsiPath, 21, 5, 21, 5); // Period=21, MA Period=5
-      
+      // 2. RSI OMA - Usar handle persistente da classe CRSIOMA  
+      int rsiHandle = rsiOMA.GetHandle();
       if(rsiHandle != INVALID_HANDLE)
         {
          int totalWindows = (int)ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int requestedWindow = (totalWindows > 0) ? totalWindows : 1;
-         if(requestedWindow < 1)
-            requestedWindow = 1;
+         int window = ChartIndicatorAdd(chartID, totalWindows, rsiHandle);
 
-         int window = ChartIndicatorAdd(chartID, requestedWindow, rsiHandle);
-
-         if(window >= 0)
+         if(window > 0)
            {
             m_rsiWindow = window;
-            Print("[VisualManager] ✅ RSI OMA anexado em subwindow ", window);
             attached++;
+            Print("[VisualManager] ✅ RSI OMA anexado em subwindow ", window);
            }
          else
            {
             int error = GetLastError();
-            Print("[VisualManager] ⚠️ RSI OMA não anexado (erro ", error, ") - cálculos funcionam normalmente");
+            Print("[VisualManager] ⚠️ RSI OMA não anexado (erro ", error, ")");
             allSuccess = false;
            }
-
-         IndicatorRelease(rsiHandle);
         }
       else
         {
-         Print("[VisualManager] ⚠️ Erro ao criar handle RSI OMA para timeframe ", EnumToString(currentTF));
+         Print("[VisualManager] ⚠️ Handle RSI OMA inválido");
          allSuccess = false;
         }
       
-      ChartRedraw(chartID);
-
-      // 3. WAE - Criar handle para o timeframe do gráfico atual
-      string waePath = ComposeIndicatorPath("WaddahAttarExplosion_Professional");
-      int waeHandle = iCustom(_Symbol, currentTF, waePath, 
-                             150,      // Sensitivity
-                             20,       // Fast EMA
-                             40,       // Slow EMA
-                             20,       // BB Period
-                             2.0,      // BB Deviation
-                             PRICE_CLOSE); // Price
-      
+      // 3. WAE - Usar handle persistente da classe CWAE
+      int waeHandle = wae.GetHandle();
       if(waeHandle != INVALID_HANDLE)
         {
          int totalWindows = (int)ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int requestedWindow = (totalWindows > 0) ? totalWindows : 1;
-         if(requestedWindow <= m_rsiWindow)
-            requestedWindow = m_rsiWindow + 1;
-         if(requestedWindow < 1)
-            requestedWindow = 1;
+         int window = ChartIndicatorAdd(chartID, totalWindows, waeHandle);
 
-         int window = ChartIndicatorAdd(chartID, requestedWindow, waeHandle);
-
-         if(window >= 0)
+         if(window > 0)
            {
             m_waeWindow = window;
-            Print("[VisualManager] ✅ WAE anexado em subwindow ", window);
             attached++;
+            Print("[VisualManager] ✅ WAE anexado em subwindow ", window);
            }
          else
            {
             int error = GetLastError();
-            Print("[VisualManager] ⚠️ WAE não anexado (erro ", error, ") - cálculos funcionam normalmente");
+            Print("[VisualManager] ⚠️ WAE não anexado (erro ", error, ")");
             allSuccess = false;
            }
-
-         IndicatorRelease(waeHandle);
         }
       else
         {
-         Print("[VisualManager] ⚠️ Erro ao criar handle WAE para timeframe ", EnumToString(currentTF));
+         Print("[VisualManager] ⚠️ Handle WAE inválido");
          allSuccess = false;
         }
       
@@ -1578,7 +1550,7 @@ public:
       m_visualManager.CreateGGTrendBarVisuals();
       
       // TERCEIRO: Anexar todos os indicadores ao gráfico usando handles persistentes
-      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart();
+      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_traderMagic, m_rsi, m_wae);
       
       if(!indicatorsAttached)
         {

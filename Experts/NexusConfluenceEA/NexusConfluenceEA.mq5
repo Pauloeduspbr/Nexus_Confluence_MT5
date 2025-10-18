@@ -744,7 +744,6 @@ public:
 //+------------------------------------------------------------------+
 //| Forward declarations para uso em CVisualManager                  |
 //+------------------------------------------------------------------+
-class CGGTrendBar;
 class CTraderMagic;
 class CRSIOMA;
 class CWAE;
@@ -991,7 +990,7 @@ public:
      }
 
    // Anexar indicadores ao gráfico usando handles persistentes das classes
-   bool AttachIndicatorsToChart(CGGTrendBar &ggTrendBar, CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
+   bool AttachIndicatorsToChart(CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
      {
       // No testador de estratégia, não anexar visualmente (não suportado)
       if(MQLInfoInteger(MQL_TESTER))
@@ -1008,28 +1007,45 @@ public:
       Print("============================================================");
       Print("[VisualManager] Anexando indicadores ao gráfico...");
       
-      // 0. GG_TRENDBAR - Usar handle persistente da classe CGGTrendBar
-      int ggHandle = ggTrendBar.GetHandle();
-      if(ggHandle != INVALID_HANDLE)
+      // 0. GG_TRENDBAR - Criar handle VISUAL separado para anexação ao gráfico
+      // O handle principal (m_handle) tem CreateVisualObjects=false para cálculos
+      // Precisamos de um handle COM CreateVisualObjects=true para visualização
+      string ggPath = ComposeIndicatorPath(GGTrendBarIndicator);
+      int ggVisualHandle = iCustom(_Symbol, PERIOD_M1, ggPath,
+                                   clrLime,              // UpColor
+                                   clrRed,               // DownColor
+                                   clrYellow,            // FlatColor
+                                   clrAqua,              // TextColor
+                                   CORNER_LEFT_UPPER,    // Corner
+                                   true,                 // CreateVisualObjects = TRUE para visualização!
+                                   GG_ADX_Period,
+                                   GG_ADX_Price,
+                                   GG_Step_Psar,
+                                   GG_Max_Psar);
+      
+      if(ggVisualHandle != INVALID_HANDLE)
         {
          // Anexar ao gráfico principal (window 0)
-         int window = ChartIndicatorAdd(chartID, 0, ggHandle);
+         int window = ChartIndicatorAdd(chartID, 0, ggVisualHandle);
          
          if(window >= 0)
            {
             attached++;
             Print("[VisualManager] ✅ GG_TrendBar anexado visualmente ao gráfico (window ", window, ")");
+            // Liberar handle visual - o indicador já está anexado
+            IndicatorRelease(ggVisualHandle);
            }
          else
            {
             int error = GetLastError();
             Print("[VisualManager] ⚠️ GG_TrendBar não anexado visualmente (erro ", error, ") - objetos visuais do EA funcionam normalmente");
+            IndicatorRelease(ggVisualHandle);
             allSuccess = false;
            }
         }
       else
         {
-         Print("[VisualManager] ⚠️ Handle GG_TrendBar inválido");
+         Print("[VisualManager] ⚠️ Erro ao criar handle visual GG_TrendBar");
          allSuccess = false;
         }
       
@@ -1539,7 +1555,7 @@ public:
       m_visualManager.CreateGGTrendBarVisuals();
       
       // TERCEIRO: Anexar todos os indicadores ao gráfico usando handles persistentes
-      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_ggTrendBar, m_traderMagic, m_rsi, m_wae);
+      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_traderMagic, m_rsi, m_wae);
       
       if(!indicatorsAttached)
         {

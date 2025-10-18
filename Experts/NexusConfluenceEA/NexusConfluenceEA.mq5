@@ -916,59 +916,35 @@ public:
       long chartID = ChartID();
       
       // 1. REMOVER INDICADORES ANEXADOS DO GRÁFICO
+      // Abordagem: Remover indicadores por índice (mais robusto que por nome)
       if(m_indicatorsAttached)
         {
-         // Remover SuperTrend (window 0)
-         if(m_superTrendWindow >= 0)
-           {
-            if(ChartIndicatorDelete(chartID, m_superTrendWindow, TrendMagicIndicator))
-              {
-               Print("[VisualManager] ✅ SuperTrend removido do gráfico");
-              }
-            else
-              {
-               // Tentar remover pelo nome completo
-               string fullName = "NexusConfluenceEA\\" + TrendMagicIndicator;
-               if(ChartIndicatorDelete(chartID, m_superTrendWindow, fullName))
-                  Print("[VisualManager] ✅ SuperTrend removido do gráfico (nome completo)");
-               else
-                  Print("[VisualManager] ⚠️ Erro ao remover SuperTrend: ", GetLastError());
-              }
-           }
+         // Primeiro, listar todos os indicadores para debug
+         int totalWindows = (int)ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
+         Print("[VisualManager] Total de janelas no gráfico: ", totalWindows);
          
-         // Remover RSI OMA
-         if(m_rsiWindow >= 0)
+         // Remover indicadores de cada window
+         // IMPORTANTE: Remover de trás para frente para não alterar índices
+         for(int win = totalWindows - 1; win >= 0; win--)
            {
-            if(ChartIndicatorDelete(chartID, m_rsiWindow, RSIOMAIndicator))
+            int indicatorsInWindow = ChartIndicatorsTotal(chartID, win);
+            Print("[VisualManager] Window ", win, " tem ", indicatorsInWindow, " indicadores");
+            
+            // Remover todos os indicadores desta window (de trás para frente)
+            for(int i = indicatorsInWindow - 1; i >= 0; i--)
               {
-               Print("[VisualManager] ✅ RSI OMA removido do gráfico");
-              }
-            else
-              {
-               // Tentar remover pelo nome completo
-               string fullName = "NexusConfluenceEA\\" + RSIOMAIndicator;
-               if(ChartIndicatorDelete(chartID, m_rsiWindow, fullName))
-                  Print("[VisualManager] ✅ RSI OMA removido do gráfico (nome completo)");
+               string indicatorName = ChartIndicatorName(chartID, win, i);
+               Print("[VisualManager] Tentando remover indicador: '", indicatorName, "' (window ", win, ", index ", i, ")");
+               
+               if(ChartIndicatorDelete(chartID, win, indicatorName))
+                 {
+                  Print("[VisualManager] ✅ Indicador '", indicatorName, "' removido com sucesso");
+                 }
                else
-                  Print("[VisualManager] ⚠️ Erro ao remover RSI OMA: ", GetLastError());
-              }
-           }
-         
-         // Remover WAE
-         if(m_waeWindow >= 0)
-           {
-            if(ChartIndicatorDelete(chartID, m_waeWindow, WAEIndicator))
-              {
-               Print("[VisualManager] ✅ WAE removido do gráfico");
-              }
-            else
-              {
-               // Tentar remover pelo nome completo
-               string fullName = "NexusConfluenceEA\\" + WAEIndicator;
-               if(ChartIndicatorDelete(chartID, m_waeWindow, fullName))
-                  Print("[VisualManager] ✅ WAE removido do gráfico (nome completo)");
-               else
-                  Print("[VisualManager] ⚠️ Erro ao remover WAE: ", GetLastError());
+                 {
+                  int error = GetLastError();
+                  Print("[VisualManager] ⚠️ Erro ao remover '", indicatorName, "': ", error);
+                 }
               }
            }
          

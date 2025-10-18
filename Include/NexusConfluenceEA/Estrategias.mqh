@@ -163,133 +163,83 @@ void DefineMultiTimeframes(ENUM_TIMEFRAMES tfOper,
 //| FUNÇÃO: InitializeIndicators                                     |
 //| Inicializa todos os handles dos indicadores                     |
 //|                                                                  |
+//| NOVO v4.2: Sistema simplificado com GG TrendBar como mestre     |
+//|            Remove handles multi-TF desnecessários                |
+//|                                                                  |
 //| RETORNO: true se sucesso, false se erro                         |
 //+------------------------------------------------------------------+
 bool InitializeIndicators(string symbol)
 {
-   PrintFormat("📊 Inicializando indicadores para %s...", symbol);
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📊 Inicializando indicadores (Sistema v4.2 Simplificado)...");
+   PrintFormat("════════════════════════════════════════════════════════════════");
    
    // Construir caminhos dos indicadores
-   string path_tm = IndicatorsBasePath + TrendMagicIndicator;
+   string path_st = IndicatorsBasePath + TrendMagicIndicator;
    string path_cs = IndicatorsBasePath + CurrencyStrengthIndicator;
    string path_rsi = IndicatorsBasePath + RSIOMAIndicator;
    string path_wae = IndicatorsBasePath + WAEIndicator;
    string path_gg = IndicatorsBasePath + GGTrendBarIndicator;
    
-   //--- TREND MAGIC ---
-   // MACRO-1
-   g_handles.tm_macro1 = iCustom(symbol, g_tfMacro1, path_tm,
-                                  TM_MACRO1_CCI_Period,
-                                  TM_MACRO1_ATR_Period,
-                                  TM_MACRO1_ATR_Multiplier);
-   if(g_handles.tm_macro1 == INVALID_HANDLE)
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  1️⃣ GG TRENDBAR - FILTRO MESTRE (Multi-TF Interno)          ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("🎯 [1/5] GG TrendBar (Filtro Mestre Multi-TF)...");
+   g_handles.gg_global = iCustom(symbol, PERIOD_CURRENT, path_gg,
+                                  GG_UpColor,
+                                  GG_DownColor,
+                                  GG_FlatColor,
+                                  GG_TextColor,
+                                  GG_Corner,
+                                  GG_CreateVisualObjects,
+                                  GG_ADX_Period,
+                                  GG_ADX_Price,
+                                  GG_Step_Psar,
+                                  GG_Max_Psar);
+   if(g_handles.gg_global == INVALID_HANDLE)
    {
-      PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-1 (%s)", EnumToString(g_tfMacro1));
+      PrintFormat("❌ ERRO CRÍTICO: Falha ao criar handle GG TrendBar!");
+      PrintFormat("   GG TrendBar é o FILTRO MESTRE - sistema não pode operar sem ele!");
       return false;
    }
+   PrintFormat("   ✅ GG TrendBar OK");
    
-   // MACRO-2
-   g_handles.tm_macro2 = iCustom(symbol, g_tfMacro2, path_tm,
-                                  TM_MACRO2_CCI_Period,
-                                  TM_MACRO2_ATR_Period,
-                                  TM_MACRO2_ATR_Multiplier);
-   if(g_handles.tm_macro2 == INVALID_HANDLE)
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  2️⃣ SUPERTREND (Trend Magic Oper) - Tendência Local         ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("📈 [2/5] Supertrend (Tendência Local %s)...", EnumToString(g_tfOperacional));
+   g_handles.st_oper = iCustom(symbol, g_tfOperacional, path_st,
+                                ST_OPER_CCI_Period,
+                                ST_OPER_ATR_Period,
+                                ST_OPER_ATR_Multiplier);
+   if(g_handles.st_oper == INVALID_HANDLE)
    {
-      PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-2 (%s)", EnumToString(g_tfMacro2));
+      PrintFormat("❌ ERRO: Supertrend falhou!");
       return false;
    }
+   PrintFormat("   ✅ Supertrend OK");
    
-   // MACRO-3 (se aplicável)
-   if(g_numNiveisMacro == 3)
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  3️⃣ WAE - Momentum/Explosão                                  ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("💥 [3/5] WAE (Momentum)...");
+   g_handles.wae_oper = iCustom(symbol, g_tfOperacional, path_wae,
+                                 WAE_OPER_FastMA,
+                                 WAE_OPER_SlowMA,
+                                 WAE_OPER_BBLength,
+                                 WAE_OPER_BBMultiplier,
+                                 WAE_OPER_Sensitivity);
+   if(g_handles.wae_oper == INVALID_HANDLE)
    {
-      g_handles.tm_macro3 = iCustom(symbol, g_tfMacro3, path_tm,
-                                     TM_MACRO3_CCI_Period,
-                                     TM_MACRO3_ATR_Period,
-                                     TM_MACRO3_ATR_Multiplier);
-      if(g_handles.tm_macro3 == INVALID_HANDLE)
-      {
-         PrintFormat("❌ Erro ao criar handle Trend Magic MACRO-3 (%s)", EnumToString(g_tfMacro3));
-         return false;
-      }
-   }
-   else
-   {
-      g_handles.tm_macro3 = INVALID_HANDLE; // Não aplicável
-   }
-   
-   // OPERACIONAL
-   g_handles.tm_oper = iCustom(symbol, g_tfOperacional, path_tm,
-                                TM_OPER_CCI_Period,
-                                TM_OPER_ATR_Period,
-                                TM_OPER_ATR_Multiplier);
-   if(g_handles.tm_oper == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle Trend Magic OPERACIONAL (%s)", EnumToString(g_tfOperacional));
+      PrintFormat("❌ ERRO: WAE falhou!");
       return false;
    }
+   PrintFormat("   ✅ WAE OK");
    
-   //--- CURRENCY STRENGTH (apenas operacional) ---
-   g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
-                                CS_CalculationPeriod,
-                                CS_SmoothingPeriod,
-                                CS_ShowInPercent);
-   if(g_handles.cs_oper == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle Currency Strength");
-      return false;
-   }
-   
-   //--- RSI OMA ---
-   // MACRO-1
-   g_handles.rsi_macro1 = iCustom(symbol, g_tfMacro1, path_rsi,
-                                   RSI_MACRO1_Period,
-                                   RSI_MACRO1_MA_Period,
-                                   RSI_MACRO1_MA_Method,
-                                   RSI_MACRO1_HighLevel,
-                                   RSI_MACRO1_LowLevel,
-                                   RSI_MACRO1_ShowLevels);
-   if(g_handles.rsi_macro1 == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-1");
-      return false;
-   }
-   
-   // MACRO-2
-   g_handles.rsi_macro2 = iCustom(symbol, g_tfMacro2, path_rsi,
-                                   RSI_MACRO2_Period,
-                                   RSI_MACRO2_MA_Period,
-                                   RSI_MACRO2_MA_Method,
-                                   RSI_MACRO2_HighLevel,
-                                   RSI_MACRO2_LowLevel,
-                                   RSI_MACRO2_ShowLevels);
-   if(g_handles.rsi_macro2 == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-2");
-      return false;
-   }
-   
-   // MACRO-3 (se aplicável)
-   if(g_numNiveisMacro == 3)
-   {
-      g_handles.rsi_macro3 = iCustom(symbol, g_tfMacro3, path_rsi,
-                                      RSI_MACRO3_Period,
-                                      RSI_MACRO3_MA_Period,
-                                      RSI_MACRO3_MA_Method,
-                                      RSI_MACRO3_HighLevel,
-                                      RSI_MACRO3_LowLevel,
-                                      RSI_MACRO3_ShowLevels);
-      if(g_handles.rsi_macro3 == INVALID_HANDLE)
-      {
-         PrintFormat("❌ Erro ao criar handle RSI OMA MACRO-3");
-         return false;
-      }
-   }
-   else
-   {
-      g_handles.rsi_macro3 = INVALID_HANDLE;
-   }
-   
-   // OPERACIONAL
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  4️⃣ RSI OMA - Força Relativa                                 ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("📊 [4/5] RSI OMA (Força Relativa)...");
    g_handles.rsi_oper = iCustom(symbol, g_tfOperacional, path_rsi,
                                  RSI_OPER_Period,
                                  RSI_OPER_MA_Period,
@@ -299,164 +249,28 @@ bool InitializeIndicators(string symbol)
                                  RSI_OPER_ShowLevels);
    if(g_handles.rsi_oper == INVALID_HANDLE)
    {
-      PrintFormat("❌ Erro ao criar handle RSI OMA OPERACIONAL");
+      PrintFormat("❌ ERRO: RSI OMA falhou!");
       return false;
    }
+   PrintFormat("   ✅ RSI OMA OK");
    
-   //--- WAE ---
-   // MACRO-1
-   g_handles.wae_macro1 = iCustom(symbol, g_tfMacro1, path_wae,
-                                   WAE_MACRO1_FastMA,
-                                   WAE_MACRO1_SlowMA,
-                                   WAE_MACRO1_BBLength,
-                                   WAE_MACRO1_BBMultiplier,
-                                   WAE_MACRO1_Sensitivity);
-   if(g_handles.wae_macro1 == INVALID_HANDLE)
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  5️⃣ CURRENCY STRENGTH - Contexto Moedas (Forex/Metais)      ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("� [5/5] Currency Strength (Contexto)...");
+   g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
+                                CS_CalculationPeriod,
+                                CS_SmoothingPeriod,
+                                CS_ShowInPercent);
+   if(g_handles.cs_oper == INVALID_HANDLE)
    {
-      PrintFormat("❌ Erro ao criar handle WAE MACRO-1");
+      PrintFormat("❌ ERRO: Currency Strength falhou!");
       return false;
    }
-   
-   // MACRO-2
-   g_handles.wae_macro2 = iCustom(symbol, g_tfMacro2, path_wae,
-                                   WAE_MACRO2_FastMA,
-                                   WAE_MACRO2_SlowMA,
-                                   WAE_MACRO2_BBLength,
-                                   WAE_MACRO2_BBMultiplier,
-                                   WAE_MACRO2_Sensitivity);
-   if(g_handles.wae_macro2 == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle WAE MACRO-2");
-      return false;
-   }
-   
-   // MACRO-3 (se aplicável)
-   if(g_numNiveisMacro == 3)
-   {
-      g_handles.wae_macro3 = iCustom(symbol, g_tfMacro3, path_wae,
-                                      WAE_MACRO3_FastMA,
-                                      WAE_MACRO3_SlowMA,
-                                      WAE_MACRO3_BBLength,
-                                      WAE_MACRO3_BBMultiplier,
-                                      WAE_MACRO3_Sensitivity);
-      if(g_handles.wae_macro3 == INVALID_HANDLE)
-      {
-         PrintFormat("❌ Erro ao criar handle WAE MACRO-3");
-         return false;
-      }
-   }
-   else
-   {
-      g_handles.wae_macro3 = INVALID_HANDLE;
-   }
-   
-   // OPERACIONAL
-   g_handles.wae_oper = iCustom(symbol, g_tfOperacional, path_wae,
-                                 WAE_OPER_FastMA,
-                                 WAE_OPER_SlowMA,
-                                 WAE_OPER_BBLength,
-                                 WAE_OPER_BBMultiplier,
-                                 WAE_OPER_Sensitivity);
-   if(g_handles.wae_oper == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle WAE OPERACIONAL");
-      return false;
-   }
-   
-   //--- GG TRENDBAR (global) ---
-   // IMPORTANTE: Precisa de TODOS os parâmetros visuais + CreateVisualObjects=true
-   g_handles.gg_global = iCustom(symbol, PERIOD_CURRENT, path_gg,
-                                  GG_UpColor,              // UpColor
-                                  GG_DownColor,            // DownColor
-                                  GG_FlatColor,            // FlatColor
-                                  GG_TextColor,            // TextColor
-                                  GG_Corner,               // Corner
-                                  GG_CreateVisualObjects,  // CreateVisualObjects = TRUE!
-                                  GG_ADX_Period,
-                                  GG_ADX_Price,
-                                  GG_Step_Psar,
-                                  GG_Max_Psar);
-   if(g_handles.gg_global == INVALID_HANDLE)
-   {
-      PrintFormat("❌ Erro ao criar handle GG TrendBar");
-      return false;
-   }
-   
-   // IMPORTANTE: Anexar o indicador ao gráfico para visualização
-   int window = ChartIndicatorAdd(0, 0, g_handles.gg_global);
-   if(window >= 0)
-   {
-      PrintFormat("✅ GG TrendBar anexado ao gráfico (window %d)", window);
-   }
-   else
-   {
-      int error = GetLastError();
-      PrintFormat("⚠️ GG TrendBar não anexado visualmente (erro %d) - mas handle criado OK", error);
-   }
-   
-   //--- ANEXAR DEMAIS INDICADORES AO GRÁFICO ---
-   PrintFormat("📌 Anexando indicadores ao gráfico...");
-   
-   // 1. SUPERTREND (Trend Magic OPERACIONAL) - GRÁFICO PRINCIPAL (window 0)
-   window = ChartIndicatorAdd(0, 0, g_handles.tm_oper);
-   if(window >= 0)
-   {
-      PrintFormat("✅ Supertrend (%s) anexado ao gráfico principal", EnumToString(g_tfOperacional));
-   }
-   else
-   {
-      PrintFormat("⚠️ Supertrend não anexado (erro %d)", GetLastError());
-   }
-   
-   // 2. CURRENCY STRENGTH - SUBJANELA 1
-   window = ChartIndicatorAdd(0, 1, g_handles.cs_oper);
-   if(window >= 0)
-   {
-      PrintFormat("✅ Currency Strength anexado à subjanela %d", window);
-   }
-   else
-   {
-      PrintFormat("⚠️ Currency Strength não anexado (erro %d)", GetLastError());
-   }
-   
-   // 3. RSI OMA (OPERACIONAL) - SUBJANELA 2
-   window = ChartIndicatorAdd(0, 2, g_handles.rsi_oper);
-   if(window >= 0)
-   {
-      PrintFormat("✅ RSI OMA anexado à subjanela %d", window);
-   }
-   else
-   {
-      PrintFormat("⚠️ RSI OMA não anexado (erro %d)", GetLastError());
-   }
-   
-   // 4. WAE (OPERACIONAL) - SUBJANELA 3
-   window = ChartIndicatorAdd(0, 3, g_handles.wae_oper);
-   if(window >= 0)
-   {
-      PrintFormat("✅ WAE anexado à subjanela %d", window);
-   }
-   else
-   {
-      PrintFormat("⚠️ WAE não anexado (erro %d)", GetLastError());
-   }
+   PrintFormat("   ✅ Currency Strength OK");
    
    PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("✅ Todos os indicadores inicializados e anexados com sucesso!");
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("📊 CONFIGURAÇÃO MULTI-TIMEFRAME:");
-   PrintFormat("   MACRO-1: %s | MACRO-2: %s | MACRO-3: %s | OPER: %s",
-               EnumToString(g_tfMacro1),
-               EnumToString(g_tfMacro2),
-               (g_numNiveisMacro == 3) ? EnumToString(g_tfMacro3) : "N/A",
-               EnumToString(g_tfOperacional));
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("📌 INDICADORES ANEXADOS:");
-   PrintFormat("   ✅ GG TrendBar     → Gráfico Principal (Multi-TF)");
-   PrintFormat("   ✅ Supertrend      → Gráfico Principal (%s)", EnumToString(g_tfOperacional));
-   PrintFormat("   ✅ Currency Strength → Subjanela 1");
-   PrintFormat("   ✅ RSI OMA         → Subjanela 2");
-   PrintFormat("   ✅ WAE             → Subjanela 3");
+   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS COM SUCESSO!");
    PrintFormat("════════════════════════════════════════════════════════════════");
    
    return true;
@@ -847,15 +661,14 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    result.m30Aligned = false;
    result.structureValid = false;
    
-   // Obter sinais Trend Magic de todos os timeframes macro
-   TMSignal tm_macro1 = GetTrendMagicSignal(g_handles.tm_macro1, g_tfMacro1);
-   TMSignal tm_macro2 = GetTrendMagicSignal(g_handles.tm_macro2, g_tfMacro2);
-   TMSignal tm_macro3;
-   
-   if(g_numNiveisMacro == 3)
-   {
-      tm_macro3 = GetTrendMagicSignal(g_handles.tm_macro3, g_tfMacro3);
-   }
+   // TODO ETAPA 6: SUBSTITUIR POR GG_TRENDBAR (FILTRO MESTRE)
+   // Temporariamente usando valores fixos para compilação
+   TMSignal tm_macro1, tm_macro2, tm_macro3;
+   tm_macro1.isValid = true;
+   tm_macro1.direction = TRADE_DIRECTION_BUY; // Temporário
+   tm_macro2.isValid = true;
+   tm_macro2.direction = TRADE_DIRECTION_BUY; // Temporário
+   tm_macro3.isValid = false;
    
    // Validação 1: MACRO-1 e MACRO-2 OBRIGATÓRIOS
    if(!tm_macro1.isValid || !tm_macro2.isValid)
@@ -1054,26 +867,15 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
 //+------------------------------------------------------------------+
 void ReleaseIndicators()
 {
-   if(g_handles.tm_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro1);
-   if(g_handles.tm_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro2);
-   if(g_handles.tm_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.tm_macro3);
-   if(g_handles.tm_oper != INVALID_HANDLE) IndicatorRelease(g_handles.tm_oper);
+   PrintFormat("🔓 Liberando handles dos indicadores...");
    
-   if(g_handles.cs_oper != INVALID_HANDLE) IndicatorRelease(g_handles.cs_oper);
+   if(g_handles.gg_global != INVALID_HANDLE)  IndicatorRelease(g_handles.gg_global);
+   if(g_handles.st_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.st_oper);
+   if(g_handles.wae_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.wae_oper);
+   if(g_handles.rsi_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.rsi_oper);
+   if(g_handles.cs_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.cs_oper);
    
-   if(g_handles.rsi_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro1);
-   if(g_handles.rsi_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro2);
-   if(g_handles.rsi_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_macro3);
-   if(g_handles.rsi_oper != INVALID_HANDLE) IndicatorRelease(g_handles.rsi_oper);
-   
-   if(g_handles.wae_macro1 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro1);
-   if(g_handles.wae_macro2 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro2);
-   if(g_handles.wae_macro3 != INVALID_HANDLE) IndicatorRelease(g_handles.wae_macro3);
-   if(g_handles.wae_oper != INVALID_HANDLE) IndicatorRelease(g_handles.wae_oper);
-   
-   if(g_handles.gg_global != INVALID_HANDLE) IndicatorRelease(g_handles.gg_global);
-   
-   PrintFormat("✅ Todos os handles de indicadores liberados");
+   PrintFormat("✅ Handles liberados");
 }
 
 //+------------------------------------------------------------------+

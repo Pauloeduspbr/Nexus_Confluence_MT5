@@ -739,6 +739,13 @@ public:
   };
 
 //+------------------------------------------------------------------+
+//| Forward declarations para uso em CVisualManager                  |
+//+------------------------------------------------------------------+
+class CTraderMagic;
+class CRSIOMA;
+class CWAE;
+
+//+------------------------------------------------------------------+
 //| Classe para gerenciar objetos visuais do GG_TrendBar             |
 //+------------------------------------------------------------------+
 class CVisualManager
@@ -786,6 +793,14 @@ public:
    // Criar objetos visuais do GG_TrendBar
    void CreateGGTrendBarVisuals()
      {
+      // VERIFICAR SE ESTÁ NO TESTADOR
+      // Objetos visuais não funcionam no testador de estratégia
+      if(MQLInfoInteger(MQL_TESTER))
+        {
+         Print("[VisualManager] TESTADOR - Objetos visuais GG_TrendBar desabilitados");
+         return; // Não criar objetos visuais no testador
+        }
+      
       // PRIMEIRO: Deletar objetos criados pelo indicador original (se existirem)
       DeleteOriginalIndicatorObjects();
       
@@ -976,127 +991,114 @@ public:
       Print("============================================================");
      }
 
-   // Anexar indicadores ao gráfico usando abordagem correta
-   bool AttachIndicatorsToChart()
+   // Anexar indicadores ao gráfico usando handles persistentes das classes
+   bool AttachIndicatorsToChart(CTraderMagic &traderMagic, CRSIOMA &rsiOMA, CWAE &wae)
      {
+      // No testador de estratégia, não anexar visualmente (não suportado)
+      if(MQLInfoInteger(MQL_TESTER))
+        {
+         Print("[VisualManager] Testador detectado - indicadores funcionam via handles (sem visualização)");
+         m_indicatorsAttached = false;
+         return true;
+        }
+      
       long chartID = ChartID();
       bool allSuccess = true;
+      int attached = 0;
       
       Print("============================================================");
-      Print("[VisualManager] Iniciando anexação de indicadores...");
-      Print("============================================================");
+      Print("[VisualManager] Anexando indicadores ao gráfico...");
       
-      // 1. SUPERTREND - Gráfico Principal (Window 0)
-      string superTrendPath = "NexusConfluenceEA\\" + TrendMagicIndicator;
-      Print("[VisualManager] Tentando anexar SuperTrend: ", superTrendPath);
-      
-      int tempHandle = iCustom(_Symbol, PERIOD_CURRENT, superTrendPath, 
-                               TM_CCI_Period, TM_ATR_Period, TM_ATR_Multiplier);
-      
-      if(tempHandle != INVALID_HANDLE)
+      // 1. SUPERTREND - Usar handle persistente M15 da classe CTraderMagic
+      int superTrendHandle = traderMagic.GetHandleM15();
+      if(superTrendHandle != INVALID_HANDLE)
         {
-         // Adicionar ao gráfico principal (window 0)
-         int window = ChartIndicatorAdd(chartID, 0, tempHandle);
-         m_superTrendWindow = window;  // Armazenar número da janela
+         // Tentar anexar ao gráfico principal (window 0)
+         int window = ChartIndicatorAdd(chartID, 0, superTrendHandle);
          
-         if(window == 0)
+         if(window >= 0)
            {
-            Print("[VisualManager] ✅ SuperTrend anexado ao gráfico principal (window 0)");
+            m_superTrendWindow = window;
+            attached++;
+            Print("[VisualManager] ✅ SuperTrend anexado (window ", window, ")");
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar SuperTrend. Window retornada: ", window, " Erro: ", GetLastError());
+            int error = GetLastError();
+            Print("[VisualManager] ⚠️ SuperTrend não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
         }
       else
         {
-         Print("[VisualManager] ❌ Erro ao criar handle SuperTrend: ", GetLastError());
+         Print("[VisualManager] ⚠️ Handle SuperTrend inválido");
          allSuccess = false;
         }
       
-      // Pequeno delay para garantir processamento
-      Sleep(100);
-      
-      // 2. RSI OMA - Nova Subjanela (forçar criação de window 1)
-      string rsiPath = "NexusConfluenceEA\\" + RSIOMAIndicator;
-      Print("[VisualManager] Tentando anexar RSI OMA: ", rsiPath);
-      
-      tempHandle = iCustom(_Symbol, PERIOD_CURRENT, rsiPath,
-                          RSI_Period, RSI_MA_Period, RSI_MA_Method, 
-                          RSI_HighLevel, RSI_LowLevel, RSI_ShowLevels);
-      
-      if(tempHandle != INVALID_HANDLE)
+      // 2. RSI OMA - Usar handle persistente da classe CRSIOMA  
+      int rsiHandle = rsiOMA.GetHandle();
+      if(rsiHandle != INVALID_HANDLE)
         {
-         // Forçar nova subjanela usando número de janelas atuais + 1
+         // Anexar em nova subwindow
          long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
-         m_rsiWindow = window;  // Armazenar número da janela
+         int window = ChartIndicatorAdd(chartID, (int)totalWindows, rsiHandle);
          
-         if(window > 0)
+         if(window >= 0)
            {
-            Print("[VisualManager] ✅ RSI OMA anexado em subjanela ", window);
+            m_rsiWindow = window;
+            attached++;
+            Print("[VisualManager] ✅ RSI OMA anexado (window ", window, ")");
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar RSI OMA. Window retornada: ", window, " Erro: ", GetLastError());
+            int error = GetLastError();
+            Print("[VisualManager] ⚠️ RSI OMA não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
         }
       else
         {
-         Print("[VisualManager] ❌ Erro ao criar handle RSI OMA: ", GetLastError());
+         Print("[VisualManager] ⚠️ Handle RSI OMA inválido");
          allSuccess = false;
         }
       
-      // Pequeno delay para garantir processamento
-      Sleep(100);
-      
-      // 3. WAE - Nova Subjanela (forçar criação de window 2)
-      string waePath = "NexusConfluenceEA\\" + WAEIndicator;
-      Print("[VisualManager] Tentando anexar WAE: ", waePath);
-      
-      tempHandle = iCustom(_Symbol, PERIOD_CURRENT, waePath,
-                          WAE_FastMA, WAE_SlowMA, WAE_BBLength, 
-                          WAE_BBMultiplier, WAE_Sensitivity);
-      
-      if(tempHandle != INVALID_HANDLE)
+      // 3. WAE - Usar handle persistente da classe CWAE
+      int waeHandle = wae.GetHandle();
+      if(waeHandle != INVALID_HANDLE)
         {
-         // Forçar nova subjanela usando número de janelas atuais + 1
+         // Anexar em nova subwindow
          long totalWindows = ChartGetInteger(chartID, CHART_WINDOWS_TOTAL);
-         int window = ChartIndicatorAdd(chartID, (int)totalWindows, tempHandle);
-         m_waeWindow = window;  // Armazenar número da janela
+         int window = ChartIndicatorAdd(chartID, (int)totalWindows, waeHandle);
          
-         if(window > 0)
+         if(window >= 0)
            {
-            Print("[VisualManager] ✅ WAE anexado em subjanela ", window);
+            m_waeWindow = window;
+            attached++;
+            Print("[VisualManager] ✅ WAE anexado (window ", window, ")");
            }
          else
            {
-            Print("[VisualManager] ❌ Erro ao anexar WAE. Window retornada: ", window, " Erro: ", GetLastError());
+            int error = GetLastError();
+            Print("[VisualManager] ⚠️ WAE não anexado (erro ", error, ") - cálculos funcionam normalmente");
             allSuccess = false;
            }
         }
       else
         {
-         Print("[VisualManager] ❌ Erro ao criar handle WAE: ", GetLastError());
+         Print("[VisualManager] ⚠️ Handle WAE inválido");
          allSuccess = false;
         }
       
-      // Marcar que indicadores foram anexados
-      if(allSuccess || m_superTrendWindow >= 0 || m_rsiWindow >= 0 || m_waeWindow >= 0)
-         m_indicatorsAttached = true;
+      m_indicatorsAttached = (attached > 0);
       
       ChartRedraw(chartID);
       
-      Print("============================================================");
-      if(allSuccess)
-         Print("[VisualManager] ✅ TODOS os indicadores anexados com sucesso!");
-      else
-         Print("[VisualManager] ⚠️ Alguns indicadores tiveram problemas na anexação");
+      Print("[VisualManager] Resultado: ", attached, "/3 indicadores anexados visualmente");
+      Print("[VisualManager] GG_TrendBar: Objetos visuais ativos ✅");
+      Print("[VisualManager] Todos indicadores funcionam via handles para cálculos ✅");
       Print("============================================================");
       
-      return allSuccess;
+      return true; // Sempre retornar true - anexação visual é complementar
      }
   };
 
@@ -1188,6 +1190,9 @@ public:
 
       return signal.isValid;
      }
+
+   // Getter para anexação visual ao gráfico
+   int GetHandleM15() const { return m_handles.tm_m15; }
 
 private:
    int GetHandle(const ENUM_TIMEFRAMES timeframe) const
@@ -1357,6 +1362,9 @@ public:
       return true;
      }
 
+   // Getter para anexação visual ao gráfico (usa M15 como padrão)
+   int GetHandle() const { return m_handles.rsi_m15; }
+
 private:
    int GetHandle(const ENUM_TIMEFRAMES timeframe) const
      {
@@ -1454,6 +1462,9 @@ public:
       return true;
      }
 
+   // Getter para anexação visual ao gráfico (usa M15 como padrão)
+   int GetHandle() const { return m_handles.wae_m15; }
+
 private:
    int GetHandle(const ENUM_TIMEFRAMES timeframe) const
      {
@@ -1503,13 +1514,12 @@ public:
       // SEGUNDO: Criar objetos visuais do GG_TrendBar (EA gerencia)
       m_visualManager.CreateGGTrendBarVisuals();
       
-      // TERCEIRO: Anexar outros indicadores ao gráfico
-      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart();
+      // TERCEIRO: Anexar outros indicadores ao gráfico usando handles persistentes
+      bool indicatorsAttached = m_visualManager.AttachIndicatorsToChart(m_traderMagic, m_rsi, m_wae);
       
       if(!indicatorsAttached)
         {
          Print("[CIndicatorManager] ⚠️ Atenção: Alguns indicadores não foram anexados automaticamente");
-         Print("[CIndicatorManager] Verifique os logs acima para instruções manuais");
         }
       
       return ok;

@@ -793,13 +793,8 @@ public:
    // Criar objetos visuais do GG_TrendBar
    void CreateGGTrendBarVisuals()
      {
-      // VERIFICAR SE ESTÁ NO TESTADOR
-      // Objetos visuais não funcionam no testador de estratégia
-      if(MQLInfoInteger(MQL_TESTER))
-        {
-         Print("[VisualManager] TESTADOR - Objetos visuais GG_TrendBar desabilitados");
-         return; // Não criar objetos visuais no testador
-        }
+      // Criar objetos visuais sempre (tanto em conta real quanto no testador)
+      // No testador, ajuda a visualizar o que está acontecendo
       
       // PRIMEIRO: Deletar objetos criados pelo indicador original (se existirem)
       DeleteOriginalIndicatorObjects();

@@ -182,24 +182,14 @@ struct AssetConfig
 //--- Handles dos indicadores
 struct IndicatorHandles
 {
-   int tm_macro1;     // Trend Magic MACRO-1
-   int tm_macro2;     // Trend Magic MACRO-2
-   int tm_macro3;     // Trend Magic MACRO-3
-   int tm_oper;       // Trend Magic Operacional
+   // GG TrendBar - FILTRO MESTRE (analisa todos os TFs internamente)
+   int gg_global;         // GG TrendBar Global Multi-TF
    
-   int cs_oper;       // Currency Strength Operacional
-   
-   int rsi_macro1;    // RSI OMA MACRO-1
-   int rsi_macro2;    // RSI OMA MACRO-2
-   int rsi_macro3;    // RSI OMA MACRO-3
-   int rsi_oper;      // RSI OMA Operacional
-   
-   int wae_macro1;    // WAE MACRO-1
-   int wae_macro2;    // WAE MACRO-2
-   int wae_macro3;    // WAE MACRO-3
-   int wae_oper;      // WAE Operacional
-   
-   int gg_global;     // GG TrendBar Global
+   // FILTROS MICRO - APENAS OPERACIONAL (TF atual do gráfico)
+   int st_oper;           // Supertrend (Trend Magic) Operacional - tendência local
+   int wae_oper;          // WAE Operacional - momentum/explosão
+   int rsi_oper;          // RSI OMA Operacional - força relativa
+   int cs_oper;           // Currency Strength Operacional - contexto moedas
 };
 
 //--- Registro de trade
@@ -285,28 +275,17 @@ input string WAEIndicator             = "WaddahAttarExplosion_Professional";
 //+------------------------------------------------------------------+
 
 //╔══════════════════════════════════════════════════════════════════╗
-//║                  📊 TREND MAGIC - TODOS OS TFs                   ║
+//║         📊 SUPERTREND (Trend Magic) - APENAS OPERACIONAL         ║
+//║                                                                  ║
+//║  NOTA: GG TrendBar analisa TODOS os timeframes macro (M1-MN1)   ║
+//║        Trend Magic usado apenas no TF operacional para confirmar ║
+//║        tendência LOCAL (Supertrend = linha azul/vermelha)       ║
 //╚══════════════════════════════════════════════════════════════════╝
 
-input group "=== 📈 TREND MAGIC - MACRO-1 (Timeframe mais longo) ==="
-input int    TM_MACRO1_CCI_Period     = 50;    // CCI Period
-input int    TM_MACRO1_ATR_Period     = 5;     // ATR Period
-input double TM_MACRO1_ATR_Multiplier = 1.0;   // ATR Multiplier
-
-input group "=== 📈 TREND MAGIC - MACRO-2 (Timeframe intermediário) ==="
-input int    TM_MACRO2_CCI_Period     = 50;    // CCI Period
-input int    TM_MACRO2_ATR_Period     = 5;     // ATR Period
-input double TM_MACRO2_ATR_Multiplier = 1.0;   // ATR Multiplier
-
-input group "=== 📈 TREND MAGIC - MACRO-3 (Timeframe curto - pode não existir em H1/H4) ==="
-input int    TM_MACRO3_CCI_Period     = 50;    // CCI Period
-input int    TM_MACRO3_ATR_Period     = 5;     // ATR Period
-input double TM_MACRO3_ATR_Multiplier = 1.0;   // ATR Multiplier
-
-input group "=== 📈 TREND MAGIC - OPERACIONAL (Timeframe atual do gráfico) ==="
-input int    TM_OPER_CCI_Period       = 50;    // CCI Period
-input int    TM_OPER_ATR_Period       = 5;     // ATR Period
-input double TM_OPER_ATR_Multiplier   = 1.0;   // ATR Multiplier
+input group "=== 📈 SUPERTREND (Trend Magic Operacional) - Tendência Local ==="
+input int    ST_OPER_CCI_Period       = 50;    // CCI Period
+input int    ST_OPER_ATR_Period       = 5;     // ATR Period
+input double ST_OPER_ATR_Multiplier   = 1.0;   // ATR Multiplier
 
 //╔══════════════════════════════════════════════════════════════════╗
 //║              💱 CURRENCY STRENGTH - APENAS OPERACIONAL           ║
@@ -319,72 +298,35 @@ input int    CS_SmoothingPeriod       = 5;     // Período de suavização
 input bool   CS_ShowInPercent         = true;  // Exibir em porcentagem
 
 //╔══════════════════════════════════════════════════════════════════╗
-//║                   📊 RSI OMA - TODOS OS TFs                      ║
+//║              📊 RSI OMA - APENAS OPERACIONAL (Força Relativa)    ║
+//║                                                                  ║
+//║  NOTA: GG TrendBar valida alinhamento macro em TODOS os TFs     ║
+//║        RSI OMA usado apenas no TF operacional para confirmar    ║
+//║        FORÇA do movimento (linha vermelha vs azul + inclinação) ║
 //╚══════════════════════════════════════════════════════════════════╝
 
-input group "=== 📊 RSI OMA - MACRO-1 (Timeframe mais longo) ==="
-input int              RSI_MACRO1_Period    = 14;        // RSI Period
-input int              RSI_MACRO1_MA_Period = 9;         // Moving Average Period
-input ENUM_MA_METHOD   RSI_MACRO1_MA_Method = MODE_SMA;  // MA Method
-input double           RSI_MACRO1_HighLevel = 70.0;      // High Level (sobrecompra)
-input double           RSI_MACRO1_LowLevel  = 30.0;      // Low Level (sobrevenda)
-input bool             RSI_MACRO1_ShowLevels= true;      // Show Levels
-
-input group "=== 📊 RSI OMA - MACRO-2 (Timeframe intermediário) ==="
-input int              RSI_MACRO2_Period    = 14;
-input int              RSI_MACRO2_MA_Period = 9;
-input ENUM_MA_METHOD   RSI_MACRO2_MA_Method = MODE_SMA;
-input double           RSI_MACRO2_HighLevel = 70.0;
-input double           RSI_MACRO2_LowLevel  = 30.0;
-input bool             RSI_MACRO2_ShowLevels= true;
-
-input group "=== 📊 RSI OMA - MACRO-3 (Timeframe curto - pode não existir) ==="
-input int              RSI_MACRO3_Period    = 14;
-input int              RSI_MACRO3_MA_Period = 9;
-input ENUM_MA_METHOD   RSI_MACRO3_MA_Method = MODE_SMA;
-input double           RSI_MACRO3_HighLevel = 70.0;
-input double           RSI_MACRO3_LowLevel  = 30.0;
-input bool             RSI_MACRO3_ShowLevels= true;
-
-input group "=== 📊 RSI OMA - OPERACIONAL (Timeframe atual) ==="
-input int              RSI_OPER_Period      = 14;
-input int              RSI_OPER_MA_Period   = 9;
-input ENUM_MA_METHOD   RSI_OPER_MA_Method   = MODE_SMA;
-input double           RSI_OPER_HighLevel   = 70.0;
-input double           RSI_OPER_LowLevel    = 30.0;
-input bool             RSI_OPER_ShowLevels  = true;
+input group "=== 📊 RSI OMA (Operacional) - Força Relativa ==="
+input int              RSI_OPER_Period      = 14;        // RSI Period
+input int              RSI_OPER_MA_Period   = 9;         // Moving Average Period
+input ENUM_MA_METHOD   RSI_OPER_MA_Method   = MODE_SMA;  // MA Method
+input double           RSI_OPER_HighLevel   = 70.0;      // High Level (sobrecompra)
+input double           RSI_OPER_LowLevel    = 30.0;      // Low Level (sobrevenda)
+input bool             RSI_OPER_ShowLevels  = true;      // Show Levels
 
 //╔══════════════════════════════════════════════════════════════════╗
-//║                   💥 WAE - TODOS OS TFs                          ║
+//║              💥 WAE - APENAS OPERACIONAL (Momentum/Explosão)     ║
+//║                                                                  ║
+//║  NOTA: GG TrendBar valida alinhamento macro em TODOS os TFs     ║
+//║        WAE usado apenas no TF operacional para confirmar        ║
+//║        MOMENTUM (histograma verde/vermelho acima linha amarela) ║
 //╚══════════════════════════════════════════════════════════════════╝
 
-input group "=== 💥 WAE - MACRO-1 (Timeframe mais longo) ==="
-input int    WAE_MACRO1_FastMA        = 20;    // Fast MA Period
-input int    WAE_MACRO1_SlowMA        = 40;    // Slow MA Period
-input int    WAE_MACRO1_BBLength      = 20;    // Bollinger Bands Length
-input double WAE_MACRO1_BBMultiplier  = 2.0;   // Bollinger Bands Multiplier
-input int    WAE_MACRO1_Sensitivity   = 150;   // Sensitivity
-
-input group "=== 💥 WAE - MACRO-2 (Timeframe intermediário) ==="
-input int    WAE_MACRO2_FastMA        = 20;
-input int    WAE_MACRO2_SlowMA        = 40;
-input int    WAE_MACRO2_BBLength      = 20;
-input double WAE_MACRO2_BBMultiplier  = 2.0;
-input int    WAE_MACRO2_Sensitivity   = 150;
-
-input group "=== 💥 WAE - MACRO-3 (Timeframe curto - pode não existir) ==="
-input int    WAE_MACRO3_FastMA        = 20;
-input int    WAE_MACRO3_SlowMA        = 40;
-input int    WAE_MACRO3_BBLength      = 20;
-input double WAE_MACRO3_BBMultiplier  = 2.0;
-input int    WAE_MACRO3_Sensitivity   = 150;
-
-input group "=== 💥 WAE - OPERACIONAL (Timeframe atual) ==="
-input int    WAE_OPER_FastMA          = 20;
-input int    WAE_OPER_SlowMA          = 40;
-input int    WAE_OPER_BBLength        = 20;
-input double WAE_OPER_BBMultiplier    = 2.0;
-input int    WAE_OPER_Sensitivity     = 150;
+input group "=== 💥 WAE (Operacional) - Momentum ==="
+input int    WAE_OPER_FastMA          = 20;    // Fast MA Period
+input int    WAE_OPER_SlowMA          = 40;    // Slow MA Period
+input int    WAE_OPER_BBLength        = 20;    // Bollinger Bands Length
+input double WAE_OPER_BBMultiplier    = 2.0;   // Bollinger Bands Multiplier
+input int    WAE_OPER_Sensitivity     = 150;   // Sensitivity
 
 //╔══════════════════════════════════════════════════════════════════╗
 //║              📊 GG TRENDBAR - GLOBAL (Interno Multi-TF)          ║

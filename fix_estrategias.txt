@@ -1,0 +1,148 @@
+=== INSTRUÇÕES PARA SIMPLIFICAR ESTRATEGIAS.MQH ===
+
+Este arquivo documenta todas as mudanças necessárias para completar a simplificação do sistema.
+
+══════════════════════════════════════════════════════════════════════════════
+CONTEXTO DA SIMPLIFICAÇÃO
+══════════════════════════════════════════════════════════════════════════════
+
+ANTES (v4.1 - Sistema Antigo):
+• Trend Magic analisava H4, H1, M30, M15 separadamente (4 handles)
+• RSI OMA analisava H4, H1, M30, M15 separadamente (4 handles)
+• WAE analisava H4, H1, M30, M15 separadamente (4 handles)
+• GG TrendBar usado apenas como "filtro adicional"
+• Total: 13 handles de indicadores
+
+AGORA (v4.2 - Sistema Simplificado):
+• GG TrendBar É O FILTRO MESTRE (analisa M1-MN1 internamente)
+• Supertrend (ex-Trend Magic) apenas operacional (1 handle)
+• RSI OMA apenas operacional (1 handle)
+• WAE apenas operacional (1 handle)
+• Currency Strength apenas operacional (1 handle)
+• Total: 5 handles de indicadores
+
+══════════════════════════════════════════════════════════════════════════════
+MUDANÇAS NO CÓDIGO - ESTRATEGIAS.MQH
+══════════════════════════════════════════════════════════════════════════════
+
+1. FUNÇÃO: InitializeIndicators()
+   LOCALIZAÇÃO: Linha ~168
+   AÇÃO: Substituir TODA a função pela versão simplificada abaixo:
+
+---BEGIN CÓDIGO---
+bool InitializeIndicators(string symbol)
+{
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📊 Inicializando indicadores (Sistema v4.2 Simplificado)...");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   
+   string path_st = IndicatorsBasePath + TrendMagicIndicator;
+   string path_cs = IndicatorsBasePath + CurrencyStrengthIndicator;
+   string path_rsi = IndicatorsBasePath + RSIOMAIndicator;
+   string path_wae = IndicatorsBasePath + WAEIndicator;
+   string path_gg = IndicatorsBasePath + GGTrendBarIndicator;
+   
+   // 1. GG TRENDBAR - FILTRO MESTRE
+   PrintFormat("🎯 [1/5] GG TrendBar (Filtro Mestre)...");
+   g_handles.gg_global = iCustom(symbol, PERIOD_CURRENT, path_gg,
+                                  GG_UpColor, GG_DownColor, GG_FlatColor,
+                                  GG_TextColor, GG_Corner, GG_CreateVisualObjects,
+                                  GG_ADX_Period, GG_ADX_Price,
+                                  GG_Step_Psar, GG_Max_Psar);
+   if(g_handles.gg_global == INVALID_HANDLE) {
+      PrintFormat("❌ ERRO CRÍTICO: GG TrendBar falhou!");
+      return false;
+   }
+   PrintFormat("   ✅ GG TrendBar OK");
+   
+   // 2. SUPERTREND - Tendência Local
+   PrintFormat("📈 [2/5] Supertrend (Tendência Local %s)...", EnumToString(g_tfOperacional));
+   g_handles.st_oper = iCustom(symbol, g_tfOperacional, path_st,
+                                ST_OPER_CCI_Period,
+                                ST_OPER_ATR_Period,
+                                ST_OPER_ATR_Multiplier);
+   if(g_handles.st_oper == INVALID_HANDLE) {
+      PrintFormat("❌ ERRO: Supertrend falhou!");
+      return false;
+   }
+   PrintFormat("   ✅ Supertrend OK");
+   
+   // 3. WAE - Momentum
+   PrintFormat("💥 [3/5] WAE (Momentum)...");
+   g_handles.wae_oper = iCustom(symbol, g_tfOperacional, path_wae,
+                                 WAE_OPER_FastMA, WAE_OPER_SlowMA,
+                                 WAE_OPER_BBLength, WAE_OPER_BBMultiplier,
+                                 WAE_OPER_Sensitivity);
+   if(g_handles.wae_oper == INVALID_HANDLE) {
+      PrintFormat("❌ ERRO: WAE falhou!");
+      return false;
+   }
+   PrintFormat("   ✅ WAE OK");
+   
+   // 4. RSI OMA - Força Relativa
+   PrintFormat("📊 [4/5] RSI OMA (Força Relativa)...");
+   g_handles.rsi_oper = iCustom(symbol, g_tfOperacional, path_rsi,
+                                 RSI_OPER_Period, RSI_OPER_MA_Period,
+                                 RSI_OPER_MA_Method, RSI_OPER_HighLevel,
+                                 RSI_OPER_LowLevel, RSI_OPER_ShowLevels);
+   if(g_handles.rsi_oper == INVALID_HANDLE) {
+      PrintFormat("❌ ERRO: RSI OMA falhou!");
+      return false;
+   }
+   PrintFormat("   ✅ RSI OMA OK");
+   
+   // 5. CURRENCY STRENGTH - Contexto
+   PrintFormat("💱 [5/5] Currency Strength (Contexto)...");
+   g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
+                                CS_CalculationPeriod,
+                                CS_SmoothingPeriod,
+                                CS_ShowInPercent);
+   if(g_handles.cs_oper == INVALID_HANDLE) {
+      PrintFormat("❌ ERRO: Currency Strength falhou!");
+      return false;
+   }
+   PrintFormat("   ✅ Currency Strength OK");
+   
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS COM SUCESSO!");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   
+   return true;
+}
+---END CÓDIGO---
+
+2. FUNÇÃO: ReleaseIndicators()
+   LOCALIZAÇÃO: Linha ~1055
+   AÇÃO: Substituir pela versão simplificada:
+
+---BEGIN CÓDIGO---
+void ReleaseIndicators()
+{
+   PrintFormat("🔓 Liberando handles dos indicadores...");
+   
+   if(g_handles.gg_global != INVALID_HANDLE)  IndicatorRelease(g_handles.gg_global);
+   if(g_handles.st_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.st_oper);
+   if(g_handles.wae_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.wae_oper);
+   if(g_handles.rsi_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.rsi_oper);
+   if(g_handles.cs_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.cs_oper);
+   
+   PrintFormat("✅ Handles liberados");
+}
+---END CÓDIGO---
+
+══════════════════════════════════════════════════════════════════════════════
+PRÓXIMOS PASSOS
+══════════════════════════════════════════════════════════════════════════════
+
+1. ✅ Simplificar Parametros.mqh (JÁ FEITO)
+2. ✅ Atualizar struct IndicatorHandles (JÁ FEITO)
+3. ⏳ Atualizar InitializeIndicators() - FAZER AGORA
+4. ⏳ Atualizar ReleaseIndicators() - FAZER AGORA
+5. ⏳ Remover funções obsoletas de análise MTF
+6. ⏳ Criar nova função AnalyzeGGTrendBar()
+7. ⏳ Atualizar CalculateSetupScore() para nova hierarquia
+8. ⏳ Atualizar OnTick() no EA principal
+
+══════════════════════════════════════════════════════════════════════════════
+FIM DAS INSTRUÇÕES
+══════════════════════════════════════════════════════════════════════════════

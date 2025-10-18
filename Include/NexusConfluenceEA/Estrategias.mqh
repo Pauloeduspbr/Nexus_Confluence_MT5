@@ -812,14 +812,16 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       {
          result.m30Aligned = false;
          
-         if(!AllowCautiousSetups)
+         // CORREÇÃO CRÍTICA: MACRO-3 oposto NÃO deve rejeitar o trade!
+         // Deve apenas impedir classificação PREMIUM, mas permite GOOD
+         if(AllowCautiousSetups)
          {
-            PrintFormat("⚠️ MACRO-3 OPOSTO e setups cautelosos DESABILITADOS - REJEITADO");
-            result.isValid = false;
-            return result;
+            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO com cautela)");
          }
-         
-         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (cauteloso)");
+         else
+         {
+            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO, mas não PREMIUM)");
+         }
       }
       else  // Neutro
       {

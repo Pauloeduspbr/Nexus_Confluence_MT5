@@ -269,8 +269,64 @@ bool InitializeIndicators(string symbol)
    }
    PrintFormat("   ✅ Currency Strength OK");
    
+   //╔══════════════════════════════════════════════════════════════╗
+   //║  📌 ANEXANDO INDICADORES AO GRÁFICO                          ║
+   //╚══════════════════════════════════════════════════════════════╝
+   PrintFormat("────────────────────────────────────────────────────────────────");
+   PrintFormat("📌 Anexando indicadores ao gráfico...");
+   
+   // GG TrendBar - Janela principal (com Supertrend)
+   if(!ChartIndicatorAdd(0, 0, g_handles.gg_global))
+   {
+      PrintFormat("⚠️ Aviso: Não foi possível anexar GG TrendBar ao gráfico principal");
+   }
+   else
+   {
+      PrintFormat("   ✅ GG TrendBar anexado à janela principal");
+   }
+   
+   // Supertrend - Janela principal (junto com GG TrendBar)
+   if(!ChartIndicatorAdd(0, 0, g_handles.st_oper))
+   {
+      PrintFormat("⚠️ Aviso: Não foi possível anexar Supertrend ao gráfico principal");
+   }
+   else
+   {
+      PrintFormat("   ✅ Supertrend anexado à janela principal");
+   }
+   
+   // Currency Strength - Subwindow 1
+   if(!ChartIndicatorAdd(0, 1, g_handles.cs_oper))
+   {
+      PrintFormat("⚠️ Aviso: Não foi possível anexar Currency Strength ao subwindow 1");
+   }
+   else
+   {
+      PrintFormat("   ✅ Currency Strength anexado ao subwindow 1");
+   }
+   
+   // RSI OMA - Subwindow 2
+   if(!ChartIndicatorAdd(0, 2, g_handles.rsi_oper))
+   {
+      PrintFormat("⚠️ Aviso: Não foi possível anexar RSI OMA ao subwindow 2");
+   }
+   else
+   {
+      PrintFormat("   ✅ RSI OMA anexado ao subwindow 2");
+   }
+   
+   // WAE - Subwindow 3
+   if(!ChartIndicatorAdd(0, 3, g_handles.wae_oper))
+   {
+      PrintFormat("⚠️ Aviso: Não foi possível anexar WAE ao subwindow 3");
+   }
+   else
+   {
+      PrintFormat("   ✅ WAE anexado ao subwindow 3");
+   }
+   
    PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS COM SUCESSO!");
+   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS E ANEXADOS COM SUCESSO!");
    PrintFormat("════════════════════════════════════════════════════════════════");
    
    return true;

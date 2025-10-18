@@ -650,7 +650,10 @@ GGTrendBarSignal GetGGTrendBarSignal()
 
 //+------------------------------------------------------------------+
 //| FUNÇÃO: AnalyzeMultiTimeframeAlignment                           |
-//| Valida alinhamento dos timeframes macro (OBRIGATÓRIO)           |
+//| Valida alinhamento multi-TF usando GG TRENDBAR (FILTRO MESTRE)  |
+//|                                                                  |
+//| NOVO v4.2: Substitui lógica de Trend Magic multi-TF             |
+//|            GG TrendBar analisa M1-MN1 internamente              |
 //|                                                                  |
 //| RETORNO: MultiTFResult (struct com resultado da análise)        |
 //+------------------------------------------------------------------+
@@ -664,84 +667,136 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    result.m30Aligned = false;
    result.structureValid = false;
    
-   // TODO ETAPA 6: SUBSTITUIR POR GG_TRENDBAR (FILTRO MESTRE)
-   // Temporariamente usando valores fixos para compilação
-   TMSignal tm_macro1, tm_macro2, tm_macro3;
-   tm_macro1.isValid = true;
-   tm_macro1.direction = TRADE_DIRECTION_BUY; // Temporário
-   tm_macro2.isValid = true;
-   tm_macro2.direction = TRADE_DIRECTION_BUY; // Temporário
-   tm_macro3.isValid = false;
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("🎯 Analisando Multi-Timeframe com GG TRENDBAR (FILTRO MESTRE)");
+   PrintFormat("════════════════════════════════════════════════════════════════");
    
-   // Validação 1: MACRO-1 e MACRO-2 OBRIGATÓRIOS
-   if(!tm_macro1.isValid || !tm_macro2.isValid)
+   // Obter sinais GG TrendBar de todos os timeframes
+   GGTrendBarSignal gg = GetGGTrendBarSignal();
+   
+   if(!gg.isValid)
    {
-      PrintFormat("❌ MACRO-1 ou MACRO-2 inválidos");
+      PrintFormat("❌ GG TrendBar inválido - não é possível analisar");
       return result;
    }
    
-   // Validação 2: MACRO-1 e MACRO-2 devem estar na MESMA DIREÇÃO
-   if(tm_macro1.direction != tm_macro2.direction)
+   // Mapear timeframes conforme sistema atual
+   int macro1Value = 0;  // MACRO-1 (mais longo)
+   int macro2Value = 0;  // MACRO-2 (intermediário)
+   int macro3Value = 0;  // MACRO-3 (curto) - opcional
+   
+   // Determinar quais buffers do GG TrendBar usar baseado no sistema definido
+   switch(g_tfMacro1)
    {
-      PrintFormat("⚠️ MACRO-1 e MACRO-2 em direções opostas - aguardar alinhamento");
+      case PERIOD_H4:  macro1Value = gg.h4Value;  break;
+      case PERIOD_D1:  macro1Value = gg.d1Value;  break;
+      case PERIOD_W1:  macro1Value = gg.w1Value;  break;
+      case PERIOD_M30: macro1Value = gg.m30Value; break;
+      case PERIOD_H1:  macro1Value = gg.h1Value;  break;
+   }
+   
+   switch(g_tfMacro2)
+   {
+      case PERIOD_H1:  macro2Value = gg.h1Value;  break;
+      case PERIOD_H4:  macro2Value = gg.h4Value;  break;
+      case PERIOD_D1:  macro2Value = gg.d1Value;  break;
+      case PERIOD_M30: macro2Value = gg.m30Value; break;
+      case PERIOD_M15: macro2Value = gg.m15Value; break;
+   }
+   
+   if(g_numNiveisMacro == 3)
+   {
+      switch(g_tfMacro3)
+      {
+         case PERIOD_M30: macro3Value = gg.m30Value; break;
+         case PERIOD_H1:  macro3Value = gg.h1Value;  break;
+         case PERIOD_M15: macro3Value = gg.m15Value; break;
+         case PERIOD_M5:  macro3Value = gg.m5Value;  break;
+      }
+   }
+   
+   PrintFormat("📊 GG TrendBar - MACRO-1(%s)=%+d | MACRO-2(%s)=%+d | MACRO-3(%s)=%+d",
+               TimeframeToString(g_tfMacro1), macro1Value,
+               TimeframeToString(g_tfMacro2), macro2Value,
+               TimeframeToString(g_tfMacro3), macro3Value);
+   
+   // VALIDAÇÃO 1: MACRO-1 e MACRO-2 devem estar DEFINIDOS (não neutros)
+   if(macro1Value == 0 || macro2Value == 0)
+   {
+      PrintFormat("⚠️ MACRO-1 ou MACRO-2 neutros/indefinidos - aguardar definição");
       return result;
    }
    
-   // Validação 3: Nenhum pode estar indeciso (amarelo)
-   if(tm_macro1.direction == TRADE_DIRECTION_NONE ||
-      tm_macro2.direction == TRADE_DIRECTION_NONE)
+   // VALIDAÇÃO 2: MACRO-1 e MACRO-2 devem estar na MESMA DIREÇÃO
+   if(macro1Value != macro2Value)
    {
-      PrintFormat("⚠️ MACRO-1 ou MACRO-2 indecisos (amarelo) - aguardar definição");
+      PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
+                  macro1Value, macro2Value);
       return result;
    }
    
-   // MACRO-1 e MACRO-2 alinhados!
-   result.direction = tm_macro1.direction;
-   result.h4Aligned = true; // Representação abstrata
+   // ✅ MACRO-1 e MACRO-2 ALINHADOS!
+   result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+   result.h4Aligned = true;
    result.h1Aligned = true;
    
-   // Validação 4: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
-   if(g_numNiveisMacro == 3 && tm_macro3.isValid)
+   PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s", 
+               (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH");
+   
+   // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
+   if(g_numNiveisMacro == 3)
    {
-      if(tm_macro3.direction == result.direction)
+      if(macro3Value == macro1Value)  // Mesmo sinal
       {
-         result.m30Aligned = true; // PREMIUM
-         PrintFormat("🏆 ALINHAMENTO PREMIUM: MACRO-1 + MACRO-2 + MACRO-3 na mesma direção (%s)",
-                     (result.direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
+         result.m30Aligned = true;
+         PrintFormat("🏆 ALINHAMENTO PREMIUM: MACRO-1 + MACRO-2 + MACRO-3 = %s",
+                     (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH");
       }
-      else
+      else if(macro3Value == -macro1Value)  // Oposto
       {
-         result.m30Aligned = false; // GOOD (ou CAUTIOUS se oposto)
+         result.m30Aligned = false;
          
-         // Se MACRO-3 está OPOSTO e parâmetro AllowCautiousSetups está DESABILITADO → REJEITAR
-         if(!AllowCautiousSetups && tm_macro3.direction != TRADE_DIRECTION_NONE)
+         if(!AllowCautiousSetups)
          {
-            PrintFormat("⚠️ MACRO-3 oposto e setups cautelosos desabilitados - REJEITADO");
+            PrintFormat("⚠️ MACRO-3 OPOSTO e setups cautelosos DESABILITADOS - REJEITADO");
             result.isValid = false;
             return result;
          }
          
-         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1 + MACRO-2 alinhados, MACRO-3 %s",
-                     (tm_macro3.direction == TRADE_DIRECTION_NONE) ? "neutro" : "oposto");
+         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (cauteloso)");
+      }
+      else  // Neutro
+      {
+         result.m30Aligned = false;
+         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 neutro");
       }
    }
-   else if(g_numNiveisMacro == 2)
+   else
    {
-      // Sistema de 2 níveis (H1 ou H4) - sempre GOOD se passar
-      result.m30Aligned = false; // N/A
-      PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1 + MACRO-2 alinhados (sistema 2 níveis)");
+      // Sistema 2 níveis - sempre GOOD se passou validações
+      result.m30Aligned = false;
+      PrintFormat("⭐ ALINHAMENTO GOOD: Sistema 2 níveis (MACRO-1 + MACRO-2)");
    }
    
-   // TODO: Validar estrutura de preços H4 (topos/fundos, EMA 50, etc)
-   result.structureValid = true; // Simplificado por ora
-   
+   // Estrutura válida (por ora, simplificado)
+   result.structureValid = true;
    result.isValid = true;
+   
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   
    return result;
 }
 
 //+------------------------------------------------------------------+
 //| FUNÇÃO: CalculateSetupScore                                      |
 //| Pontua e classifica o setup com base nos filtros micro          |
+//|                                                                  |
+//| HIERARQUIA v4.2 (NOVO):                                          |
+//|   1️⃣ GG TRENDBAR - Já validado (FILTRO MESTRE obrigatório)      |
+//|   2️⃣ WAE - Momentum/Explosão                                     |
+//|   3️⃣ RSI OMA - Força relativa                                    |
+//|   4️⃣ SUPERTREND - Tendência local (opcional)                    |
+//|   5️⃣ CURRENCY STRENGTH - Contexto moedas (Forex/Metais)        |
 //|                                                                  |
 //| PARÂMETROS:                                                      |
 //|   - symbol: Símbolo a analisar                                  |
@@ -753,16 +808,20 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
 //+------------------------------------------------------------------+
 SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRECTION direction, bool m30Aligned)
 {
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📊 PONTUANDO SETUP - Filtros Micro (GG TrendBar já validado)");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   
    SetupScore score;
    score.classification = SETUP_REJECT;
    score.direction = direction;
-   score.traderMagicPoints = 1; // Já validado no alinhamento macro
+   score.traderMagicPoints = 1; // GG TrendBar já validou multi-TF (FILTRO MESTRE)
    score.currencyStrengthPoints = 0;
    score.rsiomaPoints = 0;
    score.waePoints = 0;
    score.totalPoints = 0;
    
-   // Determinar quantos filtros são necessários
+   // Determinar quantos filtros são necessários conforme tipo de ativo
    bool useCS = (assetClass == ASSET_CLASS_FOREX_MAJOR ||
                  assetClass == ASSET_CLASS_FOREX_MINOR ||
                  assetClass == ASSET_CLASS_FOREX_EXOTIC ||
@@ -847,19 +906,26 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
       }
    }
    
-   // Log detalhado
-   PrintFormat("📊 PONTUAÇÃO SETUP (%s):", symbol);
-   PrintFormat("   Direção: %s", (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
-   PrintFormat("   TM: %d | CS: %d | RSI: %d | WAE: %d | TOTAL: %d/%d",
-               score.traderMagicPoints,
-               score.currencyStrengthPoints,
-               score.rsiomaPoints,
-               score.waePoints,
-               score.totalPoints,
-               score.requiredPoints);
-   PrintFormat("   Classificação: %s",
-               (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM" :
-               (score.classification == SETUP_GOOD) ? "⭐ GOOD" : "❌ REJECT");
+   // Log detalhado com nova hierarquia
+   PrintFormat("────────────────────────────────────────────────────────────────");
+   PrintFormat("📊 RESULTADO FINAL - Setup %s:", symbol);
+   PrintFormat("   Direção: %s", (direction == TRADE_DIRECTION_BUY) ? "📈 BUY" : "📉 SELL");
+   PrintFormat("   ✅ GG TrendBar: VALIDADO (Filtro Mestre)");
+   PrintFormat("   %s Currency Strength: %d pt", 
+               (score.currencyStrengthPoints > 0) ? "✅" : "❌",
+               score.currencyStrengthPoints);
+   PrintFormat("   %s RSI OMA: %d pt", 
+               (score.rsiomaPoints > 0) ? "✅" : "❌",
+               score.rsiomaPoints);
+   PrintFormat("   %s WAE: %d pt", 
+               (score.waePoints > 0) ? "✅" : "❌",
+               score.waePoints);
+   PrintFormat("   📈 TOTAL: %d/%d pontos", score.totalPoints, score.requiredPoints);
+   PrintFormat("   🎯 Classificação: %s",
+               (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM (Máxima Qualidade)" :
+               (score.classification == SETUP_GOOD) ? "⭐ GOOD (Boa Qualidade)" : 
+               "❌ REJECT (Insuficiente)");
+   PrintFormat("════════════════════════════════════════════════════════════════");
    
    return score;
 }

@@ -38,6 +38,8 @@
 CTrade g_trade;
 double g_initialBalance = 0.0;
 bool   g_tradingPaused  = false;
+datetime g_pauseTimestamp = 0;  // Quando foi pausado pela última vez
+int    g_pauseDay = 0;          // Dia que foi pausado (YYYYMMDD)
 int    g_lastReportMonth = -1;
 int    g_lastCleanupDay  = -1;
 
@@ -368,24 +370,122 @@ bool ValidateBasicConditions()
       return false;
      }
 
-   // 4. Verificar drawdown máximo
+   // 4. Verificar drawdown máximo COM DESBLOQUEIO POR TEMPO/DIA
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double currentDrawdown = (g_initialBalance - equity) / g_initialBalance * 100.0;
+   
+   // ✅ LÓGICA CORRIGIDA: Desbloqueio por TEMPO baseado no TIMEFRAME
    if(g_tradingPaused)
      {
-      PrintFormat("❌ VALIDAÇÃO FALHOU: Trading pausado (drawdown máximo)");
-      return false;
+      datetime currentTime = TimeCurrent();
+      
+      // Calcular tempo de bloqueio baseado no TIMEFRAME operacional
+      int unlockMinutes = 0;
+      ENUM_TIMEFRAMES currentTF = Period();
+      
+      switch(currentTF)
+        {
+         case PERIOD_M1:  unlockMinutes = 15;  break;  // M1: 15 minutos
+         case PERIOD_M5:  unlockMinutes = 30;  break;  // M5: 30 minutos
+         case PERIOD_M15: unlockMinutes = 60;  break;  // M15: 1 hora
+         case PERIOD_M30: unlockMinutes = 120; break;  // M30: 2 horas
+         case PERIOD_H1:  unlockMinutes = 240; break;  // H1: 4 horas
+         case PERIOD_H4:  unlockMinutes = 480; break;  // H4: 8 horas
+         default:         unlockMinutes = 60;  break;  // Padrão: 1 hora
+        }
+      
+      int elapsedMinutes = (int)((currentTime - g_pauseTimestamp) / 60);
+      
+      // Verificar condições de DESBLOQUEIO:
+      // 1. Passou tempo suficiente baseado no timeframe
+      bool timeoutReached = (elapsedMinutes >= unlockMinutes);
+      
+      // 2. Iniciou novo dia (sempre desbloqueia)
+      MqlDateTime dt;
+      TimeToStruct(currentTime, dt);
+      int currentDay = dt.year * 10000 + dt.mon * 100 + dt.day;  // YYYYMMDD
+      bool newDayStarted = (currentDay != g_pauseDay);
+      
+      // DESBLOQUEAR se qualquer condição satisfeita
+      if(timeoutReached || newDayStarted)
+        {
+         g_tradingPaused = false;
+         g_pauseTimestamp = 0;
+         g_pauseDay = 0;
+         
+         string reason = "";
+         if(newDayStarted)
+           {
+            reason = StringFormat("novo dia iniciado (%02d/%02d/%04d)", dt.day, dt.mon, dt.year);
+           }
+         else
+           {
+            reason = StringFormat("timeout de %d minutos atingido", unlockMinutes);
+           }
+         
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         PrintFormat("✅ TRADING DESBLOQUEADO AUTOMATICAMENTE!");
+         PrintFormat("   Razão: %s", reason);
+         PrintFormat("   Timeframe: %s | Tempo bloqueado: %d min", 
+                     EnumToString(currentTF), elapsedMinutes);
+         PrintFormat("   Drawdown atual: %.2f%% (limite: %.2f%%)", currentDrawdown, MaxDrawdownPercent);
+         PrintFormat("   Equity: %.2f | Balance: %.2f", equity, balance);
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         
+         Alert("Nexus Confluence: Trading desbloqueado - ", reason);
+        }
+      else
+        {
+         int remainingMinutes = unlockMinutes - elapsedMinutes;
+         PrintFormat("⏸️ Trading pausado - Tempo restante: %d min (drawdown: %.2f%%)", 
+                     remainingMinutes, currentDrawdown);
+         return false;
+        }
      }
-
-   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-   double currentDrawdown = (g_initialBalance - equity) / g_initialBalance * 100.0;
+   
+   // Verificar se deve BLOQUEAR agora
    if(currentDrawdown >= MaxDrawdownPercent)
      {
       g_tradingPaused = true;
-      PrintFormat("❌ TRADING PAUSADO: Drawdown %.2f%% >= %.2f%%", currentDrawdown, MaxDrawdownPercent);
-      Alert("Nexus Confluence: Drawdown máximo atingido! Trading pausado.");
+      g_pauseTimestamp = TimeCurrent();
+      
+      // Salvar dia do bloqueio
+      MqlDateTime dt;
+      TimeToStruct(g_pauseTimestamp, dt);
+      g_pauseDay = dt.year * 10000 + dt.mon * 100 + dt.day;
+      
+      // Calcular tempo de desbloqueio
+      int unlockMinutes = 0;
+      ENUM_TIMEFRAMES currentTF = Period();
+      switch(currentTF)
+        {
+         case PERIOD_M1:  unlockMinutes = 15;  break;
+         case PERIOD_M5:  unlockMinutes = 30;  break;
+         case PERIOD_M15: unlockMinutes = 60;  break;
+         case PERIOD_M30: unlockMinutes = 120; break;
+         case PERIOD_H1:  unlockMinutes = 240; break;
+         case PERIOD_H4:  unlockMinutes = 480; break;
+         default:         unlockMinutes = 60;  break;
+        }
+      
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      PrintFormat("❌ TRADING PAUSADO: DRAWDOWN MÁXIMO ATINGIDO!");
+      PrintFormat("   Drawdown: %.2f%% >= %.2f%%", currentDrawdown, MaxDrawdownPercent);
+      PrintFormat("   Equity: %.2f | Balance: %.2f", equity, balance);
+      PrintFormat("   Timeframe: %s", EnumToString(currentTF));
+      PrintFormat("   Será desbloqueado após:");
+      PrintFormat("   - %d minutos (%d horas)", unlockMinutes, unlockMinutes/60);
+      PrintFormat("   - OU no início do próximo dia (00:01)");
+      PrintFormat("   Bloqueado às: %s", TimeToString(g_pauseTimestamp, TIME_DATE|TIME_MINUTES));
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      
+      Alert(StringFormat("Nexus Confluence: Trading pausado por %d min (drawdown %.1f%%)", 
+                        unlockMinutes, currentDrawdown));
       return false;
      }
 
-   PrintFormat("✅ Validações básicas OK");
+   PrintFormat("✅ Validações básicas OK (Drawdown: %.2f%%)", currentDrawdown);
    return true;
   }
 

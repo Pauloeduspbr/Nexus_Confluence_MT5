@@ -77,11 +77,11 @@ double FindStructureSL(string symbol, TRADE_DIRECTION direction, int lookbackBar
          PrintFormat("   📍 SL COMPRA: Usando mínimo recente (5 candles) = %.5f", slLevel);
       }
       
-      // Adicionar buffer de segurança (5-10 pontos)
-      double buffer = 10 * _Point;
+      // Adicionar buffer de segurança configurável
+      double buffer = SL_BufferPoints * _Point;
       slLevel -= buffer;
       
-      PrintFormat("   � SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
+      PrintFormat("   🛡️ SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
                   slLevel, currentPrice - slLevel, (currentPrice - slLevel)/_Point);
    }
    else if(direction == TRADE_DIRECTION_SELL)
@@ -107,11 +107,11 @@ double FindStructureSL(string symbol, TRADE_DIRECTION direction, int lookbackBar
          PrintFormat("   📍 SL VENDA: Usando máximo recente (5 candles) = %.5f", slLevel);
       }
       
-      // Adicionar buffer de segurança
-      double buffer = 10 * _Point;
+      // Adicionar buffer de segurança configurável
+      double buffer = SL_BufferPoints * _Point;
       slLevel += buffer;
       
-      PrintFormat("   � SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
+      PrintFormat("   🛡️ SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
                   slLevel, slLevel - currentPrice, (slLevel - currentPrice)/_Point);
    }
    
@@ -137,10 +137,12 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
    result.stopLoss = 0;
    result.takeProfit1 = 0;
    result.takeProfit2 = 0;
+   result.takeProfit3 = 0;
    result.slDistance = 0;
    result.riskAmount = 0;
    result.potentialProfit1 = 0;
    result.potentialProfit2 = 0;
+   result.potentialProfit3 = 0;
    result.errorMessage = "";
    
    PrintFormat("════════════════════════════════════════════════════════════════");
@@ -166,15 +168,15 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       }
       
       // ✅ VALIDAR DIREÇÃO DO SL
-      if(direction == TRADE_DIRECTION_BUY && slLevel >= currentPrice)
+      if(slLevel >= currentPrice)
       {
-         PrintFormat("   ⚠️ SL COMPRA acima do preço! Usando 0.3%% abaixo");
-         slLevel = currentPrice * 0.997;
+         PrintFormat("   ⚠️ SL COMPRA acima do preço! Usando %.1f%% abaixo", SL_FallbackPercent);
+         slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
       }
       else if(direction == TRADE_DIRECTION_SELL && slLevel <= currentPrice)
       {
-         PrintFormat("   ⚠️ SL VENDA abaixo do preço! Usando 0.3%% acima");
-         slLevel = currentPrice * 1.003;
+         PrintFormat("   ⚠️ SL VENDA abaixo do preço! Usando %.1f%% acima", SL_FallbackPercent);
+         slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
       }
       
       result.positionSize = FixedLotSize;
@@ -186,11 +188,15 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       {
          result.takeProfit1 = currentPrice + (result.slDistance * TP1_RR);
          result.takeProfit2 = currentPrice + (result.slDistance * TP2_RR);
+         if(UseTP3)
+            result.takeProfit3 = currentPrice + (result.slDistance * TP3_RR);
       }
       else
       {
          result.takeProfit1 = currentPrice - (result.slDistance * TP1_RR);
          result.takeProfit2 = currentPrice - (result.slDistance * TP2_RR);
+         if(UseTP3)
+            result.takeProfit3 = currentPrice - (result.slDistance * TP3_RR);
       }
       
       // Calcular valores de risco e lucro
@@ -201,6 +207,8 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       result.riskAmount = slTicks * tickValue * result.positionSize;
       result.potentialProfit1 = result.riskAmount * TP1_RR;
       result.potentialProfit2 = result.riskAmount * TP2_RR;
+      if(UseTP3)
+         result.potentialProfit3 = result.riskAmount * TP3_RR;
       
       result.isValid = true;
       
@@ -209,8 +217,11 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
                   result.stopLoss, result.slDistance, result.slDistance/_Point);
       PrintFormat("   🎯 TP1 (RR 1:%.1f): %.5f", TP1_RR, result.takeProfit1);
       PrintFormat("   🎯 TP2 (RR 1:%.1f): %.5f", TP2_RR, result.takeProfit2);
-      PrintFormat("   💵 Risco: $%.2f | Lucro Potencial TP1: $%.2f | TP2: $%.2f", 
-                  result.riskAmount, result.potentialProfit1, result.potentialProfit2);
+      if(UseTP3)
+         PrintFormat("   🎯 TP3 (RR 1:%.1f): %.5f", TP3_RR, result.takeProfit3);
+      PrintFormat("   💵 Risco: $%.2f | Lucro Potencial TP1: $%.2f | TP2: $%.2f%s", 
+                  result.riskAmount, result.potentialProfit1, result.potentialProfit2,
+                  UseTP3 ? StringFormat(" | TP3: $%.2f", result.potentialProfit3) : "");
       PrintFormat("════════════════════════════════════════════════════════════════");
       
       return result;
@@ -250,9 +261,9 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
          PrintFormat("   ⚠️ ERRO: SL COMPRA está ACIMA do preço de entrada!");
          PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
          
-         // Usar SL baseado em percentual (0.3% abaixo)
-         slLevel = currentPrice * 0.997;
-         PrintFormat("      ✅ Usando SL percentual: %.5f (0.3%% abaixo)", slLevel);
+         // Usar SL baseado em percentual configurável
+         slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
+         PrintFormat("      ✅ Usando SL percentual: %.5f (%.1f%% abaixo)", slLevel, SL_FallbackPercent);
       }
    }
    else // SELL
@@ -263,9 +274,9 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
          PrintFormat("   ⚠️ ERRO: SL VENDA está ABAIXO do preço de entrada!");
          PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
          
-         // Usar SL baseado em percentual (0.3% acima)
-         slLevel = currentPrice * 1.003;
-         PrintFormat("      ✅ Usando SL percentual: %.5f (0.3%% acima)", slLevel);
+         // Usar SL baseado em percentual configurável
+         slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
+         PrintFormat("      ✅ Usando SL percentual: %.5f (%.1f%% acima)", slLevel, SL_FallbackPercent);
       }
    }
    
@@ -324,21 +335,29 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
    {
       result.takeProfit1 = currentPrice + (slDistance * TP1_RR);
       result.takeProfit2 = currentPrice + (slDistance * TP2_RR);
+      if(UseTP3)
+         result.takeProfit3 = currentPrice + (slDistance * TP3_RR);
    }
    else
    {
       result.takeProfit1 = currentPrice - (slDistance * TP1_RR);
       result.takeProfit2 = currentPrice - (slDistance * TP2_RR);
+      if(UseTP3)
+         result.takeProfit3 = currentPrice - (slDistance * TP3_RR);
    }
    
    result.potentialProfit1 = riskAmount * TP1_RR;
    result.potentialProfit2 = riskAmount * TP2_RR;
+   if(UseTP3)
+      result.potentialProfit3 = riskAmount * TP3_RR;
    result.isValid = true;
    
    PrintFormat("   📊 Preço Entrada: %.5f", currentPrice);
    PrintFormat("   🛑 Stop Loss: %.5f", result.stopLoss);
    PrintFormat("   🎯 TP1 (RR 1:%.1f): %.5f | Lucro: $%.2f", TP1_RR, result.takeProfit1, result.potentialProfit1);
    PrintFormat("   🎯 TP2 (RR 1:%.1f): %.5f | Lucro: $%.2f", TP2_RR, result.takeProfit2, result.potentialProfit2);
+   if(UseTP3)
+      PrintFormat("   🎯 TP3 (RR 1:%.1f): %.5f | Lucro: $%.2f", TP3_RR, result.takeProfit3, result.potentialProfit3);
    PrintFormat("════════════════════════════════════════════════════════════════");
    
    return result;
@@ -379,15 +398,15 @@ bool ValidateRiskCalculation(const RiskCalculation &risk, string symbol)
       return false;
    }
    
-   // Validar se SL não está muito longe (máximo 100 pontos para Forex)
-   double maxSLDistance = 100 * _Point;
+   // Validar se SL não está muito longe
+   double maxSLDistance = SL_MaxDistancePoints * _Point;
    if(risk.slDistance > maxSLDistance)
    {
       PrintFormat("⚠️ Aviso: SL muito distante (%.1f pontos), mas permitindo", risk.slDistance/_Point);
    }
    
-   // Validar se SL não está muito perto (mínimo 10 pontos)
-   double minSLDistance = 10 * _Point;
+   // Validar se SL não está muito perto
+   double minSLDistance = SL_MinDistancePoints * _Point;
    if(risk.slDistance < minSLDistance)
    {
       PrintFormat("❌ SL muito próximo (%.1f pontos < %.1f mínimo)", risk.slDistance/_Point, minSLDistance/_Point);

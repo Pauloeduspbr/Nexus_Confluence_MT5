@@ -159,10 +159,12 @@ struct RiskCalculation
    double          stopLoss;           // Stop Loss
    double          takeProfit1;        // Take Profit 1 (TP1)
    double          takeProfit2;        // Take Profit 2 (TP2)
+   double          takeProfit3;        // Take Profit 3 (TP3)
    double          slDistance;         // Distância até SL
    double          riskAmount;         // Valor em risco (moeda da conta)
    double          potentialProfit1;   // Lucro potencial TP1
    double          potentialProfit2;   // Lucro potencial TP2
+   double          potentialProfit3;   // Lucro potencial TP3
 };
 
 //--- Configuração por classe de ativo
@@ -256,12 +258,30 @@ input int    CustomStartMinute        = 0;     // ⏰ Horário início (minuto)
 input int    CustomEndHour            = 17;    // ⏰ Horário fim (hora)
 input int    CustomEndMinute          = 30;    // ⏰ Horário fim (minuto)
 
-input group "=== 🎯 GESTÃO DE SAÍDAS ==="
-input bool   EnablePartialTP          = true;  // ✂️ Habilitar saídas parciais
-input bool   EnableTrailing           = true;  // 📈 Habilitar trailing stop
-input double TP1_RR                   = 1.0;   // 🎯 RR para TP1 (50% posição)
-input double TP2_RR                   = 2.0;   // 🎯 RR para TP2 (25% posição)
-input double TrailingDistanceMultiplier = 1.0; // 📏 Multiplicador distância trailing
+input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
+input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
+input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
+input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
+input double SL_MaxDistancePoints     = 500.0;  // 📊 Distância máxima SL (pontos)
+input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
+
+input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
+input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
+input double TP1_RR                   = 1.0;    // 🎯 TP1 Risk/Reward
+input double TP2_RR                   = 2.0;    // 🎯 TP2 Risk/Reward
+input double TP3_RR                   = 3.0;    // 🎯 TP3 Risk/Reward (opcional)
+input bool   UseTP3                   = false;  // 🎯 Ativar TP3
+input double TP1_ClosePercent         = 50.0;   // 📊 % posição fechar no TP1
+input double TP2_ClosePercent         = 30.0;   // 📊 % posição fechar no TP2
+input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP3 (restante)
+
+input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
+input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
+input double TrailingDistancePoints   = 200.0;  // 📏 Distância trailing (pontos)
+input double TrailingStepPoints       = 50.0;   // 📏 Passo mínimo trailing (pontos)
+input double TrailingActivationRR     = 1.5;    // 🎯 Ativar após RR (ex: 1.5 = após 1.5:1)
+input bool   TrailingUseATR           = false;  // 📊 Usar ATR para calcular trailing
+input double TrailingATRMultiplier    = 2.0;    // � Multiplicador ATR (se ativo)
 
 input group "=== 🛡️ PROTEÇÕES ==="
 input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
@@ -270,9 +290,7 @@ input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (
 input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
 
 input group "=== 📊 CONTROLE DE POSIÇÕES ==="
-input POSITION_CONTROL_MODE PositionControlMode = POSITION_MODE_SINGLE; // � Modo de controle de posições
-input bool   RequireBreakevenBeforeNew = true;   // �️ Exigir lucro protegido antes de nova posição
-input double BreakevenTriggerRR      = 0.5;      // 📏 RR mínimo para acionar breakeven (0.5 = 50% do TP1)
+input POSITION_CONTROL_MODE PositionControlMode = POSITION_MODE_SINGLE; // 🔢 Modo de controle de posições
 
 input group "=== 📁 INDICADORES - Caminhos dos Arquivos ==="
 input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // 📂 Pasta relativa em MQL5/Indicators

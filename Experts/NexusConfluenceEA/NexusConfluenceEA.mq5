@@ -226,20 +226,11 @@ void OnTick()
          break;
          
       case POSITION_MODE_PROTECTED:
-         // ✅ Múltiplas posições apenas após lucro protegido
-         if(openPositions > 0)
+         // ✅ Múltiplas posições até limite configurado
+         if(openPositions >= MaxSimultaneousTrades)
          {
-            if(RequireBreakevenBeforeNew && !HasProtectedProfit())
-            {
-               PrintFormat("⏸️ Modo PROTECTED: Aguardando lucro protegido em posição existente (RR >= %.1f)", BreakevenTriggerRR);
-               return;
-            }
-            
-            if(openPositions >= MaxSimultaneousTrades)
-            {
-               PrintFormat("⏸️ Modo PROTECTED: Limite de %d posições atingido", MaxSimultaneousTrades);
-               return;
-            }
+            PrintFormat("⏸️ Modo PROTECTED: Limite de %d posições atingido", MaxSimultaneousTrades);
+            return;
          }
          break;
    }
@@ -801,58 +792,6 @@ void PrintConfiguration()
    PrintFormat("   Alertas: %s", SendAlerts ? "SIM" : "NÃO");
    PrintFormat("   TP parcial: %s", EnablePartialTP ? "SIM" : "NÃO");
    PrintFormat("   Trailing: %s", EnableTrailing ? "SIM" : "NÃO");
-  }
-
-//+------------------------------------------------------------------+
-//| Verifica se alguma posição tem lucro protegido (breakeven)      |
-//+------------------------------------------------------------------+
-bool HasProtectedProfit()
-  {
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-     {
-      ulong ticket = PositionGetTicket(i);
-      if(ticket <= 0) continue;
-      
-      // Verificar se é posição deste EA
-      if(PositionGetString(POSITION_SYMBOL) != _Symbol) continue;
-      if(PositionGetInteger(POSITION_MAGIC) != EA_MAGIC_NUMBER) continue;
-      
-      // Obter dados da posição
-      double entryPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-      double currentSL = PositionGetDouble(POSITION_SL);
-      double currentPrice = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ?
-                            SymbolInfoDouble(_Symbol, SYMBOL_BID) :
-                            SymbolInfoDouble(_Symbol, SYMBOL_ASK);
-      
-      // Calcular lucro em termos de RR
-      double slDistance = MathAbs(entryPrice - currentSL);
-      
-      if(slDistance == 0) continue; // Evitar divisão por zero
-      
-      // Calcular distância do lucro atual
-      double profitDistance = 0;
-      if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
-        {
-         profitDistance = currentPrice - entryPrice;
-        }
-      else
-        {
-         profitDistance = entryPrice - currentPrice;
-        }
-      
-      // Calcular RR atual
-      double currentRR = profitDistance / slDistance;
-      
-      // Verificar se atingiu o gatilho de breakeven
-      if(currentRR >= BreakevenTriggerRR)
-        {
-         PrintFormat("   ✅ Posição #%I64u tem lucro protegido (RR atual: %.2f >= %.2f)", 
-                     ticket, currentRR, BreakevenTriggerRR);
-         return true;
-        }
-     }
-   
-   return false; // Nenhuma posição com lucro protegido
   }
 
 //+------------------------------------------------------------------+

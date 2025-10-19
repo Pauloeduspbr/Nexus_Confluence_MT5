@@ -748,21 +748,22 @@ void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculatio
 //+------------------------------------------------------------------+
 bool ValidateInputParameters()
   {
+   // Validar riscos básicos
    if(AccountRiskPercent <= 0 || AccountRiskPercent > 10)
      {
-      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0-10%%)", AccountRiskPercent);
+      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0.1-10%%)", AccountRiskPercent);
       return false;
      }
 
    if(MaxRiskPremium <= 0 || MaxRiskPremium > 10)
      {
-      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0-10%%)", MaxRiskPremium);
+      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0.1-10%%)", MaxRiskPremium);
       return false;
      }
 
    if(MaxDrawdownPercent <= 0 || MaxDrawdownPercent > 50)
      {
-      PrintFormat("❌ MaxDrawdownPercent inválido: %.2f (deve ser 0-50%%)", MaxDrawdownPercent);
+      PrintFormat("❌ MaxDrawdownPercent inválido: %.2f (deve ser 1-50%%)", MaxDrawdownPercent);
       return false;
      }
 
@@ -771,7 +772,125 @@ bool ValidateInputParameters()
       PrintFormat("❌ MaxSimultaneousTrades inválido: %d (deve ser 1-10)", MaxSimultaneousTrades);
       return false;
      }
-
+   
+   // ✅ VALIDAR NOVOS PARÂMETROS v4.4
+   
+   // Stop Loss
+   if(SL_BufferPoints < 0 || SL_BufferPoints > 1000)
+     {
+      PrintFormat("❌ SL_BufferPoints inválido: %.1f (deve ser 0-1000)", SL_BufferPoints);
+      return false;
+     }
+   
+   if(SL_FallbackPercent < 0.1 || SL_FallbackPercent > 10)
+     {
+      PrintFormat("❌ SL_FallbackPercent inválido: %.2f (deve ser 0.1-10%%)", SL_FallbackPercent);
+      return false;
+     }
+   
+   if(SL_MinDistancePoints < 0 || SL_MinDistancePoints > 10000)
+     {
+      PrintFormat("❌ SL_MinDistancePoints inválido: %.1f (deve ser 0-10000)", SL_MinDistancePoints);
+      return false;
+     }
+   
+   if(SL_MaxDistancePoints < SL_MinDistancePoints || SL_MaxDistancePoints > 50000)
+     {
+      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser >= SL_Min e <= 50000)", SL_MaxDistancePoints);
+      PrintFormat("   SL_MinDistancePoints: %.1f", SL_MinDistancePoints);
+      return false;
+     }
+   
+   // Take Profit
+   if(TP1_RR < 0.1 || TP1_RR > 20)
+     {
+      PrintFormat("❌ TP1_RR inválido: %.2f (deve ser 0.1-20)", TP1_RR);
+      return false;
+     }
+   
+   if(TP2_RR < TP1_RR || TP2_RR > 20)
+     {
+      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser >= TP1_RR e <= 20)", TP2_RR);
+      return false;
+     }
+   
+   if(UseTP3)
+     {
+      if(TP3_RR < TP2_RR || TP3_RR > 20)
+        {
+         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser >= TP2_RR e <= 20)", TP3_RR);
+         return false;
+        }
+     }
+   
+   if(EnablePartialTP)
+     {
+      double totalClosePercent = TP1_ClosePercent + TP2_ClosePercent;
+      if(UseTP3)
+         totalClosePercent += TP3_ClosePercent;
+      
+      if(totalClosePercent < 90 || totalClosePercent > 110)
+        {
+         PrintFormat("❌ Soma dos TP ClosePercent inválida: %.1f%% (deve ser ~100%%)", totalClosePercent);
+         PrintFormat("   TP1: %.1f%%, TP2: %.1f%%, TP3: %.1f%%", TP1_ClosePercent, TP2_ClosePercent, TP3_ClosePercent);
+         return false;
+        }
+     }
+   
+   // Trailing Stop
+   if(TrailingDistancePoints < 0 || TrailingDistancePoints > 10000)
+     {
+      PrintFormat("❌ TrailingDistancePoints inválido: %.1f (deve ser 0-10000)", TrailingDistancePoints);
+      return false;
+     }
+   
+   if(TrailingStepPoints < 0 || TrailingStepPoints > TrailingDistancePoints)
+     {
+      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser 0-%.1f)", TrailingStepPoints, TrailingDistancePoints);
+      return false;
+     }
+   
+   if(TrailingActivationRR < 0 || TrailingActivationRR > 10)
+     {
+      PrintFormat("❌ TrailingActivationRR inválido: %.2f (deve ser 0-10)", TrailingActivationRR);
+      return false;
+     }
+   
+   if(TrailingUseATR && (TrailingATRMultiplier < 0.1 || TrailingATRMultiplier > 10))
+     {
+      PrintFormat("❌ TrailingATRMultiplier inválido: %.2f (deve ser 0.1-10)", TrailingATRMultiplier);
+      return false;
+     }
+   
+   // Horários customizados
+   if(UseCustomTradingHours)
+     {
+      if(CustomStartHour < 0 || CustomStartHour > 23)
+        {
+         PrintFormat("❌ CustomStartHour inválido: %d (deve ser 0-23)", CustomStartHour);
+         return false;
+        }
+      
+      if(CustomStartMinute < 0 || CustomStartMinute > 59)
+        {
+         PrintFormat("❌ CustomStartMinute inválido: %d (deve ser 0-59)", CustomStartMinute);
+         return false;
+        }
+      
+      if(CustomEndHour < 0 || CustomEndHour > 23)
+        {
+         PrintFormat("❌ CustomEndHour inválido: %d (deve ser 0-23)", CustomEndHour);
+         return false;
+        }
+      
+      if(CustomEndMinute < 0 || CustomEndMinute > 59)
+        {
+         PrintFormat("❌ CustomEndMinute inválido: %d (deve ser 0-59)", CustomEndMinute);
+         return false;
+        }
+     }
+   
+   PrintFormat("✅ Todos os parâmetros validados com sucesso");
    return true;
   }
 

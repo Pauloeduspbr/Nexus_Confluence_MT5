@@ -823,17 +823,37 @@ bool ValidateInputParameters()
         }
      }
    
+   // Validar percentuais individuais (soma será validada na execução)
    if(EnablePartialTP)
      {
+      if(TP1_ClosePercent < 0 || TP1_ClosePercent > 100)
+        {
+         PrintFormat("❌ TP1_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP1_ClosePercent);
+         return false;
+        }
+      
+      if(TP2_ClosePercent < 0 || TP2_ClosePercent > 100)
+        {
+         PrintFormat("❌ TP2_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP2_ClosePercent);
+         return false;
+        }
+      
+      if(UseTP3 && (TP3_ClosePercent < 0 || TP3_ClosePercent > 100))
+        {
+         PrintFormat("❌ TP3_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP3_ClosePercent);
+         return false;
+        }
+      
+      // Avisar se soma não é 100%, mas permitir (pode ser estratégia intencional)
       double totalClosePercent = TP1_ClosePercent + TP2_ClosePercent;
       if(UseTP3)
          totalClosePercent += TP3_ClosePercent;
       
-      if(totalClosePercent < 90 || totalClosePercent > 110)
+      if(totalClosePercent < 95 || totalClosePercent > 105)
         {
-         PrintFormat("❌ Soma dos TP ClosePercent inválida: %.1f%% (deve ser ~100%%)", totalClosePercent);
+         PrintFormat("⚠️ AVISO: Soma dos TP ClosePercent: %.1f%% (recomendado ~100%%)", totalClosePercent);
          PrintFormat("   TP1: %.1f%%, TP2: %.1f%%, TP3: %.1f%%", TP1_ClosePercent, TP2_ClosePercent, TP3_ClosePercent);
-         return false;
+         // Não retornar false, apenas avisar
         }
      }
    

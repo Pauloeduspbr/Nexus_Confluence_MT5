@@ -28,10 +28,10 @@ TradeOnSaturday=false||false||0||true||N
 TradeOnSunday=true||false||0||true||N
 ; === ⏰ HORÁRIOS CUSTOMIZÁVEIS (Otimização Principal) ===
 UseCustomTradingHours=true||false||0||true||Y
-CustomStartHour=0||0||1||23||Y
-CustomStartMinute=0||0||0||59||N
-CustomEndHour=23||23||1||23||Y
-CustomEndMinute=59||59||0||59||N
+CustomStartHour=0||0||0||12||Y
+CustomStartMinute=0||0||0||0||N
+CustomEndHour=23||18||12||23||Y
+CustomEndMinute=59||59||59||59||N
 ; === ⚠️ CONFIGURAÇÃO DE STOP LOSS (Otimização Principal) ===
 SL_BufferPoints=10.0||5.0||1.0||50.0||Y
 SL_FallbackPercent=0.3||0.3||0.1||1.0||N
@@ -43,10 +43,10 @@ EnablePartialTP=true||true||0||true||N
 TP1_RR=1.0||1.0||0.5||2.0||Y
 TP2_RR=2.0||2.0||1.0||3.0||Y
 TP3_RR=3.0||3.0||2.0||5.0||N
-UseTP3=false||false||0||true||N
-TP1_ClosePercent=50.0||50.0||30.0||70.0||N
-TP2_ClosePercent=30.0||30.0||20.0||50.0||N
-TP3_ClosePercent=20.0||20.0||10.0||30.0||N
+UseTP3=false||false||0||false||N
+TP1_ClosePercent=50.0||50.0||50.0||50.0||N
+TP2_ClosePercent=50.0||50.0||50.0||50.0||N
+TP3_ClosePercent=0.0||0.0||0.0||0.0||N
 ; === 📈 CONFIGURAÇÃO DE TRAILING STOP ===
 EnableTrailing=true||false||0||true||N
 TrailingDistancePoints=200.0||200.0||50.0||500.0||N

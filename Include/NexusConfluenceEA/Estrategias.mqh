@@ -552,15 +552,25 @@ RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES
    bool slopePositive = (result.slope > 0.5);  // Mínimo 0.5 de inclinação
    bool slopeNegative = (result.slope < -0.5);
    
+   // ✅ CORREÇÃO CRÍTICA v4.3: Validar zona de sobrecompra/sobrevenda
+   bool notOverbought = (rsiRed[0] < RSI_OPER_HighLevel);   // <70 (evita topos)
+   bool notOversold = (rsiRed[0] > RSI_OPER_LowLevel);      // >30 (evita fundos)
+   
    if(direction == TRADE_DIRECTION_BUY)
    {
-      // Para compra: linha vermelha acima da azul + inclinação positiva
-      result.isAligned = (redAboveBlue && slopePositive);
+      // Para compra: linha vermelha acima da azul + inclinação positiva + NÃO sobrecomprado
+      result.isAligned = (redAboveBlue && slopePositive && notOverbought);
+      
+      if(!notOverbought)
+         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f >= %.1f (sobrecompra)", rsiRed[0], RSI_OPER_HighLevel);
    }
    else if(direction == TRADE_DIRECTION_SELL)
    {
-      // Para venda: linha vermelha abaixo da azul + inclinação negativa
-      result.isAligned = (!redAboveBlue && slopeNegative);
+      // Para venda: linha vermelha abaixo da azul + inclinação negativa + NÃO sobrevendido
+      result.isAligned = (!redAboveBlue && slopeNegative && notOversold);
+      
+      if(!notOversold)
+         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f <= %.1f (sobrevenda)", rsiRed[0], RSI_OPER_LowLevel);
    }
    
    return result;
@@ -783,21 +793,33 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       return result;
    }
    
-   // VALIDAÇÃO 2: MACRO-1 e MACRO-2 devem estar na MESMA DIREÇÃO
-   if(macro1Value != macro2Value)
+   // ✅ CORREÇÃO CRÍTICA: VALIDAÇÃO 2 - Verificar DIREÇÃO (positivo/negativo), não valor exato
+   // +1 e +2 = AMBOS BULLISH (mesma direção)
+   // -1 e -2 = AMBOS BEARISH (mesma direção)
+   bool macro1Bullish = (macro1Value > 0);
+   bool macro2Bullish = (macro2Value > 0);
+   bool macro1Bearish = (macro1Value < 0);
+   bool macro2Bearish = (macro2Value < 0);
+   
+   // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
+   if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
    {
       PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
                   macro1Value, macro2Value);
       return result;
    }
    
-   // ✅ MACRO-1 e MACRO-2 ALINHADOS!
+   // ✅ MACRO-1 e MACRO-2 ALINHADOS NA MESMA DIREÇÃO!
    result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
    result.h4Aligned = true;
    result.h1Aligned = true;
    
-   PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s", 
-               (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH");
+   // Calcular força do alinhamento (ambos +2/-2 = máximo)
+   int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
+   
+   PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
+               (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
+               macro1Value, macro2Value, alignmentStrength);
    
    // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)

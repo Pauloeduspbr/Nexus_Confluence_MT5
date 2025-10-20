@@ -1,0 +1,68 @@
+; saved automatically on 2025.04.24 18:00:00
+; 🔥 MODO DEBUG EXTREMO - TODOS OS FILTROS RELAXADOS 🔥
+; Este .set DESABILITA validações rigorosas para identificar o problema
+; Use APENAS para diagnóstico!
+
+OperationalTimeframe=PERIOD_M15||16388||0||32767||N
+TF_MACRO_1=PERIOD_H4||16396||0||32767||N
+TF_MACRO_2=PERIOD_H1||16385||0||32767||N
+TF_MACRO_3=PERIOD_M30||16386||0||32767||N
+
+; === RISCO ===
+AccountRiskPercent=1.5||1.5||0.5||5.0||N
+MaxRiskPremium=2.0||2.0||0.5||5.0||N
+MaxSimultaneousTrades=3||3||1||10||N
+
+; === FILTROS DE MERCADO - TODOS DESABILITADOS! ===
+ValidateATRRange=false||false|||N                    ; ❌ DESABILITAR ATR
+ValidateSpreadBeforeEntry=true||true|||N             ; Manter spread ativo
+MaxSpreadMultiplier=100.0||100.0||1.0||500.0||N      ; ❌ SPREAD ILIMITADO!
+
+; === HORÁRIOS - 24H SEM RESTRIÇÕES ===
+UseCustomTradingHours=false||false|||N               ; ❌ OPERAR 24H
+CustomStartHour=10||10||0||23||N
+CustomStartMinute=0||0||0||59||N
+CustomEndHour=14||14||0||23||N
+CustomEndMinute=0||0||0||59||N
+
+; === DIAS DA SEMANA - TODOS ATIVOS ===
+TradeOnMonday=true||true|||N
+TradeOnTuesday=true||true|||N
+TradeOnWednesday=true||true|||N
+TradeOnThursday=true||true|||N
+TradeOnFriday=true||true|||N
+TradeOnSaturday=false||false|||N
+TradeOnSunday=false||false|||N
+
+; === RSI OMA - LIMITES EXTREMOS (QUASE NUNCA REJEITA) ===
+RSI_OPER_HighLevel=90.0||90.0||50.0||100.0||N        ; ❌ 90 (antes 70)
+RSI_OPER_LowLevel=10.0||10.0||0.0||50.0||N           ; ❌ 10 (antes 30)
+RSI_OPER_SlopeThreshold=0.1||0.1||0.0||5.0||N        ; Manter padrão
+RSI_OPER_MinDifference=1.0||1.0||0.0||10.0||N        ; Manter padrão
+
+; === WAE - SEM MUDANÇAS (JÁ PERMISSIVO) ===
+WAE_OPER_MinForce=5.0||5.0||0.0||50.0||N
+WAE_OPER_RequireExpansion=true||true|||N
+
+; === CURRENCY STRENGTH - SEM MUDANÇAS ===
+CS_OPER_MinStrengthDiff=15.0||15.0||0.0||100.0||N
+
+; === SETUPS CAUTELOSOS - ATIVO! ===
+AllowCautiousSetups=true||true|||N                   ; ✅ PERMITIR CAUTELOSOS
+
+; === SAÍDAS - PADRÃO ===
+TP1_Percent=50.0||50.0||0.0||100.0||N
+TP1_RR=1.0||1.0||0.1||10.0||N
+TP2_Percent=25.0||25.0||0.0||100.0||N
+TP2_RR=2.0||2.0||0.1||10.0||N
+EnableTrailingStop=true||true|||N
+TrailingDistanceMultiplier=1.0||1.0||0.1||10.0||N
+MoveToBreakevenAtTP1=true||true|||N
+
+; === LOGGING - COMPLETO ===
+EnableDetailedLogging=true||true|||N
+SendAlerts=false||false|||N
+
+; === PROTEÇÕES - MÍNIMAS ===
+MaxSlippage=10||10||0||100||N
+EA_MAGIC_NUMBER=20241015||20241015||1000000||99999999||N

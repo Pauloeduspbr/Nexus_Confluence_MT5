@@ -1,0 +1,105 @@
+; saved on 2025.10.19 22:00:00
+; this file contains input parameters for testing/optimizing NexusConfluenceEA expert advisor
+; to use it in the strategy tester, click Load in the context menu of the Inputs tab
+;
+; ════════════════════════════════════════════════════════
+; 🎯 NEXUS CONFLUENCE v4.9 - SEM BLOQUEIO ✅
+; ════════════════════════════════════════════════════════
+; === ⚙️ CONFIGURAÇÕES GERAIS ===
+AccountRiskPercent=1.5||1.5||0.5||3.0||Y
+MaxRiskPremium=2.0||2.0||0.5||3.0||Y
+; 🔥 REMOVIDO v4.9: MaxDrawdownPercent (BLOQUEIO DESABILITADO)
+MaxSimultaneousTrades=3||3||1||5||Y
+EnableSecondaryHours=true||false||0||true||N
+EnableMorningB3=false||false||0||true||N
+AvoidNews=true||false||0||true||N
+ValidateATRRange=true||false||0||true||N
+SendAlerts=false||false||0||true||N
+AllowCautiousSetups=false||false||0||true||N
+; === 💰 GESTÃO DE LOTE ===
+FixedLotSize=0||0||0.1||3||Y
+; === 📅 FILTRO SEMANAL - Dias da Semana ===
+TradeOnMonday=true||false||0||true||N
+TradeOnTuesday=true||false||0||true||N
+TradeOnWednesday=true||false||0||true||N
+TradeOnThursday=true||false||0||true||N
+TradeOnFriday=true||false||0||true||N
+TradeOnSaturday=false||false||0||true||N
+TradeOnSunday=true||false||0||true||N
+; === ⏰ HORÁRIOS CUSTOMIZÁVEIS (para otimização) ===
+UseCustomTradingHours=false||false||0||true||Y
+CustomStartHour=0||0||0||23||Y
+CustomStartMinute=0||0||0||59||Y
+CustomEndHour=23||18||18||23||Y
+CustomEndMinute=59||59||59||59||N
+; === ⚠️ CONFIGURAÇÃO DE STOP LOSS ===
+SL_BufferPoints=10.0||5.0||1.0||50.0||Y
+SL_FallbackPercent=0.3||0.3||0.1||1.0||N
+SL_MinDistancePoints=50.0||20.0||10.0||100.0||Y
+SL_MaxDistancePoints=500.0||500.0||100.0||1000.0||Y
+SL_UseStructure=true||false||0||true||N
+; === 🎯 CONFIGURAÇÃO DE TAKE PROFIT ===
+EnablePartialTP=true||false||0||true||N
+TP1_RR=1.0||0.5||0.1||2.0||Y
+TP2_RR=2.0||2.1||0.2||4.0||Y
+TP3_RR=3.0||3.0||2.0||5.0||N
+UseTP3=false||false||0||false||N
+TP1_ClosePercent=50.0||30.0||10.0||70.0||Y
+TP2_ClosePercent=50.0||30.0||10.0||70.0||Y
+TP3_ClosePercent=0.0||0.0||0.0||0.0||N
+; === 📈 CONFIGURAÇÃO DE TRAILING STOP ===
+EnableTrailing=true||false||0||true||N
+TrailingDistancePoints=200.0||10||5||400||Y
+TrailingStepPoints=50.0||0||5||100.0||Y
+TrailingActivationRR=1.5||0.5||0.1||3.0||Y
+TrailingUseATR=false||false||0||true||Y
+TrailingATRMultiplier=2.0||0||0.5||5.0||Y
+; === 🛡️ PROTEÇÕES ===
+MaxSlippagePoints=30||30||10||100||N
+LookbackStructureBars=80||80||50||150||N
+BrokerGMTOffset=2||2||1||20||N
+MaxSpreadMultiplier=5.0||5.0||1.0||10.0||N
+; === 📊 CONTROLE DE POSIÇÕES ===
+PositionControlMode=0||0||0||2||Y
+; === 📁 INDICADORES - Caminhos dos Arquivos ===
+IndicatorsBasePath=NexusConfluenceEA\
+GGTrendBarIndicator=GG_TrendBar_Indicator
+TrendMagicIndicator=TrendMagic_MT5
+CurrencyStrengthIndicator=CurrencyStrengthMeter_MT5
+RSIOMAIndicator=RSIOMA_v2HHLSX_MT5
+WAEIndicator=WaddahAttarExplosion_Professional
+; === 📈 SUPERTREND (Trend Magic Operacional) - Tendência Local =
+ST_OPER_CCI_Period=50||50||30||100||N
+ST_OPER_ATR_Period=5||5||3||10||N
+ST_OPER_ATR_Multiplier=1.0||1.0||0.5||3.0||N
+; === 💱 CURRENCY STRENGTH - OPERACIONAL ===
+CS_CalculationPeriod=24||24||12||48||N
+CS_SmoothingPeriod=5||5||3||10||N
+CS_ShowInPercent=true||false||0||true||N
+; === 📊 RSI OMA (Operacional) - Força Relativa ===
+RSI_OPER_Period=14||14||10||20||N
+RSI_OPER_MA_Period=9||9||5||15||N
+RSI_OPER_MA_Method=0||0||0||3||Y
+RSI_OPER_HighLevel=70.0||70.0||60.0||80.0||N
+RSI_OPER_LowLevel=30.0||30.0||20.0||40.0||N
+RSI_OPER_ShowLevels=true||false||0||true||N
+; === 💥 WAE (Operacional) - Momentum ===
+WAE_OPER_FastMA=20||20||10||30||N
+WAE_OPER_SlowMA=40||40||30||60||N
+WAE_OPER_BBLength=20||20||15||30||N
+WAE_OPER_BBMultiplier=2.0||2.0||1.5||3.0||N
+WAE_OPER_Sensitivity=150||150||100||200||N
+; === 📊 GG TRENDBAR - GLOBAL ===
+GG_UpColor=65280
+GG_DownColor=255
+GG_FlatColor=65535
+GG_TextColor=16776960
+GG_Corner=0||0||0||3||N
+GG_CreateVisualObjects=true||false||0||true||N
+GG_ADX_Period=14||14||10||20||N
+GG_ADX_Price=1||1||0||7||Y
+GG_Step_Psar=0.02||0.02||0.01||0.05||N
+GG_Max_Psar=0.2||0.2||0.1||0.5||N
+; ════════════════════════════════════════════════════════
+; ✅ FIM DOS PARÂMETROS v4.9 - SEM BLOQUEIO
+; ════════════════════════════════════════════════════════

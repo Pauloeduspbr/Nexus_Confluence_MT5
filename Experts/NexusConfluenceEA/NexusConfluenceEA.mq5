@@ -184,25 +184,45 @@ void OnTick()
    if(!mtf.isValid)
      {
       // MACRO-1 e MACRO-2 não alinhados ou indecisos
+      PrintFormat("❌ DEBUG ETAPA 2: Multi-timeframe NÃO ALINHADO - MACRO-1 e MACRO-2 indecisos ou opostos");
       return;
      }
+   PrintFormat("✅ DEBUG ETAPA 2: Multi-timeframe ALINHADO - Direção: %s", 
+               (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA");
 
    // ETAPA 3: Calcular pontuação dos filtros micro
    SetupScore score = CalculateSetupScore(_Symbol, g_currentAssetClass, mtf.direction, mtf.m30Aligned);
+   PrintFormat("📊 DEBUG ETAPA 3: Setup calculado - Pontos: %d/%d | Classificação: %s",
+               score.totalPoints, score.requiredPoints,
+               (score.classification == SETUP_PREMIUM) ? "PREMIUM" : 
+               (score.classification == SETUP_GOOD) ? "GOOD" : "REJECT");
 
    // ETAPA 4: Validar classificação do setup
    if(score.classification == SETUP_REJECT)
      {
       // Não atingiu confluência mínima
+      PrintFormat("❌ DEBUG ETAPA 4: Setup REJEITADO - Pontos insuficientes (%d/%d)", 
+                  score.totalPoints, score.requiredPoints);
       return;
      }
+   PrintFormat("✅ DEBUG ETAPA 4: Setup APROVADO - %s", 
+               (score.classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
 
    // ETAPA 5: Validar condições de mercado (spread, ATR, etc)
    if(!ValidateMarketConditions(_Symbol, g_currentAssetClass))
+     {
+      PrintFormat("❌ DEBUG ETAPA 5: Condições de mercado INVÁLIDAS - Spread ou ATR fora do range");
       return;
+     }
+   PrintFormat("✅ DEBUG ETAPA 5: Condições de mercado VÁLIDAS");
 
    // ETAPA 6: CONTROLE DE POSIÇÕES - Verificar modo configurado
    int openPositions = CountOpenTrades();
+   PrintFormat("🔢 DEBUG ETAPA 6: Posições abertas: %d | Modo: %s | Limite: %d",
+               openPositions, 
+               (PositionControlMode == POSITION_MODE_SINGLE) ? "SINGLE" :
+               (PositionControlMode == POSITION_MODE_MULTIPLE) ? "MULTIPLE" : "PROTECTED",
+               MaxSimultaneousTrades);
    
    switch(PositionControlMode)
    {
@@ -210,6 +230,7 @@ void OnTick()
          // ✅ Apenas 1 posição por vez
          if(openPositions > 0)
          {
+            PrintFormat("❌ DEBUG ETAPA 6: Modo SINGLE bloqueou - %d posição(ões) aberta(s)", openPositions);
             PrintFormat("⏸️ Modo SINGLE: Já existe %d posição(ões) aberta(s), aguardando fechamento", openPositions);
             return;
          }
@@ -219,6 +240,7 @@ void OnTick()
          // ✅ Múltiplas posições até limite máximo
          if(openPositions >= MaxSimultaneousTrades)
          {
+            PrintFormat("❌ DEBUG ETAPA 6: Modo MULTIPLE bloqueou - Limite %d atingido", MaxSimultaneousTrades);
             PrintFormat("⏸️ Modo MULTIPLE: Limite de %d posições atingido", MaxSimultaneousTrades);
             return;
          }
@@ -228,20 +250,26 @@ void OnTick()
          // ✅ Múltiplas posições até limite configurado
          if(openPositions >= MaxSimultaneousTrades)
          {
+            PrintFormat("❌ DEBUG ETAPA 6: Modo PROTECTED bloqueou - Limite %d atingido", MaxSimultaneousTrades);
             PrintFormat("⏸️ Modo PROTECTED: Limite de %d posições atingido", MaxSimultaneousTrades);
             return;
          }
          break;
    }
+   PrintFormat("✅ DEBUG ETAPA 6: Controle de posições OK - Pode abrir nova posição");
 
    // ETAPA 7: Calcular risco e tamanho da posição
    RiskCalculation risk = CalculateRiskPosition(_Symbol, score, mtf.direction, g_currentAssetClass);
    if(!risk.isValid)
      {
       if(risk.errorMessage != "")
-         PrintFormat("⚠️ Risco inválido: %s", risk.errorMessage);
+         PrintFormat("❌ DEBUG ETAPA 7: Risco INVÁLIDO - %s", risk.errorMessage);
+      else
+         PrintFormat("❌ DEBUG ETAPA 7: Risco INVÁLIDO - Sem mensagem de erro");
       return;
      }
+   PrintFormat("✅ DEBUG ETAPA 7: Risco CALCULADO - Lote: %.2f | SL: %.5f | Risco: %.2f", 
+               risk.positionSize, risk.stopLoss, risk.riskAmount);
 
    // ETAPA 8: Executar trade
    PrintFormat("════════════════════════════════════════════════════════════════");

@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.24";    // 🔥 CORREÇÕES CRÍTICAS - Sistema bloqueio limitado (máx 12h) + Reset no pregão
+const string EA_VERSION = "4.25";    // 🔥 v4.25: CORREÇÃO FINAL - TODOS os bloqueios limitados a 12h máximo (DD diário/semanal/perdas consecutivas)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

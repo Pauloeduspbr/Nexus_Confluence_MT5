@@ -522,19 +522,18 @@ bool ValidateDrawdownLimits()
          PrintFormat("   Balance início dia: $%.2f", g_dailyStartBalance);
          PrintFormat("   Equity atual: $%.2f", equity);
          PrintFormat("   Perda: $%.2f", g_dailyStartBalance - equity);
-         
-         // Pausar até início do próximo dia
-         MqlDateTime dt;
-         TimeToStruct(TimeCurrent(), dt);
-         dt.hour = 23; dt.min = 59; dt.sec = 59;
-         datetime nextDay = StructToTime(dt) + 1;
-         g_pauseUntilTime = nextDay;
+
+         // 🔥 v4.25: USAR CalculatePauseTime() - MÁXIMO 12H (não até meia-noite!)
+         int pauseSeconds = CalculatePauseTime(Period());
+         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
          g_dailyDrawdownHit = true;
-         
-         PrintFormat("⏸️ SISTEMA PAUSADO até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         
+
+         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
+                     pauseSeconds, pauseSeconds/3600.0,
+                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+
          if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: DD diário %.1f%%", dailyDD));
+            SendNotification(StringFormat("Nexus PAUSADO: DD diário %.1f%% por %.1fh", dailyDD, pauseSeconds/3600.0));
          
          return false;
         }
@@ -550,19 +549,18 @@ bool ValidateDrawdownLimits()
          PrintFormat("   Balance início semana: $%.2f", g_weeklyStartBalance);
          PrintFormat("   Equity atual: $%.2f", equity);
          PrintFormat("   Perda: $%.2f", g_weeklyStartBalance - equity);
-         
-         // Pausar até próxima segunda-feira
-         MqlDateTime dt;
-         TimeToStruct(TimeCurrent(), dt);
-         int daysToMonday = (8 - dt.day_of_week) % 7;
-         if(daysToMonday == 0) daysToMonday = 7;
-         g_pauseUntilTime = TimeCurrent() + daysToMonday * 86400;
+
+         // 🔥 v4.25: USAR CalculatePauseTime() - MÁXIMO 12H (NÃO até segunda-feira!)
+         int pauseSeconds = CalculatePauseTime(Period());
+         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
          g_weeklyDrawdownHit = true;
-         
-         PrintFormat("⏸️ SISTEMA PAUSADO até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         
+
+         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
+                     pauseSeconds, pauseSeconds/3600.0,
+                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+
          if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: DD semanal %.1f%%", weeklyDD));
+            SendNotification(StringFormat("Nexus PAUSADO: DD semanal %.1f%% por %.1fh", weeklyDD, pauseSeconds/3600.0));
          
          return false;
         }
@@ -572,18 +570,22 @@ bool ValidateDrawdownLimits()
    if(g_consecutiveLosses >= MaxConsecutiveLosses)
      {
       PrintFormat("🔴 PERDAS CONSECUTIVAS ATINGIDAS: %d >= %d", g_consecutiveLosses, MaxConsecutiveLosses);
-      PrintFormat("⏸️ Sistema já deve estar pausado");
-      
-      // Se não estiver pausado, pausar agora
+
+      // 🔥 v4.25: USAR CalculatePauseTime() ao invés de 24h hardcoded!
       if(g_pauseUntilTime == 0)
         {
-         g_pauseUntilTime = TimeCurrent() + 24*3600; // 24 horas
-         PrintFormat("⏸️ PAUSANDO por 24 horas até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         
+         int pauseSeconds = CalculatePauseTime(Period()); // 🔥 MÁXIMO 12H!
+         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
+
+         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
+                     pauseSeconds, pauseSeconds/3600.0,
+                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+
          if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: %d perdas consecutivas", g_consecutiveLosses));
+            SendNotification(StringFormat("Nexus PAUSADO: %d perdas consecutivas por %.1fh",
+                                          g_consecutiveLosses, pauseSeconds/3600.0));
         }
-      
+
       return false;
      }
    

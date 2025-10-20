@@ -227,9 +227,13 @@ input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
 input group "════════════════════════════════════════════════════════"
 
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
-input double AccountRiskPercent       = 1.5;   // 📊 Risco padrão por trade (%)
-input double MaxRiskPremium           = 2.0;   // 🏆 Risco máximo setup PREMIUM (%)
+input double AccountRiskPercent       = 0.5;   // 📊 Risco padrão por trade (%) - 🔥 v4.15: REDUZIDO 1.5→0.5
+input double MaxRiskPremium           = 1.0;   // 🏆 Risco máximo setup PREMIUM (%) - 🔥 v4.15: REDUZIDO 2.0→1.0
 // 🔥 REMOVIDO v4.9: input double MaxDrawdownPercent = 15.0; // Bloqueio por drawdown DESABILITADO
+// 🔥 v4.15: PROTEÇÕES DE DRAWDOWN REATIVADAS (versão melhorada)
+input double MaxDailyDrawdown         = 3.0;   // 🛡️ Drawdown máximo diário (%) - pausa trading
+input double MaxWeeklyDrawdown        = 5.0;   // 🛡️ Drawdown máximo semanal (%) - pausa trading
+input int    MaxConsecutiveLosses     = 3;     // 🛡️ Máximo perdas consecutivas - pausa 24h
 input int    MaxSimultaneousTrades    = 3;     // 🔢 Máximo de trades simultâneos
 input bool   EnableSecondaryHours     = true;  // 🕐 Habilitar horários secundários Forex
 input bool   EnableMorningB3          = false; // 🇧🇷 Habilitar sessão da manhã B3
@@ -237,6 +241,7 @@ input bool   AvoidNews                = true;  // 📰 Evitar operar próximo a 
 input bool   ValidateATRRange         = true;  // 📏 Validar ATR ideal por ativo
 input bool   SendAlerts               = true;  // 🔔 Enviar notificações push
 input bool   AllowCautiousSetups      = false; // ⚠️ Permitir setups CAUTELOSOS (2/2 + MACRO-3 oposto)
+input bool   AllowGoodSetups          = false; // 🔥 v4.15: OPERAR APENAS PREMIUM (3/3 filtros)
 
 input group "=== 💰 GESTÃO DE LOTE ==="
 input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)
@@ -252,11 +257,11 @@ input bool   TradeOnSaturday          = false; // 📅 Operar no Sábado (Cripto
 input bool   TradeOnSunday            = false; // 📅 Operar no Domingo (Cripto 24/7)
 
 input group "=== ⏰ HORÁRIOS CUSTOMIZÁVEIS (para otimização) ==="
-input bool   UseCustomTradingHours    = false; // ⏰ Usar horários customizados
-input int    CustomStartHour          = 9;     // ⏰ Horário início (hora)
+input bool   UseCustomTradingHours    = true;  // ⏰ Usar horários customizados - 🔥 v4.15: ATIVADO
+input int    CustomStartHour          = 10;    // ⏰ Horário início (hora) - 🔥 v4.15: Londres/NY overlap
 input int    CustomStartMinute        = 0;     // ⏰ Horário início (minuto)
-input int    CustomEndHour            = 17;    // ⏰ Horário fim (hora)
-input int    CustomEndMinute          = 30;    // ⏰ Horário fim (minuto)
+input int    CustomEndHour            = 16;    // ⏰ Horário fim (hora) - 🔥 v4.15: Fim overlap
+input int    CustomEndMinute          = 0;     // ⏰ Horário fim (minuto) - 🔥 v4.15: 30→0
 
 input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
 input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
@@ -277,17 +282,22 @@ input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP
 
 input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
 input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
-input double TrailingDistancePoints   = 200.0;  // 📏 Distância trailing (pontos)
+input double TrailingDistancePoints   = 200.0;  // 📏 Distância trailing (pontos) - usado se ATR desabilitado
 input double TrailingStepPoints       = 50.0;   // 📏 Passo mínimo trailing (pontos)
 input double TrailingActivationRR     = 1.5;    // 🎯 Ativar após RR (ex: 1.5 = após 1.5:1)
-input bool   TrailingUseATR           = false;  // 📊 Usar ATR para calcular trailing
-input double TrailingATRMultiplier    = 2.0;    // � Multiplicador ATR (se ativo)
+input bool   TrailingUseATR           = true;   // 📊 Usar ATR para calcular trailing - 🔥 v4.15: ATIVADO
+input double TrailingATRMultiplier    = 2.5;    // 📊 Multiplicador ATR (se ativo) - 🔥 v4.15: 2.0→2.5
 
 input group "=== 🛡️ PROTEÇÕES ==="
 input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
 input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estrutura M15
 input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
 input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
+
+input group "=== 📊 FILTRO ADX (Trending Markets) - 🔥 v4.15 ==="
+input bool   UseADXFilter             = false; // 📊 Habilitar filtro ADX (mercados trending)
+input int    ADX_Period               = 14;    // 📊 Período ADX
+input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 📊 CONTROLE DE POSIÇÕES ==="
 input POSITION_CONTROL_MODE PositionControlMode = POSITION_MODE_SINGLE; // 🔢 Modo de controle de posições
@@ -387,7 +397,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION      = "4.14";    // 🔥 CRÍTICO: Correção Lógica Supertrend (DBL_MAX)
+const string EA_VERSION      = "4.15";    // 🔥 CRÍTICO: Correções Backtest - Risco/Trailing/Proteções
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

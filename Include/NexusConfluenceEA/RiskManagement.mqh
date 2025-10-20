@@ -534,6 +534,51 @@ void CleanupClosedTrades()
       // Verificar se posição ainda existe
       if(!PositionSelectByTicket(ticket))
       {
+         // 🔥 v4.15: NOVO - Registrar perda/ganho para contador de perdas consecutivas
+         if(HistorySelectByPosition(ticket))
+           {
+            ulong dealTicket = 0;
+            for(int d = HistoryDealsTotal() - 1; d >= 0; d--)
+              {
+               dealTicket = HistoryDealGetTicket(d);
+               if(HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID) == ticket)
+                 {
+                  double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+                  
+                  if(profit < 0)
+                    {
+                     // Trade fechou em PERDA
+                     g_consecutiveLosses++;
+                     PrintFormat("📉 Trade #%I64u fechou em PERDA (%.2f) - Perdas consecutivas: %d", 
+                                 ticket, profit, g_consecutiveLosses);
+                     
+                     // Verificar se atingiu limite de perdas consecutivas
+                     if(g_consecutiveLosses >= MaxConsecutiveLosses)
+                       {
+                        g_pauseUntilTime = TimeCurrent() + 86400; // Pausar 24 horas
+                        string msg = StringFormat("🚨 %d PERDAS CONSECUTIVAS! Trading PAUSADO por 24 horas até %s",
+                                                  g_consecutiveLosses,
+                                                  TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+                        PrintFormat("%s", msg);
+                        if(SendAlerts) SendNotification(msg);
+                       }
+                    }
+                  else if(profit > 0)
+                    {
+                     // Trade fechou em GANHO - resetar contador
+                     if(g_consecutiveLosses > 0)
+                       {
+                        PrintFormat("📈 Trade #%I64u fechou em GANHO (%.2f) - Perdas consecutivas RESETADAS (era %d)",
+                                    ticket, profit, g_consecutiveLosses);
+                        g_consecutiveLosses = 0;
+                       }
+                    }
+                  
+                  break;
+                 }
+              }
+           }
+         
          RemoveTradeState(ticket);
       }
    }
@@ -567,19 +612,7 @@ void ManageSingleTrade(ulong ticket)
    int stateIdx = FindOrCreateTradeState(ticket);
    
    // ════════════════════════════════════════════════════════════════
-   // 1. MOVER PARA BREAKEVEN quando atingir 1:1 RR
-   // ════════════════════════════════════════════════════════════════
-   if(!g_tradeStates[stateIdx].movedToBreakeven && currentRR >= 1.0)
-   {
-      if(MoveToBreakeven(ticket, openPrice, symbol))
-      {
-         g_tradeStates[stateIdx].movedToBreakeven = true;
-         PrintFormat("✅ Trade #%I64u: SL movido para BREAKEVEN (RR atual: %.2f)", ticket, currentRR);
-      }
-   }
-   
-   // ════════════════════════════════════════════════════════════════
-   // 2. TAKE PROFIT PARCIAL TP1
+   // 1. TAKE PROFIT PARCIAL TP1 (executar ANTES de mover BE)
    // ════════════════════════════════════════════════════════════════
    if(EnablePartialTP && !g_tradeStates[stateIdx].tp1Hit && currentRR >= TP1_RR)
    {
@@ -588,6 +621,20 @@ void ManageSingleTrade(ulong ticket)
          g_tradeStates[stateIdx].tp1Hit = true;
          PrintFormat("🎯 Trade #%I64u: TP1 atingido! Fechados %.1f%% (RR: %.2f)", 
                      ticket, TP1_ClosePercent, currentRR);
+      }
+   }
+   
+   // ════════════════════════════════════════════════════════════════
+   // 2. MOVER PARA BREAKEVEN - 🔥 v4.15: APENAS APÓS TP1 FECHADO
+   // ════════════════════════════════════════════════════════════════
+   if(!g_tradeStates[stateIdx].movedToBreakeven && 
+      g_tradeStates[stateIdx].tp1Hit &&              // 🔥 NOVO: Só após TP1 fechado
+      currentRR >= 1.2)                              // 🔥 NOVO: Em 1.2:1, não 1.0
+   {
+      if(MoveToBreakeven(ticket, openPrice, symbol))
+      {
+         g_tradeStates[stateIdx].movedToBreakeven = true;
+         PrintFormat("✅ Trade #%I64u: SL movido para BREAKEVEN após TP1 (RR atual: %.2f)", ticket, currentRR);
       }
    }
    

@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.14 - Sistema Universal Multi-Timeframe    |
+//| Nexus Confluence EA v4.15 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |
 //| Descrição: Expert Advisor completo que implementa sistema        |
@@ -9,11 +9,18 @@
 //| NOVO v4.11: Correção crítica SL + Gestão de posições            |
 //| NOVO v4.12: Supertrend obrigatório + Hierarquia otimizada       |
 //| NOVO v4.13: Magic Number INPUT + Limpeza total indicadores      |
-//| 🔥 CRÍTICO v4.14: CORREÇÃO LÓGICA SUPERTREND (DBL_MAX)         |
+//| 🔥 v4.14: CORREÇÃO LÓGICA SUPERTREND (DBL_MAX)                 |
+//| 🔥 v4.15: CORREÇÕES CRÍTICAS BACKTEST                          |
+//|   - Risco reduzido: 0.5-1% (era 1.5-2%)                        |
+//|   - Apenas setups PREMIUM (3/3 filtros)                         |
+//|   - Proteção drawdown diário/semanal                            |
+//|   - Breakeven apenas após TP1 fechado                           |
+//|   - Trailing dinâmico 2.5x ATR                                 |
+//|   - Horários Londres/NY overlap apenas                          |
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.14 - Correção Crítica Leitura Supertrend             |
+//| Versão: 4.15 - Correções Análise Crítica Backtest              |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
@@ -47,6 +54,15 @@ ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
 
 // Controle de novo candle para evitar análise redundante
 datetime g_lastCandleTime = 0;
+
+// 🔥 v4.15: Variáveis de controle de drawdown
+double g_dailyStartBalance    = 0.0;      // Balance início do dia
+double g_weeklyStartBalance   = 0.0;      // Balance início da semana
+int    g_consecutiveLosses    = 0;        // Contador de perdas consecutivas
+datetime g_lastTradeCloseTime = 0;        // Última vez que trade fechou
+datetime g_pauseUntilTime     = 0;        // Pausado até (timestamp)
+bool   g_dailyDrawdownHit     = false;    // Flag drawdown diário atingido
+bool   g_weeklyDrawdownHit    = false;    // Flag drawdown semanal atingido
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -207,6 +223,16 @@ void OnTick()
                   score.totalPoints, score.requiredPoints);
       return;
      }
+   
+   // 🔥 v4.15: FILTRO PREMIUM - Operar apenas setups PREMIUM (3/3 filtros)
+   if(!AllowGoodSetups && score.classification != SETUP_PREMIUM)
+     {
+      PrintFormat("⚠️ DEBUG ETAPA 4: Setup GOOD rejeitado - Apenas PREMIUM permitido (AllowGoodSetups=false)");
+      PrintFormat("   📊 Pontos: %d/%d | Para operar GOOD, altere AllowGoodSetups=true", 
+                  score.totalPoints, score.requiredPoints);
+      return;
+     }
+   
    PrintFormat("✅ DEBUG ETAPA 4: Setup APROVADO - %s", 
                (score.classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
 
@@ -379,6 +405,13 @@ string AssetClassToString(ASSET_CLASS cls)
 //+------------------------------------------------------------------+
 bool ValidateBasicConditions()
   {
+   // 🔥 v4.15: NOVA VALIDAÇÃO - Proteção de Drawdown
+   if(!ValidateDrawdownProtection())
+     {
+      PrintFormat("🛡️ VALIDAÇÃO FALHOU: Proteção de drawdown ativa");
+      return false;
+     }
+   
    // 1. Verificar se trading está habilitado
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
      {
@@ -401,6 +434,92 @@ bool ValidateBasicConditions()
      }
 
    PrintFormat("✅ Validações básicas OK");
+   return true;
+  }
+
+//+------------------------------------------------------------------+
+//| 🔥 v4.15: NOVA - Validar proteção de drawdown                   |
+//+------------------------------------------------------------------+
+bool ValidateDrawdownProtection()
+  {
+   double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   // Verificar se está pausado por perdas consecutivas
+   if(TimeCurrent() < g_pauseUntilTime)
+     {
+      PrintFormat("⏸️ EA PAUSADO até %s (perdas consecutivas: %d)", 
+                  TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES), 
+                  g_consecutiveLosses);
+      return false;
+     }
+   
+   // Resetar contadores no início do dia (00:00)
+   if(dt.hour == 0 && dt.min == 0)
+     {
+      MqlDateTime dtYesterday;
+      TimeToStruct(TimeCurrent() - 86400, dtYesterday);
+      
+      if(g_dailyStartBalance == 0.0 || dt.day != dtYesterday.day)
+        {
+         g_dailyStartBalance = currentBalance;
+         g_dailyDrawdownHit = false;
+         PrintFormat("📅 Novo dia: Balance inicial = %.2f", g_dailyStartBalance);
+        }
+     }
+   
+   // Resetar contadores no início da semana (Segunda 00:00)
+   if(dt.day_of_week == 1 && dt.hour == 0 && dt.min == 0)
+     {
+      MqlDateTime dtLastWeek;
+      TimeToStruct(TimeCurrent() - 604800, dtLastWeek);
+      
+      if(g_weeklyStartBalance == 0.0 || dt.day != dtLastWeek.day)
+        {
+         g_weeklyStartBalance = currentBalance;
+         g_weeklyDrawdownHit = false;
+         g_consecutiveLosses = 0;
+         PrintFormat("📅 Nova semana: Balance inicial = %.2f", g_weeklyStartBalance);
+        }
+     }
+   
+   // Inicializar se primeira execução
+   if(g_dailyStartBalance == 0.0) g_dailyStartBalance = currentBalance;
+   if(g_weeklyStartBalance == 0.0) g_weeklyStartBalance = currentBalance;
+   
+   // Calcular drawdowns
+   double dailyDD = ((g_dailyStartBalance - currentBalance) / g_dailyStartBalance) * 100.0;
+   double weeklyDD = ((g_weeklyStartBalance - currentBalance) / g_weeklyStartBalance) * 100.0;
+   
+   // Verificar drawdown diário
+   if(dailyDD >= MaxDailyDrawdown)
+     {
+      if(!g_dailyDrawdownHit)
+        {
+         g_dailyDrawdownHit = true;
+         string msg = StringFormat("🚨 DRAWDOWN DIÁRIO ATINGIDO: %.2f%% (limite: %.2f%%) - Trading PAUSADO até amanhã!",
+                                   dailyDD, MaxDailyDrawdown);
+         PrintFormat("%s", msg);
+         if(SendAlerts) SendNotification(msg);
+        }
+      return false;
+     }
+   
+   // Verificar drawdown semanal
+   if(weeklyDD >= MaxWeeklyDrawdown)
+     {
+      if(!g_weeklyDrawdownHit)
+        {
+         g_weeklyDrawdownHit = true;
+         string msg = StringFormat("🚨 DRAWDOWN SEMANAL ATINGIDO: %.2f%% (limite: %.2f%%) - Trading PAUSADO até segunda!",
+                                   weeklyDD, MaxWeeklyDrawdown);
+         PrintFormat("%s", msg);
+         if(SendAlerts) SendNotification(msg);
+        }
+      return false;
+     }
+   
    return true;
   }
 

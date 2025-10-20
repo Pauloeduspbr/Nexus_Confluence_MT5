@@ -786,38 +786,112 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
                TimeframeToString(g_tfMacro2), macro2Value,
                TimeframeToString(g_tfMacro3), macro3Value);
    
-   // VALIDAÇÃO 1: MACRO-1 e MACRO-2 devem estar DEFINIDOS (não neutros)
-   if(macro1Value == 0 || macro2Value == 0)
-   {
-      PrintFormat("⚠️ MACRO-1 ou MACRO-2 neutros/indefinidos - aguardar definição");
-      return result;
-   }
+   // ════════════════════════════════════════════════════════════════════════════
+   // 🔥 VALIDAÇÃO RELAXADA v4.10 - SOLUÇÃO PARA MERCADOS SIDEWAYS
+   // ════════════════════════════════════════════════════════════════════════════
+   //
+   // LÓGICA ANTIGA (v4.9 - MUITO RIGOROSA):
+   // - Exigia ambos MACRO definidos (não 0)
+   // - Exigia ambos na mesma direção
+   // - Resultado: ZERO trades em sideways
+   //
+   // LÓGICA NOVA (v4.10 - BALANCEADA):
+   // - Permite se pelo menos 1 MACRO FORTE (+2 ou -2)
+   // - Permite se ambos mesma direção OU um neutro
+   // - Rejeita apenas se conflitantes (+1 vs -1, por exemplo)
+   // ════════════════════════════════════════════════════════════════════════════
    
-   // ✅ CORREÇÃO CRÍTICA: VALIDAÇÃO 2 - Verificar DIREÇÃO (positivo/negativo), não valor exato
-   // +1 e +2 = AMBOS BULLISH (mesma direção)
-   // -1 e -2 = AMBOS BEARISH (mesma direção)
+   // Verificar se há tendência FORTE em pelo menos um MACRO
+   bool macro1Strong = (MathAbs(macro1Value) >= 2);
+   bool macro2Strong = (MathAbs(macro2Value) >= 2);
+   bool hasStrongTrend = (macro1Strong || macro2Strong);
+   
+   // Classificar direções
    bool macro1Bullish = (macro1Value > 0);
    bool macro2Bullish = (macro2Value > 0);
    bool macro1Bearish = (macro1Value < 0);
    bool macro2Bearish = (macro2Value < 0);
+   bool macro1Neutral = (macro1Value == 0);
+   bool macro2Neutral = (macro2Value == 0);
    
-   // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
-   if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
+   // Verificar se estão conflitando (direções opostas não-neutras)
+   bool areConflicting = ((macro1Bullish && macro2Bearish) || (macro1Bearish && macro2Bullish));
+   
+   // ✅ DECISÃO: Permitir trading se:
+   // 1. Pelo menos um MACRO está forte (+2 ou -2) E
+   // 2. Não estão conflitando (opostos)
+   //
+   // EXEMPLOS PERMITIDOS:
+   // H4=+2, H1=+1 ✅ (ambos bullish)
+   // H4=+2, H1=0  ✅ (um forte, outro neutro)
+   // H4=-2, H1=-1 ✅ (ambos bearish)
+   // H4=0, H1=+2  ✅ (um neutro, outro forte)
+   //
+   // EXEMPLOS REJEITADOS:
+   // H4=+1, H1=-1 ❌ (conflitantes sem força)
+   // H4=0, H1=0   ❌ (ambos neutros, sem tendência)
+   // H4=+2, H1=-1 ❌ (conflitantes)
+   
+   if(!hasStrongTrend)
    {
-      PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
+      PrintFormat("⚠️ Nenhum MACRO com tendência forte (abs >= 2) - MACRO-1=%+d, MACRO-2=%+d",
                   macro1Value, macro2Value);
+      PrintFormat("   Aguardando força em pelo menos um timeframe maior");
       return result;
    }
    
-   // ✅ MACRO-1 e MACRO-2 ALINHADOS NA MESMA DIREÇÃO!
-   result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+   if(areConflicting)
+   {
+      PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) CONFLITANTES (direções opostas)",
+                  macro1Value, macro2Value);
+      PrintFormat("   Aguardando alinhamento ou neutralização");
+      return result;
+   }
+   
+   // ✅ VALIDAÇÃO PASSOU! Determinar direção do trade
+   //
+   // Prioridade de decisão:
+   // 1. Se ambos mesma direção: usar essa direção
+   // 2. Se um neutro: usar o não-neutro
+   // 3. Se um forte: priorizar o forte
+   
+   TRADE_DIRECTION determinedDirection = TRADE_DIRECTION_NONE;
+   
+   if(macro1Bullish && macro2Bullish)
+   {
+      // Ambos bullish
+      determinedDirection = TRADE_DIRECTION_BUY;
+   }
+   else if(macro1Bearish && macro2Bearish)
+   {
+      // Ambos bearish
+      determinedDirection = TRADE_DIRECTION_SELL;
+   }
+   else if(macro1Neutral && !macro2Neutral)
+   {
+      // MACRO-1 neutro, usar MACRO-2
+      determinedDirection = (macro2Bullish) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+   }
+   else if(!macro1Neutral && macro2Neutral)
+   {
+      // MACRO-2 neutro, usar MACRO-1
+      determinedDirection = (macro1Bullish) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+   }
+   else
+   {
+      // Caso não identificado (não deveria chegar aqui)
+      PrintFormat("❌ ERRO LÓGICO: Estado não identificado - MACRO-1=%+d, MACRO-2=%+d", macro1Value, macro2Value);
+      return result;
+   }
+   
+   result.direction = determinedDirection;
    result.h4Aligned = true;
    result.h1Aligned = true;
    
-   // Calcular força do alinhamento (ambos +2/-2 = máximo)
+   // Calcular força do alinhamento
    int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
    
-   PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
+   PrintFormat("✅ VALIDAÇÃO MTF APROVADA: %s (MACRO-1=%+d, MACRO-2=%+d, Força min=%d)", 
                (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
                macro1Value, macro2Value, alignmentStrength);
    

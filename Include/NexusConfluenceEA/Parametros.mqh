@@ -264,7 +264,7 @@ input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
 input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
 input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
 input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
-input double SL_MaxDistancePoints     = 500.0;  // 📊 Distância máxima SL (pontos)
+input double SL_MaxDistancePoints     = 300.0;  // 📊 Distância máxima SL (pontos) - v4.22: 500→300 (30 pips forex)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
 input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
 input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.21";    // 🔥 LEITURA CANDLE FECHADO - Corrige sincronização timeframes superiores
+const string EA_VERSION = "4.22";    // 🔥 CORREÇÕES CRÍTICAS - SL máximo obrigatório + RSI OMA obrigatório
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

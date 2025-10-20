@@ -1,22 +1,19 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.21 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.21: CORREÇÃO CRÍTICA LEITURA GG TRENDBAR                   |
-//|   ❌ PROBLEMA v4.20: EA lia candle ATUAL [0] dos timeframes     |
-//|      - M30/H1/H4 podem NÃO ter atualizado no candle atual       |
-//|      - Exemplo: M30 visual VERDE mas buffer [0]=-1 (vermelho)   |
-//|      - CAUSA: ADX/PSAR ainda calculando novo candle             |
+//| Nexus Confluence EA v4.22 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.22: CORREÇÕES CRÍTICAS IDENTIFICADAS EM ANÁLISE DE IMAGENS |
 //|                                                                  |
-//|   ✅ SOLUÇÃO v4.21: Ler candle FECHADO [1]                      |
-//|      - Candle [1] tem valores CONFIRMADOS e DEFINITIVOS         |
-//|      - Garante sincronização entre todos os timeframes          |
-//|      - Logs mostram [0] vs [1] para debug                       |
+//|   ❌ BUG #1: Validação SL máximo não rejeitava (v4.21)          |
+//|      Problema: SL_MaxDistancePoints=500 mas permitia 800!        |
+//|      Resultado: TP's absurdos (120-240 pips), nunca atingidos   |
+//|      ✅ CORREÇÃO: Agora REJEITA se SL > 300 pontos (30 pips)    |
 //|                                                                  |
-//|   📊 EVIDÊNCIA: Imagens usuário vs logs                          |
-//|      - Imagem Jan 2: M30/H1/H4 TODOS VERDES                     |
-//|      - Log v4.20: M30=-1 (vermelho) → INCONSISTÊNCIA!          |
-//|      - Conclusão: Timing issue resolvido com candle [1]         |
+//|   ❌ BUG #2: RSI OMA podia ser ignorado se isValid=false        |
+//|      Evidência: Imagem 6 - RSI bullish mas EA vendeu!           |
+//|      ✅ CORREÇÃO: RSI OMA agora OBRIGATÓRIO - rejeita se inválido|
 //|                                                                  |
-//|   ⚠️ IMPACTO ESPERADO: +50% entradas (fix sincronização)        |
+//|   📊 AJUSTES: SL máximo 500→300 pontos (Forex razoável)         |
+//|                                                                  |
+//|   ⚠️ IMPACTO ESPERADO: Menos trades, mas mais qualidade         |
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |

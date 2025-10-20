@@ -426,11 +426,15 @@ bool ValidateRiskCalculation(const RiskCalculation &risk, string symbol)
       return false;
    }
    
-   // Validar se SL não está muito longe
+   // 🔥 v4.22 CORREÇÃO CRÍTICA: REJEITAR se SL muito distante
+   // BUG v4.21: Apenas alertava mas permitia SL de 800 pontos (limite 500!)
+   // Resultado: TP's absurdos (120-240 pips), nunca atingidos, breakeven/trailing nunca ativam
    double maxSLDistance = SL_MaxDistancePoints * _Point;
    if(risk.slDistance > maxSLDistance)
    {
-      PrintFormat("⚠️ Aviso: SL muito distante (%.1f pontos), mas permitindo", risk.slDistance/_Point);
+      PrintFormat("❌ SL muito distante (%.1f pontos > %.1f máximo) - REJEITADO", 
+                  risk.slDistance/_Point, SL_MaxDistancePoints);
+      return false;  // ✅ REJEITAR!
    }
    
    // Validar se SL não está muito perto

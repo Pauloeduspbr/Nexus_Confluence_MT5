@@ -1029,10 +1029,22 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
          PrintFormat("   ❌ WAE não alinhado (0 pontos)");
       }
       
-      // 2️⃣ RSI OMA - FORÇA RELATIVA
-      PrintFormat("2️⃣ RSI OMA (Força Relativa)...");
+      // 2️⃣ RSI OMA - FORÇA RELATIVA (OBRIGATÓRIO!)
+      PrintFormat("2️⃣ RSI OMA (Força Relativa - OBRIGATÓRIO)...");
       RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
-      if(rsi.isValid && rsi.isAligned)
+      
+      // 🔥 v4.22 CORREÇÃO CRÍTICA: RSI OMA OBRIGATÓRIO!
+      // BUG v4.21: Se rsi.isValid=false, continuava sem RSI
+      // Evidência: Imagem 6 mostrou RSI bullish mas EA vendeu!
+      if(!rsi.isValid)
+      {
+         PrintFormat("   ❌ RSI OMA INVÁLIDO - REJEITANDO SETUP COMPLETO!");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
+      }
+      
+      if(rsi.isAligned)
       {
          score.rsiomaPoints = 1;
          PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
@@ -1040,7 +1052,7 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
       }
       else
       {
-         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos)");
+         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos) - Mas VÁLIDO");
       }
       
       // 3️⃣ CURRENCY STRENGTH - CONTEXTO
@@ -1095,10 +1107,20 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
          PrintFormat("   ❌ WAE não alinhado (0 pontos)");
       }
       
-      // 2️⃣ RSI OMA - FORÇA RELATIVA
-      PrintFormat("2️⃣ RSI OMA (Força Relativa)...");
+      // 2️⃣ RSI OMA - FORÇA RELATIVA (OBRIGATÓRIO!)
+      PrintFormat("2️⃣ RSI OMA (Força Relativa - OBRIGATÓRIO)...");
       RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
-      if(rsi.isValid && rsi.isAligned)
+      
+      // 🔥 v4.22 CORREÇÃO CRÍTICA: RSI OMA OBRIGATÓRIO também para ÍNDICES!
+      if(!rsi.isValid)
+      {
+         PrintFormat("   ❌ RSI OMA INVÁLIDO - REJEITANDO SETUP COMPLETO!");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
+      }
+      
+      if(rsi.isAligned)
       {
          score.rsiomaPoints = 1;
          PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
@@ -1106,7 +1128,7 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
       }
       else
       {
-         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos)");
+         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos) - Mas VÁLIDO");
       }
       
       score.totalPoints = score.waePoints + score.rsiomaPoints;

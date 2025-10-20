@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.12 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.14 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -14,19 +14,21 @@
 //|   - GetWAESignal(): Lê WAE                                      |
 //|   - GetGGTrendBarSignal(): Lê GG TrendBar                       |
 //|   - CalculateSetupScore(): Pontua e classifica setup            |
+//|   - ReleaseIndicators(): Limpeza COMPLETA ao remover EA         |
 //|                                                                   |
 //| NOVO v4.12: Supertrend obrigatório + Hierarquia otimizada       |
-//|             (WAE → RSI → CS) conforme análise crítica            |
+//| NOVO v4.13: Limpeza total (handles + gráfico + objetos)         |
+//| 🔥 CRÍTICO v4.14: CORREÇÃO LÓGICA SUPERTREND (DBL_MAX)         |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.12 - Correções Hierarquia Filtros                     |
+//| VERSÃO: 4.14 - Correção Crítica Leitura Supertrend             |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.12"
-#property version   "4.12"
+#property copyright "Nexus Confluence EA v4.14"
+#property version   "4.14"
 #property strict
 
 // Incluir primeiro o arquivo de parâmetros
@@ -378,16 +380,20 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
                bufferUp[0], bufferDown[0],
                bufferUp[1], bufferDown[1]);
    
-   // CORREÇÃO CRÍTICA: Em Supertrend/TrendMagic, quando o buffer tem valor (não é EMPTY_VALUE),
-   // aquele é o buffer ATIVO. O outro buffer fica em EMPTY_VALUE ou 0.
+   // 🔥 CORREÇÃO CRÍTICA v4.14: TrendMagic usa DBL_MAX para buffer INATIVO!
+   // - bufferUp pequeno (< 1e10) = Linha UP ATIVA (tendência BULLISH)
+   // - bufferDown pequeno (< 1e10) = Linha DOWN ATIVA (tendência BEARISH)
+   // - Valor gigante (DBL_MAX ~1.7e308) = Linha INATIVA
    
-   // Determinar direção atual (qual linha tem valor válido)
-   bool currentBullish = (bufferUp[0] != EMPTY_VALUE && bufferUp[0] != 0);
-   bool currentBearish = (bufferDown[0] != EMPTY_VALUE && bufferDown[0] != 0);
+   double DBL_MAX_LIMIT = 1.0e10; // Threshold para detectar DBL_MAX
+   
+   // Determinar direção atual (qual linha tem valor VÁLIDO/PEQUENO)
+   bool currentBullish = (bufferUp[0] < DBL_MAX_LIMIT && bufferUp[0] > 0);
+   bool currentBearish = (bufferDown[0] < DBL_MAX_LIMIT && bufferDown[0] > 0);
    
    // Verificar se mudou de cor recentemente (últimos 2 candles)
-   bool wasBullish = (bufferUp[2] != EMPTY_VALUE && bufferUp[2] != 0);
-   bool wasBearish = (bufferDown[2] != EMPTY_VALUE && bufferDown[2] != 0);
+   bool wasBullish = (bufferUp[2] < DBL_MAX_LIMIT && bufferUp[2] > 0);
+   bool wasBearish = (bufferDown[2] < DBL_MAX_LIMIT && bufferDown[2] > 0);
    
    // Detectar mudança confirmada
    if(currentBullish && !wasBullish)
@@ -1116,19 +1122,167 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
 
 //+------------------------------------------------------------------+
 //| FUNÇÃO: ReleaseIndicators                                        |
-//| Libera todos os handles dos indicadores                         |
+//| Libera handles E remove objetos visuais do gráfico              |
 //+------------------------------------------------------------------+
 void ReleaseIndicators()
 {
-   PrintFormat("🔓 Liberando handles dos indicadores...");
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("🔓 LIMPANDO INDICADORES E OBJETOS VISUAIS...");
+   PrintFormat("════════════════════════════════════════════════════════════════");
    
-   if(g_handles.gg_global != INVALID_HANDLE)  IndicatorRelease(g_handles.gg_global);
-   if(g_handles.st_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.st_oper);
-   if(g_handles.wae_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.wae_oper);
-   if(g_handles.rsi_oper != INVALID_HANDLE)   IndicatorRelease(g_handles.rsi_oper);
-   if(g_handles.cs_oper != INVALID_HANDLE)    IndicatorRelease(g_handles.cs_oper);
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 1: Liberar handles (memória)
+   // ═══════════════════════════════════════════════════════════════
+   int handlesLiberados = 0;
    
-   PrintFormat("✅ Handles liberados");
+   if(g_handles.gg_global != INVALID_HANDLE)  
+   {
+      IndicatorRelease(g_handles.gg_global);
+      handlesLiberados++;
+      PrintFormat("   ✅ Handle GG TrendBar liberado");
+   }
+   
+   if(g_handles.st_oper != INVALID_HANDLE)    
+   {
+      IndicatorRelease(g_handles.st_oper);
+      handlesLiberados++;
+      PrintFormat("   ✅ Handle Supertrend liberado");
+   }
+   
+   if(g_handles.wae_oper != INVALID_HANDLE)   
+   {
+      IndicatorRelease(g_handles.wae_oper);
+      handlesLiberados++;
+      PrintFormat("   ✅ Handle WAE liberado");
+   }
+   
+   if(g_handles.rsi_oper != INVALID_HANDLE)   
+   {
+      IndicatorRelease(g_handles.rsi_oper);
+      handlesLiberados++;
+      PrintFormat("   ✅ Handle RSI OMA liberado");
+   }
+   
+   if(g_handles.cs_oper != INVALID_HANDLE)    
+   {
+      IndicatorRelease(g_handles.cs_oper);
+      handlesLiberados++;
+      PrintFormat("   ✅ Handle Currency Strength liberado");
+   }
+   
+   PrintFormat("📊 Total de handles liberados: %d", handlesLiberados);
+   
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 2: Remover TODOS os indicadores do gráfico (janelas)
+   // ═══════════════════════════════════════════════════════════════
+   int indicatorsRemoved = 0;
+   int totalWindows = (int)ChartGetInteger(0, CHART_WINDOWS_TOTAL);
+   
+   PrintFormat("\n🔍 Detectadas %d janelas no gráfico (incluindo principal)", totalWindows);
+   
+   // Remover indicadores das sub-janelas (janela 1, 2, 3...)
+   // IMPORTANTE: Começar do fim para não bagunçar índices
+   for(int window = totalWindows - 1; window >= 1; window--)
+   {
+      int indicatorsInWindow = ChartIndicatorsTotal(0, window);
+      PrintFormat("   📊 Janela %d: %d indicador(es)", window, indicatorsInWindow);
+      
+      // Remover todos os indicadores desta janela
+      for(int i = indicatorsInWindow - 1; i >= 0; i--)
+      {
+         string indicatorName = ChartIndicatorName(0, window, i);
+         if(indicatorName != "")
+         {
+            if(ChartIndicatorDelete(0, window, indicatorName))
+            {
+               indicatorsRemoved++;
+               PrintFormat("      ✅ Removido: %s", indicatorName);
+            }
+            else
+            {
+               PrintFormat("      ⚠️ Falha ao remover: %s", indicatorName);
+            }
+         }
+      }
+   }
+   
+   // Remover indicadores da janela principal (janela 0)
+   int mainWindowIndicators = ChartIndicatorsTotal(0, 0);
+   PrintFormat("   📊 Janela principal: %d indicador(es)", mainWindowIndicators);
+   
+   for(int i = mainWindowIndicators - 1; i >= 0; i--)
+   {
+      string indicatorName = ChartIndicatorName(0, 0, i);
+      if(indicatorName != "")
+      {
+         // FILTRO: Só remover indicadores do Nexus (evitar remover outros EAs)
+         if(StringFind(indicatorName, "GG_TrendBar") >= 0 ||
+            StringFind(indicatorName, "TrendMagic") >= 0 ||
+            StringFind(indicatorName, "Supertrend") >= 0 ||
+            StringFind(indicatorName, "WAE") >= 0 ||
+            StringFind(indicatorName, "Waddah") >= 0 ||
+            StringFind(indicatorName, "RSI") >= 0 ||
+            StringFind(indicatorName, "RSIOMA") >= 0 ||
+            StringFind(indicatorName, "Currency") >= 0 ||
+            StringFind(indicatorName, "Strength") >= 0)
+         {
+            if(ChartIndicatorDelete(0, 0, indicatorName))
+            {
+               indicatorsRemoved++;
+               PrintFormat("      ✅ Removido: %s", indicatorName);
+            }
+            else
+            {
+               PrintFormat("      ⚠️ Falha ao remover: %s", indicatorName);
+            }
+         }
+      }
+   }
+   
+   PrintFormat("📊 Total de indicadores removidos do gráfico: %d", indicatorsRemoved);
+   
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 3: Remover objetos gráficos (textos, linhas, etc)
+   // ═══════════════════════════════════════════════════════════════
+   int objectsRemoved = 0;
+   int totalObjects = ObjectsTotal(0);
+   
+   PrintFormat("\n🔍 Detectados %d objetos gráficos no gráfico", totalObjects);
+   
+   // Remover objetos que começam com prefixos conhecidos do Nexus
+   for(int i = totalObjects - 1; i >= 0; i--)
+   {
+      string objName = ObjectName(0, i);
+      
+      // FILTRO: Só remover objetos do Nexus
+      if(StringFind(objName, "Nexus") >= 0 ||
+         StringFind(objName, "GG_") >= 0 ||
+         StringFind(objName, "TM_") >= 0 ||
+         StringFind(objName, "WAE_") >= 0 ||
+         StringFind(objName, "RSI_") >= 0 ||
+         StringFind(objName, "CS_") >= 0)
+      {
+         if(ObjectDelete(0, objName))
+         {
+            objectsRemoved++;
+            PrintFormat("   ✅ Objeto removido: %s", objName);
+         }
+      }
+   }
+   
+   PrintFormat("📊 Total de objetos gráficos removidos: %d", objectsRemoved);
+   
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 4: Forçar redesenho do gráfico
+   // ═══════════════════════════════════════════════════════════════
+   ChartRedraw(0);
+   
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("✅ LIMPEZA COMPLETA!");
+   PrintFormat("   Handles liberados: %d", handlesLiberados);
+   PrintFormat("   Indicadores removidos: %d", indicatorsRemoved);
+   PrintFormat("   Objetos removidos: %d", objectsRemoved);
+   PrintFormat("════════════════════════════════════════════════════════════════");
 }
 
 //+------------------------------------------------------------------+

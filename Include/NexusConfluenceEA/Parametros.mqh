@@ -376,14 +376,18 @@ input double             GG_Step_Psar  = 0.02;         // PSAR Step
 input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
 
 input group "════════════════════════════════════════════════════════"
+input group "  🔐 IDENTIFICAÇÃO DO EA                              "
+input group "════════════════════════════════════════════════════════"
+input int    EA_MAGIC_NUMBER = 20241015;  // 🔐 Magic Number (único por instância!)
+
+input group "════════════════════════════════════════════════════════"
 input group "     ✅ FIM DOS PARÂMETROS - TOTAL: 90+ INPUTS         "
 input group "════════════════════════════════════════════════════════"
 
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const int    EA_MAGIC_NUMBER = 20241015;  // Magic Number do EA
-const string EA_VERSION      = "4.12";    // Versão do EA (Correções Hierarquia Filtros)
+const string EA_VERSION      = "4.14";    // 🔥 CRÍTICO: Correção Lógica Supertrend (DBL_MAX)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

@@ -1,16 +1,22 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.20 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.20: ANÁLISE COMPLETA - MÚLTIPLOS BUGS BLOQUEIO IDENTIFICADOS|
-//|   ❌ BUG #1: Comparação M30 ERRADA (comparava com H4, não direção)|
-//|      ✅ CORREÇÃO: Compara M30 com DIREÇÃO do setup              |
-//|   ❌ BUG #2: AllowGoodSetups=false rejeitava setups 2/2 válidos |
-//|      ✅ CORREÇÃO: Permite GOOD quando M30 divergente + flag true|
-//|   🔍 DEBUG: Logs MASSIVOS de TODOS os valores lidos             |
-//|      - GG TrendBar RAW (double antes conversão)                 |
-//|      - GG TrendBar INT (após conversão)                         |
-//|      - Supertrend completo (isValid, direction, strength, turn) |
-//|      - Comparação detalhada MACRO vs MICRO                      |
-//|   ⚠️ IMPACTO ESPERADO: +200% entradas (bugs bloqueavam 90%!)    |
+//| Nexus Confluence EA v4.21 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.21: CORREÇÃO CRÍTICA LEITURA GG TRENDBAR                   |
+//|   ❌ PROBLEMA v4.20: EA lia candle ATUAL [0] dos timeframes     |
+//|      - M30/H1/H4 podem NÃO ter atualizado no candle atual       |
+//|      - Exemplo: M30 visual VERDE mas buffer [0]=-1 (vermelho)   |
+//|      - CAUSA: ADX/PSAR ainda calculando novo candle             |
+//|                                                                  |
+//|   ✅ SOLUÇÃO v4.21: Ler candle FECHADO [1]                      |
+//|      - Candle [1] tem valores CONFIRMADOS e DEFINITIVOS         |
+//|      - Garante sincronização entre todos os timeframes          |
+//|      - Logs mostram [0] vs [1] para debug                       |
+//|                                                                  |
+//|   📊 EVIDÊNCIA: Imagens usuário vs logs                          |
+//|      - Imagem Jan 2: M30/H1/H4 TODOS VERDES                     |
+//|      - Log v4.20: M30=-1 (vermelho) → INCONSISTÊNCIA!          |
+//|      - Conclusão: Timing issue resolvido com candle [1]         |
+//|                                                                  |
+//|   ⚠️ IMPACTO ESPERADO: +50% entradas (fix sincronização)        |
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |

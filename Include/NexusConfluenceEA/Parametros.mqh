@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION      = "4.20";    // 🔥 ANÁLISE COMPLETA - Bugs bloqueio identificados e corrigidos
+const string EA_VERSION = "4.21";    // 🔥 LEITURA CANDLE FECHADO - Corrige sincronização timeframes superiores
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

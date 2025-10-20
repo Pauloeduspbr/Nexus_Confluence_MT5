@@ -671,46 +671,46 @@ GGTrendBarSignal GetGGTrendBarSignal()
    
    // GG TrendBar tem 18 buffers (9 TFs × 2)
    // Buffers de dados: 0=M1, 2=M5, 4=M15, 6=M30, 8=H1, 10=H4, 12=D1, 14=W1, 16=MN1
-   double gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1];
+   // 🔥 v4.21: LER CANDLE FECHADO [1] ao invés do atual [0] para garantir valores CONFIRMADOS
+   double gg_m1[2], gg_m5[2], gg_m15[2], gg_m30[2], gg_h1[2], gg_h4[2], gg_d1[2], gg_w1[2], gg_mn1[2];
    
-   if(CopyBuffer(g_handles.gg_global, 0, 0, 1, gg_m1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 2, 0, 1, gg_m5) != 1 ||
-      CopyBuffer(g_handles.gg_global, 4, 0, 1, gg_m15) != 1 ||
-      CopyBuffer(g_handles.gg_global, 6, 0, 1, gg_m30) != 1 ||
-      CopyBuffer(g_handles.gg_global, 8, 0, 1, gg_h1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 10, 0, 1, gg_h4) != 1 ||
-      CopyBuffer(g_handles.gg_global, 12, 0, 1, gg_d1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 14, 0, 1, gg_w1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 16, 0, 1, gg_mn1) != 1)
+   if(CopyBuffer(g_handles.gg_global, 0, 0, 2, gg_m1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 2, 0, 2, gg_m5) != 2 ||
+      CopyBuffer(g_handles.gg_global, 4, 0, 2, gg_m15) != 2 ||
+      CopyBuffer(g_handles.gg_global, 6, 0, 2, gg_m30) != 2 ||
+      CopyBuffer(g_handles.gg_global, 8, 0, 2, gg_h1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 10, 0, 2, gg_h4) != 2 ||
+      CopyBuffer(g_handles.gg_global, 12, 0, 2, gg_d1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 14, 0, 2, gg_w1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 16, 0, 2, gg_mn1) != 2)
    {
       PrintFormat("❌ Erro ao copiar buffers GG TrendBar");
       return result;
    }
    
-   // 🔥 v4.20: LOG DETALHADO dos valores RAW lidos do indicador
-   PrintFormat("🔍 [DEBUG GG TRENDBAR] Valores RAW dos buffers:");
-   PrintFormat("   Buffer[0] M1  = %.0f", gg_m1[0]);
-   PrintFormat("   Buffer[1] M5  = %.0f", gg_m5[0]);
-   PrintFormat("   Buffer[2] M15 = %.0f", gg_m15[0]);
-   PrintFormat("   Buffer[3] M30 = %.0f", gg_m30[0]);
-   PrintFormat("   Buffer[4] H1  = %.0f", gg_h1[0]);
-   PrintFormat("   Buffer[5] H4  = %.0f", gg_h4[0]);
-   PrintFormat("   Buffer[6] D1  = %.0f", gg_d1[0]);
-   PrintFormat("   Buffer[7] W1  = %.0f", gg_w1[0]);
-   PrintFormat("   Buffer[8] MN1 = %.0f", gg_mn1[0]);
+   // 🔥 v4.21: COMPARAR CANDLE ATUAL [0] vs CANDLE FECHADO [1]
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] CANDLE ATUAL [0] (pode estar incompleto):");
+   PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
+               gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
    
-   // Preencher valores (+1 = bullish, 0 = neutral, -1 = bearish)
-   result.m1Value = (int)gg_m1[0];
-   result.m5Value = (int)gg_m5[0];
-   result.m15Value = (int)gg_m15[0];
-   result.m30Value = (int)gg_m30[0];
-   result.h1Value = (int)gg_h1[0];
-   result.h4Value = (int)gg_h4[0];
-   result.d1Value = (int)gg_d1[0];
-   result.w1Value = (int)gg_w1[0];
-   result.mn1Value = (int)gg_mn1[0];
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] CANDLE FECHADO [1] (VALORES CONFIRMADOS - USADO PELO EA):");
+   PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
+               gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1]);
    
-   PrintFormat("🔍 [DEBUG GG TRENDBAR] Valores convertidos (int):");
+   // 🔥 v4.21: USAR CANDLE FECHADO [1] para garantir valores CONFIRMADOS
+   // Problema v4.20: Timeframes superiores (M30/H1/H4) podem não ter atualizado no candle atual [0]
+   // Solução: Usar último candle FECHADO [1] que tem valores definitivos
+   result.m1Value = (int)gg_m1[1];
+   result.m5Value = (int)gg_m5[1];
+   result.m15Value = (int)gg_m15[1];
+   result.m30Value = (int)gg_m30[1];
+   result.h1Value = (int)gg_h1[1];
+   result.h4Value = (int)gg_h4[1];
+   result.d1Value = (int)gg_d1[1];
+   result.w1Value = (int)gg_w1[1];
+   result.mn1Value = (int)gg_mn1[1];
+   
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] Valores convertidos (int) do candle [1]:");
    PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
                result.m1Value, result.m5Value, result.m15Value, result.m30Value,
                result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);

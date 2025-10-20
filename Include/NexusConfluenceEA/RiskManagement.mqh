@@ -28,8 +28,8 @@
 //| DATA: Outubro 2025                                               |
 //| VERSÃO: 4.24 - Sistema Bloqueio Limitado                        |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.24"
-#property version   "4.24"
+#property copyright "Nexus Confluence EA v4.26"
+#property version   "4.26"
 #property strict
 
 #include "Parametros.mqh"

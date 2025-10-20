@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.25";    // 🔥 v4.25: CORREÇÃO FINAL - TODOS os bloqueios limitados a 12h máximo (DD diário/semanal/perdas consecutivas)
+const string EA_VERSION = "4.26";    // 🔥 v4.26: SINCRONISMO PERFEITO - Todos indicadores leem candle FECHADO [1] (valores confirmados = sinais visuais!)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

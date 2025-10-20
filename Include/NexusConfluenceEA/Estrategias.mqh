@@ -31,8 +31,8 @@
 //| DATA: Outubro 2025                                               |
 //| VERSÃO: 4.23 - Correção Crítica Abertura Ordens                 |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.23"
-#property version   "4.23"
+#property copyright "Nexus Confluence EA v4.26"
+#property version   "4.26"
 #property strict
 
 // Incluir primeiro o arquivo de parâmetros

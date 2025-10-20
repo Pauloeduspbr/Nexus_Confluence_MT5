@@ -1,144 +1,135 @@
+; saved automatically on 2025.10.20 18:00:00
 ; Nexus Confluence EA v4.16 - Configuração Otimizada Baseline
 ; Data: 20/10/2025
 ; Objetivo: Corrigir PF 1.10/DD 55% para PF 1.5+/DD <20%
-; Perfil: Conservador com TP's estendidos
+; Perfil: Conservador com TP's estendidos + Todos parametros ajustaveis
 
 ; ═══════════════════════════════════════════════════════════════
 ; 💰 GESTÃO DE RISCO - CONSERVADOR
 ; ═══════════════════════════════════════════════════════════════
-AccountRiskPercent=0.5        ; Reduzido para controlar DD
-MaxRiskPremium=1.0            ; Máximo apenas em PREMIUM 3/3
-MaxDailyDrawdown=3.0          ; Pausa se perder 3% no dia
-MaxWeeklyDrawdown=5.0         ; Pausa se perder 5% na semana
-MaxConsecutiveLosses=3        ; Pausa após 3 perdas seguidas
-MaxSimultaneousTrades=3       ; Máximo 3 posições abertas
-FixedLotSize=0.0              ; Automático por risco %
+AccountRiskPercent=0.5||0.5||0.1||5.0||N
+MaxRiskPremium=1.0||1.0||0.1||5.0||N
+MaxDailyDrawdown=3.0||3.0||0.5||10.0||N
+MaxWeeklyDrawdown=5.0||5.0||1.0||20.0||N
+MaxConsecutiveLosses=3||3||1||10||N
+MaxSimultaneousTrades=3||3||1||10||N
+FixedLotSize=0.0||0.0||0.0||10.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 🛡️ STOP LOSS ESTRUTURAL - PARAMETRIZADO
 ; ═══════════════════════════════════════════════════════════════
-SL_UseStructure=true          ; Usar estrutura de preços
-SL_StructureCandles=50        ; Analisar últimos 50 candles
-SL_StructureStrength=2.0      ; Swing forte (2x ATR)
-SL_SafetyMultiplier=1.2       ; +20% margem de segurança
-SL_BufferPoints=10.0          ; Buffer adicional 10 pontos
-SL_FallbackPercent=0.3        ; 0.3% do preço se estrutura falhar
-SL_MinDistancePoints=50.0     ; Mínimo 50 pontos
-SL_MaxDistancePoints=500.0    ; Máximo 500 pontos
+SL_UseStructure=true||true|||N
+SL_StructureCandles=50||50||20||100||N
+SL_StructureStrength=2.0||2.0||1.0||5.0||N
+SL_SafetyMultiplier=1.2||1.2||1.0||2.0||N
+SL_BufferPoints=10.0||10.0||0.0||50.0||N
+SL_FallbackPercent=0.3||0.3||0.1||1.0||N
+SL_MinDistancePoints=50.0||50.0||10.0||200.0||N
+SL_MaxDistancePoints=500.0||500.0||100.0||2000.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 🎯 TAKE PROFIT DINÂMICO - BASEADO EM ATR
 ; ═══════════════════════════════════════════════════════════════
-EnablePartialTP=true          ; Saídas parciais ATIVAS
-TP_UseATR=true                ; TPs baseados em ATR
-TP1_RR=1.5                    ; 🔥 v4.16: 1.0→1.5 (melhorar payoff)
-TP2_RR=3.0                    ; 🔥 v4.16: 2.0→3.0 (capturar movimento)
-TP3_RR=5.0                    ; 🔥 v4.16: 3.0→5.0 (movimentos grandes)
-UseTP3=false                  ; TP3 desabilitado por padrão
-
-; TPs baseados em ATR (se TP_UseATR=true)
-TP1_ATRMultiplier=2.0         ; TP1 = 2x ATR
-TP2_ATRMultiplier=4.0         ; TP2 = 4x ATR
-TP3_ATRMultiplier=6.0         ; TP3 = 6x ATR
-TP_MinRRRatio=1.2             ; Rejeitar se RR < 1:1.2
-
-; Percentuais de fechamento
-TP1_ClosePercent=40.0         ; 🔥 v4.16: 50→40% (deixar correr mais)
-TP2_ClosePercent=40.0         ; 🔥 v4.16: 30→40% (equilíbrio)
-TP3_ClosePercent=20.0         ; Fechar restante
+EnablePartialTP=true||true|||N
+TP_UseATR=true||true|||N
+TP1_RR=1.5||1.5||0.5||5.0||N
+TP2_RR=3.0||3.0||1.0||10.0||N
+TP3_RR=5.0||5.0||2.0||20.0||N
+UseTP3=false||false|||N
+TP1_ATRMultiplier=2.0||2.0||0.5||10.0||N
+TP2_ATRMultiplier=4.0||4.0||1.0||20.0||N
+TP3_ATRMultiplier=6.0||6.0||2.0||30.0||N
+TP_MinRRRatio=1.2||1.2||0.5||3.0||N
+TP1_ClosePercent=40.0||40.0||10.0||100.0||N
+TP2_ClosePercent=40.0||40.0||10.0||100.0||N
+TP3_ClosePercent=20.0||20.0||10.0||100.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 📈 TRAILING STOP AVANÇADO
 ; ═══════════════════════════════════════════════════════════════
-EnableTrailing=true           ; Trailing ATIVO
-TrailingUseATR=true           ; Baseado em ATR
-TrailingATRMultiplier=2.5     ; 2.5x ATR
-TrailingDistancePoints=200.0  ; Fallback se ATR desabilitado
-TrailingStepPoints=50.0       ; Passo mínimo 50 pontos
-TrailingActivationRR=1.5      ; Ativar após 1.5:1
-TrailingStartAfterTP=true     ; 🔥 v4.16: Só após TP1 fechado
-TrailingMinProfit=0.5         ; 🔥 v4.16: Lucro mín 0.5% para ativar
-TrailingMaxRisk=0.2           ; 🔥 v4.16: Risco máx 0.2%
+EnableTrailing=true||true|||N
+TrailingUseATR=true||true|||N
+TrailingATRMultiplier=2.5||2.5||1.0||10.0||N
+TrailingDistancePoints=200.0||200.0||50.0||1000.0||N
+TrailingStepPoints=50.0||50.0||10.0||200.0||N
+TrailingActivationRR=1.5||1.5||0.5||5.0||N
+TrailingStartAfterTP=true||true|||N
+TrailingMinProfit=0.5||0.5||0.1||5.0||N
+TrailingMaxRisk=0.2||0.2||0.0||1.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 🛡️ BREAKEVEN E PROTEÇÃO DE LUCRO
 ; ═══════════════════════════════════════════════════════════════
-EnableBreakeven=true          ; 🔥 v4.16: ATIVO
-BreakevenAfterRR=1.0          ; Mover BE após 1:1
-BreakevenPlusPoints=5.0       ; BE + 5 pontos (lucro mínimo)
-EnableProfitLock=true         ; 🔥 v4.16: Travar lucro
-LockProfitAfterRR=2.0         ; Travar após 2:1
-LockProfitPercent=50.0        ; Travar 50% do lucro flutuante
+EnableBreakeven=true||true|||N
+BreakevenAfterRR=1.0||1.0||0.5||3.0||N
+BreakevenPlusPoints=5.0||5.0||0.0||50.0||N
+EnableProfitLock=true||true|||N
+LockProfitAfterRR=2.0||2.0||1.0||5.0||N
+LockProfitPercent=50.0||50.0||10.0||100.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 💰 RISCO ADAPTATIVO - DESABILITADO (Conservador)
 ; ═══════════════════════════════════════════════════════════════
-UseAdaptiveSizing=false       ; Desabilitado (testar primeiro fixo)
-WinStreakMultiplier=1.2       ; Se ativar: +20% após ganhos
-WinStreakThreshold=2          ; 2 ganhos para aumentar
-LossStreakDivisor=0.5         ; Se ativar: -50% após perdas
-LossStreakThreshold=2         ; 2 perdas para reduzir
-MaxPositionMultiplier=2.0     ; Máximo 2x lote base
-MaxDailyLoss=5.0              ; Perda máx 5% dia (pausa)
-MaxWeeklyLoss=10.0            ; Perda máx 10% semana (pausa)
-ReduceRiskAfterLoss=true      ; Reduzir risco após perdas
-RiskReductionFactor=0.5       ; Reduzir 50%
-RecoveryMode=false            ; Modo recuperação OFF
+UseAdaptiveSizing=false||false|||N
+WinStreakMultiplier=1.2||1.2||1.0||3.0||N
+WinStreakThreshold=2||2||1||10||N
+LossStreakDivisor=0.5||0.5||0.1||1.0||N
+LossStreakThreshold=2||2||1||10||N
+MaxPositionMultiplier=2.0||2.0||1.0||5.0||N
+MaxDailyLoss=5.0||5.0||1.0||20.0||N
+MaxWeeklyLoss=10.0||10.0||2.0||50.0||N
+ReduceRiskAfterLoss=true||true|||N
+RiskReductionFactor=0.5||0.5||0.1||1.0||N
+RecoveryMode=false||false|||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 🎯 QUALIDADE DE SETUP (Confluência)
 ; ═══════════════════════════════════════════════════════════════
-MinConfluenceScore=75         ; 🔥 v4.16: Pontuação mínima 75/100
-RequireSupertrend=true        ; Supertrend OBRIGATÓRIO
-RequireADXConfirmation=false  ; ADX opcional (testar depois)
-MinADXStrength=20.0           ; Se RequireADX=true
-RequireVolumeConfirm=false    ; Volume opcional
-VolumeMultiplier=1.2          ; 1.2x volume médio
+MinConfluenceScore=75||75||50||100||N
+RequireSupertrend=true||true|||N
+RequireADXConfirmation=false||false|||N
+MinADXStrength=20.0||20.0||10.0||50.0||N
+RequireVolumeConfirm=false||false|||N
+VolumeMultiplier=1.2||1.2||1.0||3.0||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; ⏰ HORÁRIOS - LONDRES/NY OVERLAP (10-16h BR)
 ; ═══════════════════════════════════════════════════════════════
-UseCustomTradingHours=true    ; Horários customizados ATIVOS
-CustomStartHour=10            ; Início 10:00 BR
-CustomStartMinute=0
-CustomEndHour=16              ; Fim 16:00 BR
-CustomEndMinute=0
-
-; Dias da semana
-TradeOnMonday=true
-TradeOnTuesday=true
-TradeOnWednesday=true
-TradeOnThursday=true
-TradeOnFriday=true
-TradeOnSaturday=false
-TradeOnSunday=false
+UseCustomTradingHours=true||true|||N
+CustomStartHour=10||10||0||23||N
+CustomStartMinute=0||0||0||59||N
+CustomEndHour=16||16||0||23||N
+CustomEndMinute=0||0||0||59||N
+TradeOnMonday=true||true|||N
+TradeOnTuesday=true||true|||N
+TradeOnWednesday=true||true|||N
+TradeOnThursday=true||true|||N
+TradeOnFriday=true||true|||N
+TradeOnSaturday=false||false|||N
+TradeOnSunday=false||false|||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 📊 FILTROS E VALIDAÇÕES
 ; ═══════════════════════════════════════════════════════════════
-AllowGoodSetups=false         ; 🔥 Apenas PREMIUM 3/3
-AllowCautiousSetups=false     ; Sem setups cautelosos
-ValidateATRRange=true         ; Validar ATR
-UseADXFilter=false            ; ADX filter OFF (testar depois)
-ADX_Period=14
-ADX_MinTrend=25.0
-AvoidNews=true                ; Evitar notícias
-MaxSpreadMultiplier=5.0       ; 5x spread tolerância (testes)
+AllowGoodSetups=false||false|||N
+AllowCautiousSetups=false||false|||N
+ValidateATRRange=true||true|||N
+UseADXFilter=false||false|||N
+ADX_Period=14||14||5||50||N
+ADX_MinTrend=25.0||25.0||10.0||50.0||N
+AvoidNews=true||true|||N
+MaxSpreadMultiplier=5.0||5.0||1.0||100.0||N
+EnableSecondaryHours=true||true|||N
+EnableMorningB3=false||false|||N
 
 ; ═══════════════════════════════════════════════════════════════
 ; 🛡️ PROTEÇÕES GERAIS
 ; ═══════════════════════════════════════════════════════════════
-MaxSlippagePoints=30          ; Desvio máximo 30 pontos
-LookbackStructureBars=80      ; 80 candles para estrutura
-BrokerGMTOffset=2             ; GMT+2 (inverno)
-SendAlerts=true               ; Notificações ATIVAS
-EnableSecondaryHours=true     ; Horários secundários Forex
-EnableMorningB3=false         ; Sessão manhã B3 OFF
+MaxSlippagePoints=30||30||5||100||N
+LookbackStructureBars=80||80||20||200||N
+BrokerGMTOffset=2||2||-12||12||N
+SendAlerts=true||true|||N
 
-; ═══════════════════════════════════════════════════════════════
-; 🎯 MODO DE POSIÇÕES
-; ═══════════════════════════════════════════════════════════════
-PositionControlMode=2         ; PROTECTED (múltiplas com limite)
 
 ; ═══════════════════════════════════════════════════════════════
 ; 📝 NOTAS DE CONFIGURAÇÃO

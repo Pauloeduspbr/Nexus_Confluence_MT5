@@ -238,7 +238,7 @@ input bool   AvoidNews                = true;  // 📰 Evitar operar próximo a 
 input bool   ValidateATRRange         = true;  // 📏 Validar ATR ideal por ativo
 input bool   SendAlerts               = true;  // 🔔 Enviar notificações push
 input bool   AllowCautiousSetups      = false; // ⚠️ Permitir setups CAUTELOSOS (2/2 + MACRO-3 oposto)
-input bool   AllowGoodSetups          = false; // 🔥 v4.15: OPERAR APENAS PREMIUM (3/3 filtros)
+input bool   AllowGoodSetups          = true;  // 🔥 v4.17: PERMITIR GOOD (2/3 filtros) - era false
 
 input group "=== 💰 GESTÃO DE LOTE ==="
 input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)
@@ -272,12 +272,12 @@ input double SL_SafetyMultiplier      = 1.2;    // 🛡️ Margem de segurança 
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
-input double TP1_RR                   = 1.5;    // 🎯 TP1 Risk/Reward - 🔥 v4.16: 1.0→1.5
-input double TP2_RR                   = 3.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.16: 2.0→3.0
-input double TP3_RR                   = 5.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.16: 3.0→5.0
+input double TP1_RR                   = 2.0;    // 🎯 TP1 Risk/Reward - 🔥 v4.17: 1.5→2.0 (+33%)
+input double TP2_RR                   = 4.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.17: 3.0→4.0 (+33%)
+input double TP3_RR                   = 6.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.17: 5.0→6.0 (+20%)
 input bool   UseTP3                   = false;  // 🎯 Ativar TP3
-input double TP1_ClosePercent         = 40.0;   // 📊 % posição fechar no TP1 - 🔥 v4.16: 50→40
-input double TP2_ClosePercent         = 40.0;   // 📊 % posição fechar no TP2 - 🔥 v4.16: 30→40
+input double TP1_ClosePercent         = 30.0;   // 📊 % posição fechar no TP1 - 🔥 v4.17: 40→30 (deixar correr)
+input double TP2_ClosePercent         = 50.0;   // 📊 % posição fechar no TP2 - 🔥 v4.17: 40→50 (fechar mais)
 input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP3 (restante)
 input bool   TP_UseATR                = true;   // 📊 Usar ATR para cálculo de TP (dinâmico)
 input double TP1_ATRMultiplier        = 2.0;    // 📊 TP1 = X vezes ATR (se TP_UseATR=true)
@@ -329,8 +329,8 @@ input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
-input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 (75 = bom, 90 = excelente)
-input bool   RequireSupertrend        = true;  // ⚠️ Supertrend obrigatório sempre
+input int    MinConfluenceScore       = 60;    // 📊 Pontuação mínima 0-100 - 🔥 v4.17: 75→60 (relaxar)
+input bool   RequireSupertrend        = false; // ⚠️ Supertrend obrigatório - 🔥 v4.17: true→false (TESTAR SEM)
 input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
 input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true
 input bool   RequireVolumeConfirm     = false; // 📊 Requer volume acima da média

@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.16 - Sistema Universal Multi-Timeframe    |
+//| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |
 //| Descrição: Expert Advisor completo que implementa sistema        |
@@ -26,10 +26,16 @@
 //|   - Controle granular de drawdown                              |
 //|   - Breakeven/Lock profit parametrizados                        |
 //|   - Qualidade de setup ajustável                                |
+//| 🔥 v4.17: CORREÇÕES CRÍTICAS BUGS IDENTIFICADOS                |
+//|   - DEBUG MASSIVO: Logs detalhados sinais SELL                  |
+//|   - PROTEÇÃO DD REFORÇADA: Verificação início OnTick()          |
+//|   - TP's AUMENTADOS: 1.5→2.0, 3.0→4.0, 5.0→6.0                |
+//|   - FILTROS RELAXADOS: MinScore 75→60, GOOD permitido          |
+//|   - PAUSA VISÍVEL: Contador perdas + notificações              |
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.16 - Parametrização Total                            |
+//| Versão: 4.17 - Correções Críticas 5 Bugs                       |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
@@ -202,9 +208,31 @@ void OnTick()
                TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
    PrintFormat("════════════════════════════════════════════════════════════════");
    
+   // 🔥 v4.17: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO (PROTEÇÃO DD)
+   if(g_pauseUntilTime > TimeCurrent())
+   {
+      static datetime lastPauseLog = 0;
+      if(TimeCurrent() - lastPauseLog > 3600)  // Log 1x por hora
+      {
+         int hoursRemaining = (int)((g_pauseUntilTime - TimeCurrent()) / 3600);
+         PrintFormat("⏸️ SISTEMA PAUSADO - Tempo restante: %d horas", hoursRemaining);
+         PrintFormat("   Motivo: Drawdown ou perdas consecutivas");
+         PrintFormat("   Pausado até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         lastPauseLog = TimeCurrent();
+      }
+      return;
+   }
+
    // ETAPA 1: Validações básicas de segurança
    if(!ValidateBasicConditions())
       return;
+
+   // 🔥 v4.17: ETAPA 1.5: VERIFICAR DRAWDOWN ANTES DE QUALQUER ANÁLISE
+   if(!ValidateDrawdownLimits())
+   {
+      PrintFormat("🛑 DRAWDOWN LIMIT ATINGIDO - Sistema pausado");
+      return;
+   }
 
    // ETAPA 2: Análise multi-timeframe OBRIGATÓRIA
    MultiTFResult mtf = AnalyzeMultiTimeframeAlignment();
@@ -217,12 +245,39 @@ void OnTick()
    PrintFormat("✅ DEBUG ETAPA 2: Multi-timeframe ALINHADO - Direção: %s", 
                (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA");
 
+   // 🔥 v4.17: DEBUG DETALHADO DIREÇÃO DETECTADA
+   string directionStr = (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : 
+                         (mtf.direction == TRADE_DIRECTION_SELL) ? "VENDA" : "NENHUMA";
+   PrintFormat("🎯 v4.17 DEBUG: Direção detectada = %s (%d)", directionStr, mtf.direction);
+   
+   if(mtf.direction == TRADE_DIRECTION_SELL)
+   {
+      PrintFormat("═══════════════════════════════════════════════════════════════");
+      PrintFormat("🔍 v4.17: SINAL DE VENDA DETECTADO - ANÁLISE COMPLETA");
+      PrintFormat("═══════════════════════════════════════════════════════════════");
+      PrintFormat("  📊 Multi-TF Válido: %s", mtf.isValid ? "SIM" : "NÃO");
+      PrintFormat("  📊 H4 Alinhado: %s", mtf.h4Aligned ? "SIM" : "NÃO");
+      PrintFormat("  📊 H1 Alinhado: %s", mtf.h1Aligned ? "SIM" : "NÃO");
+      PrintFormat("  📊 M30 Alinhado: %s", mtf.m30Aligned ? "SIM" : "NÃO");
+      PrintFormat("═══════════════════════════════════════════════════════════════");
+   }
+
    // ETAPA 3: Calcular pontuação dos filtros micro
    SetupScore score = CalculateSetupScore(_Symbol, g_currentAssetClass, mtf.direction, mtf.m30Aligned);
    PrintFormat("📊 DEBUG ETAPA 3: Setup calculado - Pontos: %d/%d | Classificação: %s",
                score.totalPoints, score.requiredPoints,
                (score.classification == SETUP_PREMIUM) ? "PREMIUM" : 
                (score.classification == SETUP_GOOD) ? "GOOD" : "REJECT");
+   
+   // 🔥 v4.17: DEBUG EXTRA PARA VENDAS
+   if(mtf.direction == TRADE_DIRECTION_SELL)
+   {
+      PrintFormat("  🔍 FILTROS VENDA:");
+      PrintFormat("     RSI OMA: Pontos=%d", score.rsiomaPoints);
+      PrintFormat("     WAE: Pontos=%d", score.waePoints);
+      PrintFormat("     Currency Strength: Pontos=%d", score.currencyStrengthPoints);
+      PrintFormat("     TOTAL: %d/%d pontos", score.totalPoints, score.requiredPoints);
+   }
 
    // ETAPA 4: Validar classificação do setup
    if(score.classification == SETUP_REJECT)
@@ -408,6 +463,92 @@ string AssetClassToString(ASSET_CLASS cls)
      }
   }
 
+
+//+------------------------------------------------------------------+
+//| 🔥 v4.17: Validação de Drawdown REFORÇADA (Crítico!)           |
+//+------------------------------------------------------------------+
+bool ValidateDrawdownLimits()
+  {
+   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
+   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   
+   // PROTEÇÃO 1: Drawdown Diário
+   if(g_dailyStartBalance > 0)
+     {
+      double dailyDD = ((g_dailyStartBalance - equity) / g_dailyStartBalance) * 100.0;
+      if(dailyDD >= MaxDailyDrawdown)
+        {
+         PrintFormat("🔴 DRAWDOWN DIÁRIO ATINGIDO: %.2f%% >= %.2f%%", dailyDD, MaxDailyDrawdown);
+         PrintFormat("   Balance início dia: $%.2f", g_dailyStartBalance);
+         PrintFormat("   Equity atual: $%.2f", equity);
+         PrintFormat("   Perda: $%.2f", g_dailyStartBalance - equity);
+         
+         // Pausar até início do próximo dia
+         MqlDateTime dt;
+         TimeToStruct(TimeCurrent(), dt);
+         dt.hour = 23; dt.min = 59; dt.sec = 59;
+         datetime nextDay = StructToTime(dt) + 1;
+         g_pauseUntilTime = nextDay;
+         g_dailyDrawdownHit = true;
+         
+         PrintFormat("⏸️ SISTEMA PAUSADO até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         
+         if(SendAlerts)
+            SendNotification(StringFormat("Nexus PAUSADO: DD diário %.1f%%", dailyDD));
+         
+         return false;
+        }
+     }
+   
+   // PROTEÇÃO 2: Drawdown Semanal
+   if(g_weeklyStartBalance > 0)
+     {
+      double weeklyDD = ((g_weeklyStartBalance - equity) / g_weeklyStartBalance) * 100.0;
+      if(weeklyDD >= MaxWeeklyDrawdown)
+        {
+         PrintFormat("🔴 DRAWDOWN SEMANAL ATINGIDO: %.2f%% >= %.2f%%", weeklyDD, MaxWeeklyDrawdown);
+         PrintFormat("   Balance início semana: $%.2f", g_weeklyStartBalance);
+         PrintFormat("   Equity atual: $%.2f", equity);
+         PrintFormat("   Perda: $%.2f", g_weeklyStartBalance - equity);
+         
+         // Pausar até próxima segunda-feira
+         MqlDateTime dt;
+         TimeToStruct(TimeCurrent(), dt);
+         int daysToMonday = (8 - dt.day_of_week) % 7;
+         if(daysToMonday == 0) daysToMonday = 7;
+         g_pauseUntilTime = TimeCurrent() + daysToMonday * 86400;
+         g_weeklyDrawdownHit = true;
+         
+         PrintFormat("⏸️ SISTEMA PAUSADO até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         
+         if(SendAlerts)
+            SendNotification(StringFormat("Nexus PAUSADO: DD semanal %.1f%%", weeklyDD));
+         
+         return false;
+        }
+     }
+   
+   // PROTEÇÃO 3: Perdas Consecutivas
+   if(g_consecutiveLosses >= MaxConsecutiveLosses)
+     {
+      PrintFormat("🔴 PERDAS CONSECUTIVAS ATINGIDAS: %d >= %d", g_consecutiveLosses, MaxConsecutiveLosses);
+      PrintFormat("⏸️ Sistema já deve estar pausado");
+      
+      // Se não estiver pausado, pausar agora
+      if(g_pauseUntilTime == 0)
+        {
+         g_pauseUntilTime = TimeCurrent() + 24*3600; // 24 horas
+         PrintFormat("⏸️ PAUSANDO por 24 horas até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         
+         if(SendAlerts)
+            SendNotification(StringFormat("Nexus PAUSADO: %d perdas consecutivas", g_consecutiveLosses));
+        }
+      
+      return false;
+     }
+   
+   return true; // Tudo OK
+  }
 
 //+------------------------------------------------------------------+
 //| Validações básicas antes de cada tick                           |

@@ -1,26 +1,28 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.23 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.23: CORREÇÕES CRÍTICAS - ORDENS NÃO ABRINDO (USDJPY)      |
+//| Nexus Confluence EA v4.24 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.24: CORREÇÃO CRÍTICA - SISTEMA DE BLOQUEIO EXCESSIVO      |
 //|                                                                  |
-//|   ❌ BUG #1: DESSINCRONIZAÇÃO TEMPORAL (CRÍTICO!)               |
-//|      Problema: GG TrendBar lia candle [1], filtros micro [0]    |
-//|      Resultado: Multi-TF "atrasado" 1 candle, conflito com Micro|
-//|      Evidência: Imagens USDJPY com sinais mas sem trades        |
-//|      ✅ CORREÇÃO: GG TrendBar agora lê [0] = TUDO SINCRONIZADO  |
+//|   ❌ BUG #1: BLOQUEIO EXCESSIVO POR PERDAS CONSECUTIVAS         |
+//|      Problema: H4 pausava por 40h, D1 por 3 dias!               |
+//|      Resultado: EA bloqueado por dias, perdendo oportunidades   |
+//|      ✅ CORREÇÃO: NUNCA pausa por mais de 12 horas!             |
+//|                  M15: 3h | M30: 5h | H1: 8h | H4: 12h          |
 //|                                                                  |
-//|   ❌ BUG #2: M30 divergente REJEITAVA setup válido              |
-//|      Problema: AllowGoodSetups=false + M30 oposto = REJEITADO   |
-//|      Resultado: H4+H1 alinhados mas M30 oposto = SEM TRADE      |
-//|      ✅ CORREÇÃO: M30 só define PREMIUM vs GOOD (não rejeita)   |
+//|   ❌ BUG #2: Reset apenas à meia-noite (não início do pregão)   |
+//|      Problema: Bloqueio continuava durante todo pregão seguinte |
+//|      Resultado: EA inativo mesmo após novo dia                  |
+//|      ✅ CORREÇÃO: Reset automático no início do pregão          |
+//|                  Detecta CustomStartHour ou 09:00 padrão        |
 //|                                                                  |
-//|   📊 AJUSTE #1: ATR ranges para pares JPY                       |
-//|      USDJPY: 5-80 pips (era 10-100)                             |
-//|      Outros JPY minor: 8-120 pips (era 15-150)                  |
+//|   ✅ PROTEÇÃO ADICIONAL #1: Forçar desbloqueio se > 12h         |
+//|      Se pausa exceder 12h, desbloqueio automático forçado       |
 //|                                                                  |
-//|   📊 AJUSTE #2: Logs de debug detalhados                        |
-//|      Mostra valores [0] vs [1], direção, filtros que falharam   |
+//|   ✅ PROTEÇÃO ADICIONAL #2: Logs visíveis a cada novo candle    |
+//|      Mostra tempo restante + horário de liberação               |
 //|                                                                  |
-//|   ⚠️ IMPACTO ESPERADO: ORDENS DEVEM ABRIR EM SINAIS VÁLIDOS!    |
+//|   📊 MANTIDO v4.23: Sincronização temporal + M30 logic + ATR JPY|
+//|                                                                  |
+//|   ⚠️ IMPACTO ESPERADO: EA NUNCA FICARÁ BLOQUEADO POR MAIS DE 12H|
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
@@ -58,7 +60,7 @@
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.23 - Correção Crítica Abertura Ordens USDJPY         |
+//| Versão: 4.24 - Correção Crítica Sistema Bloqueio Excessivo     |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
@@ -231,19 +233,34 @@ void OnTick()
                TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
    PrintFormat("════════════════════════════════════════════════════════════════");
    
-   // 🔥 v4.17: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO (PROTEÇÃO DD)
+   // 🔥 v4.24: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO + FORÇAR DESBLOQUEIO
    if(g_pauseUntilTime > TimeCurrent())
    {
-      static datetime lastPauseLog = 0;
-      if(TimeCurrent() - lastPauseLog > 3600)  // Log 1x por hora
+      // 🔥 v4.24 PROTEÇÃO: Forçar desbloqueio se passou mais de 12 horas
+      int secondsPaused = (int)(g_pauseUntilTime - TimeCurrent());
+      if(secondsPaused > 43200)  // Mais de 12 horas? FORÇAR DESBLOQUEIO!
       {
-         int hoursRemaining = (int)((g_pauseUntilTime - TimeCurrent()) / 3600);
-         PrintFormat("⏸️ SISTEMA PAUSADO - Tempo restante: %d horas", hoursRemaining);
-         PrintFormat("   Motivo: Drawdown ou perdas consecutivas");
-         PrintFormat("   Pausado até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         lastPauseLog = TimeCurrent();
+         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa excedeu 12h (era %d segundos)", secondsPaused);
+         PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
+         g_pauseUntilTime = 0;
+         g_consecutiveLosses = 0;
       }
-      return;
+      else
+      {
+         // Mostrar log A CADA TICK (não apenas 1x por hora)
+         int minutesRemaining = secondsPaused / 60;
+         int hoursRemaining = minutesRemaining / 60;
+         int minsOnly = minutesRemaining % 60;
+
+         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
+         PrintFormat("⏸️ SISTEMA PAUSADO - Aguardando liberação");
+         PrintFormat("⏸️ Tempo restante: %d hora(s) e %d minuto(s)", hoursRemaining, minsOnly);
+         PrintFormat("⏸️ Motivo: %d perdas consecutivas (limite: %d)",
+                     g_consecutiveLosses, MaxConsecutiveLosses);
+         PrintFormat("⏸️ Pausado até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
+         return;
+      }
    }
 
    // ETAPA 1: Validações básicas de segurança
@@ -623,31 +640,64 @@ bool ValidateDrawdownProtection()
    TimeToStruct(TimeCurrent(), dt);
    
    // ════════════════════════════════════════════════════════════════
-   // RESET AUTOMÁTICO DIÁRIO (00:00 ou novo dia detectado)
+   // 🔥 v4.24: RESET AUTOMÁTICO NO INÍCIO DO PREGÃO (NÃO MEIA-NOITE!)
    // ════════════════════════════════════════════════════════════════
+
+   // Detectar início do pregão (baseado em CustomStartHour ou 09:00 padrão)
+   int sessionStartHour = UseCustomTradingHours ? CustomStartHour : 9;
+   int sessionStartMinute = UseCustomTradingHours ? CustomStartMinute : 0;
+
+   // Verificar se mudou de dia OU se passou pelo horário de início
+   bool isNewTradingDay = false;
+
    if(lastDay != dt.day)
+   {
+      isNewTradingDay = true;
+      lastDay = dt.day;
+   }
+   // OU se passou pelo horário de início do pregão hoje
+   else if(dt.hour == sessionStartHour && dt.min <= sessionStartMinute + 15)
+   {
+      // Dentro da janela de 15 minutos após o início
+      static bool resetDoneToday = false;
+      static int lastResetDay = -1;
+
+      if(!resetDoneToday || lastResetDay != dt.day)
+      {
+         isNewTradingDay = true;
+         resetDoneToday = true;
+         lastResetDay = dt.day;
+      }
+   }
+
+   if(isNewTradingDay)
      {
-      // 🔥 NOVO DIA DETECTADO - Resetar TUDO
+      // 🔥 RESET COMPLETO - INÍCIO DO PREGÃO
       if(lastDay != -1) // Não resetar na primeira execução
         {
          PrintFormat("════════════════════════════════════════════════════════════════");
-         PrintFormat("📅 NOVO DIA DETECTADO: %02d/%02d/%04d", dt.day, dt.mon, dt.year);
+         PrintFormat("🌅 INÍCIO DO PREGÃO DETECTADO: %02d/%02d/%04d %02d:%02d",
+                     dt.day, dt.mon, dt.year, dt.hour, dt.min);
          PrintFormat("════════════════════════════════════════════════════════════════");
-         
+
          // Resetar drawdown diário
          g_dailyStartBalance = currentBalance;
          g_dailyDrawdownHit = false;
-         
-         // 🔥 DESBLOQUEIO AUTOMÁTICO POR PERDAS CONSECUTIVAS
-         if(g_pauseUntilTime > 0 && TimeCurrent() >= g_pauseUntilTime)
+
+         // 🔥 v4.24: FORÇAR DESBLOQUEIO TOTAL (não importa quanto tempo falta)
+         if(g_pauseUntilTime > 0 || g_consecutiveLosses > 0)
            {
-            PrintFormat("🔓 DESBLOQUEIO AUTOMÁTICO: Perdas consecutivas (%d) resetadas - Novo dia!", g_consecutiveLosses);
+            PrintFormat("🔓 DESBLOQUEIO TOTAL: Novo pregão - Todos contadores resetados!");
+            PrintFormat("   Perdas consecutivas: %d → 0", g_consecutiveLosses);
+            if(g_pauseUntilTime > 0)
+               PrintFormat("   Pausa cancelada (era até: %s)", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+
             g_consecutiveLosses = 0;
             g_pauseUntilTime = 0;
            }
-         
-         PrintFormat("   💰 Balance inicial dia: $%.2f", g_dailyStartBalance);
-         PrintFormat("   🔄 Perdas consecutivas: %d (resetado)", g_consecutiveLosses);
+
+         PrintFormat("   💰 Balance inicial pregão: $%.2f", g_dailyStartBalance);
+         PrintFormat("   ✅ Sistema LIBERADO para operar!");
          PrintFormat("════════════════════════════════════════════════════════════════");
         }
       else
@@ -656,8 +706,6 @@ bool ValidateDrawdownProtection()
          g_dailyStartBalance = currentBalance;
          g_weeklyStartBalance = currentBalance;
         }
-      
-      lastDay = dt.day;
      }
    
    // ════════════════════════════════════════════════════════════════
@@ -686,23 +734,55 @@ bool ValidateDrawdownProtection()
      }
    
    // ════════════════════════════════════════════════════════════════
-   // VERIFICAR SE ESTÁ PAUSADO POR PERDAS CONSECUTIVAS
+   // 🔥 v4.24: VERIFICAR SE ESTÁ PAUSADO + FORÇAR DESBLOQUEIO 12H
    // ════════════════════════════════════════════════════════════════
    if(TimeCurrent() < g_pauseUntilTime)
      {
-      int minutesRemaining = (int)((g_pauseUntilTime - TimeCurrent()) / 60);
-      PrintFormat("⏸️ EA PAUSADO: %d perdas consecutivas | Tempo restante: %d minutos (%s)", 
-                  g_consecutiveLosses,
-                  minutesRemaining,
-                  TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+      int secondsRemaining = (int)(g_pauseUntilTime - TimeCurrent());
+
+      // 🔥 v4.24: PROTEÇÃO - Forçar desbloqueio se mais de 12 horas
+      if(secondsRemaining > 43200)
+        {
+         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa de %d segundos excede 12h!", secondsRemaining);
+         PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
+         g_pauseUntilTime = 0;
+         g_consecutiveLosses = 0;
+         return true; // Liberar para continuar validações
+        }
+
+      // Mostrar tempo restante de forma clara
+      int minutesRemaining = secondsRemaining / 60;
+      int hoursRemaining = minutesRemaining / 60;
+      int minsOnly = minutesRemaining % 60;
+
+      // Não logar a cada tick, apenas a cada 15 minutos
+      static datetime lastWarningLog = 0;
+      if(TimeCurrent() - lastWarningLog > 900) // 15 minutos
+        {
+         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
+         PrintFormat("⏸️ EA PAUSADO POR PERDAS CONSECUTIVAS");
+         PrintFormat("⏸️ Perdas: %d (limite: %d)", g_consecutiveLosses, MaxConsecutiveLosses);
+         PrintFormat("⏸️ Tempo restante: %dh%02dm", hoursRemaining, minsOnly);
+         PrintFormat("⏸️ Liberação em: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
+         PrintFormat("⏸️ Reset automático no início do próximo pregão (%02d:%02d)",
+                     sessionStartHour, sessionStartMinute);
+         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
+         lastWarningLog = TimeCurrent();
+        }
+
       return false;
      }
-   
+
    // Se tempo de pausa expirou, liberar
    if(g_pauseUntilTime > 0 && TimeCurrent() >= g_pauseUntilTime)
      {
-      PrintFormat("🔓 DESBLOQUEIO: Tempo de pausa expirado - EA liberado para operar");
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      PrintFormat("🔓 DESBLOQUEIO: Tempo de pausa expirou");
+      PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
+      PrintFormat("   Sistema LIBERADO para operar!");
+      PrintFormat("════════════════════════════════════════════════════════════════");
       g_pauseUntilTime = 0;
+      g_consecutiveLosses = 0;
      }
    
    // Inicializar se primeira execução

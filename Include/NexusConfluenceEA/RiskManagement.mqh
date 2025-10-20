@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| RiskManagement.mqh                                               |
-//| Nexus Confluence EA v4.15 - Gestão de Risco e Posicionamento    |
+//| Nexus Confluence EA v4.24 - Gestão de Risco e Posicionamento    |
 //|                                                                   |
 //| PROPÓSITO: Calcular tamanho de posição, SL, TP, Breakeven       |
 //|            e Trailing Stop baseado em estrutura de preços        |
@@ -8,6 +8,7 @@
 //| NOVO v4.11: Correção crítica FindStructureSL()                   |
 //|             Implementação completa de gestão de posições         |
 //| NOVO v4.15: Proteção drawdown + Registro perdas consecutivas    |
+//| 🔥 v4.24: Limites de pausa (máx 12h) + Reset no pregão         |
 //|                                                                   |
 //| FUNÇÕES PRINCIPAIS:                                              |
 //|   - CalculatePositionSize(): Calcula lote baseado em risco       |
@@ -18,16 +19,17 @@
 //|   - MoveToBreakeven(): Move SL para breakeven (NOVO)            |
 //|   - ExecutePartialClose(): Fecha parcialmente posição (NOVO)    |
 //|   - UpdateTrailingStop(): Atualiza trailing stop (NOVO)         |
+//|   - CalculatePauseTime(): Calcula tempo de pausa limitado       |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (structs, enums, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.15 - Proteções Drawdown                               |
+//| VERSÃO: 4.24 - Sistema Bloqueio Limitado                        |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.15"
-#property version   "4.15"
+#property copyright "Nexus Confluence EA v4.24"
+#property version   "4.24"
 #property strict
 
 #include "Parametros.mqh"
@@ -835,26 +837,41 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
 }
 
 //+------------------------------------------------------------------+
-//| 🔥 v4.15: Calcular tempo de pausa baseado no timeframe          |
+//| 🔥 v4.24: Calcular tempo de pausa LIMITADO (MÁXIMO 12H!)        |
 //+------------------------------------------------------------------+
 int CalculatePauseTime(ENUM_TIMEFRAMES timeframe)
 {
-   // Lógica: Pausar por múltiplos do timeframe operacional
-   // Quanto maior o TF, maior a pausa (mais trades por período)
-   
-   int pauseMultiplier = 10; // Número de candles de pausa
-   
+   // 🔥 CORREÇÃO CRÍTICA v4.24: NUNCA pausar por mais de 12 horas!
+   // Pausas longas impedem recuperação e bloqueiam trades válidos
+
+   const int MAX_PAUSE_SECONDS = 43200; // 12 horas (meio pregão)
+   int pauseSeconds = 0;
+
    switch(timeframe)
    {
-      case PERIOD_M1:  return pauseMultiplier * 60;       // 10 minutos
-      case PERIOD_M5:  return pauseMultiplier * 5 * 60;   // 50 minutos
-      case PERIOD_M15: return pauseMultiplier * 15 * 60;  // 2.5 horas
-      case PERIOD_M30: return pauseMultiplier * 30 * 60;  // 5 horas
-      case PERIOD_H1:  return pauseMultiplier * 3600;     // 10 horas
-      case PERIOD_H4:  return pauseMultiplier * 4 * 3600; // 40 horas (~2 dias)
-      case PERIOD_D1:  return 86400 * 3;                  // 3 dias
-      default:         return 86400;                      // 24 horas padrão
+      case PERIOD_M1:  pauseSeconds = 1800;    // 30 minutos (30 candles)
+                       break;
+      case PERIOD_M5:  pauseSeconds = 3600;    // 1 hora (12 candles)
+                       break;
+      case PERIOD_M15: pauseSeconds = 10800;   // 3 horas (12 candles)
+                       break;
+      case PERIOD_M30: pauseSeconds = 18000;   // 5 horas (10 candles)
+                       break;
+      case PERIOD_H1:  pauseSeconds = 28800;   // 8 horas (8 candles)
+                       break;
+      case PERIOD_H4:  pauseSeconds = 43200;   // 12 horas (3 candles)
+                       break;
+      case PERIOD_D1:  pauseSeconds = 43200;   // 12 horas (máximo permitido)
+                       break;
+      default:         pauseSeconds = 21600;   // 6 horas padrão
+                       break;
    }
+
+   // Garantir que NUNCA ultrapasse 12 horas
+   if(pauseSeconds > MAX_PAUSE_SECONDS)
+      pauseSeconds = MAX_PAUSE_SECONDS;
+
+   return pauseSeconds;
 }
 
 //+------------------------------------------------------------------+

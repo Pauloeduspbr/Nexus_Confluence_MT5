@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.23";    // 🔥 CORREÇÕES CRÍTICAS - Sincronização temporal + M30 logic + ATR JPY
+const string EA_VERSION = "4.24";    // 🔥 CORREÇÕES CRÍTICAS - Sistema bloqueio limitado (máx 12h) + Reset no pregão
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

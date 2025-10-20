@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.1 - Sistema Multi-Timeframe Universal     |
+//| Nexus Confluence EA v4.12 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -15,15 +15,18 @@
 //|   - GetGGTrendBarSignal(): Lê GG TrendBar                       |
 //|   - CalculateSetupScore(): Pontua e classifica setup            |
 //|                                                                   |
+//| NOVO v4.12: Supertrend obrigatório + Hierarquia otimizada       |
+//|             (WAE → RSI → CS) conforme análise crítica            |
+//|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.1 - Multi-Timeframe                                    |
+//| VERSÃO: 4.12 - Correções Hierarquia Filtros                     |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.1"
-#property version   "4.10"
+#property copyright "Nexus Confluence EA v4.12"
+#property version   "4.12"
 #property strict
 
 // Incluir primeiro o arquivo de parâmetros
@@ -923,6 +926,42 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    score.waePoints = 0;
    score.totalPoints = 0;
    
+   // ═══════════════════════════════════════════════════════════════════════
+   // 🔥 CORREÇÃO CRÍTICA v4.12: ADICIONAR VALIDAÇÃO SUPERTREND OBRIGATÓRIA
+   // ═══════════════════════════════════════════════════════════════════════
+   PrintFormat("🎯 [FILTRO OBRIGATÓRIO] Validando Supertrend Operacional (%s)...", 
+               TimeframeToString(g_tfOperacional));
+   
+   // Verificar Supertrend no timeframe operacional
+   TMSignal supertrend = GetSupertrendSignal(g_handles.st_oper, g_tfOperacional);
+   
+   if(!supertrend.isValid)
+   {
+      PrintFormat("⚠️ Supertrend INVÁLIDO - aguardar confirmação");
+      PrintFormat("   Razão: Indicador não retornou sinal válido");
+      score.classification = SETUP_REJECT;
+      return score;
+   }
+   
+   // Validar se Supertrend alinha com direção GG TrendBar
+   if(supertrend.direction != direction)
+   {
+      PrintFormat("❌ SUPERTREND CONTRA DIREÇÃO GG TRENDBAR - REJECT!");
+      PrintFormat("   GG TrendBar: %s", (direction == TRADE_DIRECTION_BUY) ? "📈 BUY" : "📉 SELL");
+      PrintFormat("   Supertrend: %s", (supertrend.direction == TRADE_DIRECTION_BUY) ? "📈 BUY" : "📉 SELL");
+      PrintFormat("   ⚠️ Macro e Micro NÃO estão alinhados - aguardar convergência");
+      score.classification = SETUP_REJECT;
+      return score;
+   }
+   
+   PrintFormat("✅ Supertrend ALINHADO com GG TrendBar (%s)", 
+               (direction == TRADE_DIRECTION_BUY) ? "📈 BUY" : "📉 SELL");
+   if(supertrend.turnedRecently)
+   {
+      PrintFormat("   🎯 BÔNUS: Virada recente detectada (entrada em momentum)");
+   }
+   // ═══════════════════════════════════════════════════════════════════════
+   
    // Determinar quantos filtros são necessários conforme tipo de ativo
    bool useCS = (assetClass == ASSET_CLASS_FOREX_MAJOR ||
                  assetClass == ASSET_CLASS_FOREX_MINOR ||
@@ -932,31 +971,55 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    
    if(useCS)
    {
-      // Sistema 3 filtros: CS + RSI + WAE (precisa 2 de 3)
+      // Sistema 3 filtros: WAE + RSI + CS (precisa 2 de 3)
+      // ✅ CORREÇÃO v4.12: Ordem otimizada - WAE primeiro (momentum crítico)
       score.requiredPoints = 2;
       
-      // Currency Strength
-      CSSignal cs = GetCurrencyStrengthSignal(symbol, direction, assetClass);
-      if(cs.isValid && cs.isAligned)
-      {
-         score.currencyStrengthPoints = 1;
-      }
+      PrintFormat("────────────────────────────────────────────────────────────────");
+      PrintFormat("📊 Analisando Filtros Micro (ORDEM OTIMIZADA):");
       
-      // RSI OMA
-      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
-      if(rsi.isValid && rsi.isAligned)
-      {
-         score.rsiomaPoints = 1;
-      }
-      
-      // WAE
+      // 1️⃣ WAE - MOMENTUM (prioridade máxima)
+      PrintFormat("1️⃣ WAE (Momentum/Explosão)...");
       WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
       if(wae.isValid && wae.isAligned)
       {
          score.waePoints = 1;
+         PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
+                     wae.strength, wae.isExpanding ? "SIM" : "NÃO");
+      }
+      else
+      {
+         PrintFormat("   ❌ WAE não alinhado (0 pontos)");
       }
       
-      score.totalPoints = score.currencyStrengthPoints + score.rsiomaPoints + score.waePoints;
+      // 2️⃣ RSI OMA - FORÇA RELATIVA
+      PrintFormat("2️⃣ RSI OMA (Força Relativa)...");
+      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
+      if(rsi.isValid && rsi.isAligned)
+      {
+         score.rsiomaPoints = 1;
+         PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
+                     rsi.strength, rsi.slope);
+      }
+      else
+      {
+         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos)");
+      }
+      
+      // 3️⃣ CURRENCY STRENGTH - CONTEXTO
+      PrintFormat("3️⃣ Currency Strength (Contexto Moedas)...");
+      CSSignal cs = GetCurrencyStrengthSignal(symbol, direction, assetClass);
+      if(cs.isValid && cs.isAligned)
+      {
+         score.currencyStrengthPoints = 1;
+         PrintFormat("   ✅ Currency Strength alinhado (+1 ponto) - Separação: %.2f", cs.strength);
+      }
+      else
+      {
+         PrintFormat("   ❌ Currency Strength não alinhado (0 pontos)");
+      }
+      
+      score.totalPoints = score.waePoints + score.rsiomaPoints + score.currencyStrengthPoints;
       
       // Classificação
       if(score.totalPoints >= 3 && m30Aligned)
@@ -974,24 +1037,42 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    }
    else
    {
-      // Sistema 2 filtros: RSI + WAE (precisa 2 de 2) - ÍNDICES
+      // Sistema 2 filtros: WAE + RSI (precisa 2 de 2) - ÍNDICES
+      // ✅ CORREÇÃO v4.12: Ordem otimizada - WAE primeiro
       score.requiredPoints = 2;
       
-      // RSI OMA
-      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
-      if(rsi.isValid && rsi.isAligned)
-      {
-         score.rsiomaPoints = 1;
-      }
+      PrintFormat("────────────────────────────────────────────────────────────────");
+      PrintFormat("📊 Analisando Filtros Micro - ÍNDICES (ORDEM OTIMIZADA):");
       
-      // WAE
+      // 1️⃣ WAE - MOMENTUM
+      PrintFormat("1️⃣ WAE (Momentum/Explosão)...");
       WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
       if(wae.isValid && wae.isAligned)
       {
          score.waePoints = 1;
+         PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
+                     wae.strength, wae.isExpanding ? "SIM" : "NÃO");
+      }
+      else
+      {
+         PrintFormat("   ❌ WAE não alinhado (0 pontos)");
       }
       
-      score.totalPoints = score.rsiomaPoints + score.waePoints;
+      // 2️⃣ RSI OMA - FORÇA RELATIVA
+      PrintFormat("2️⃣ RSI OMA (Força Relativa)...");
+      RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
+      if(rsi.isValid && rsi.isAligned)
+      {
+         score.rsiomaPoints = 1;
+         PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
+                     rsi.strength, rsi.slope);
+      }
+      else
+      {
+         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos)");
+      }
+      
+      score.totalPoints = score.waePoints + score.rsiomaPoints;
       
       // Classificação (mais rigorosa para índices)
       if(score.totalPoints >= 2 && m30Aligned)
@@ -1012,16 +1093,17 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    PrintFormat("────────────────────────────────────────────────────────────────");
    PrintFormat("📊 RESULTADO FINAL - Setup %s:", symbol);
    PrintFormat("   Direção: %s", (direction == TRADE_DIRECTION_BUY) ? "📈 BUY" : "📉 SELL");
-   PrintFormat("   ✅ GG TrendBar: VALIDADO (Filtro Mestre)");
-   PrintFormat("   %s Currency Strength: %d pt", 
-               (score.currencyStrengthPoints > 0) ? "✅" : "❌",
-               score.currencyStrengthPoints);
-   PrintFormat("   %s RSI OMA: %d pt", 
-               (score.rsiomaPoints > 0) ? "✅" : "❌",
-               score.rsiomaPoints);
-   PrintFormat("   %s WAE: %d pt", 
+   PrintFormat("   ✅ GG TrendBar: VALIDADO (Filtro Mestre Macro)");
+   PrintFormat("   ✅ Supertrend: ALINHADO (Filtro Obrigatório Micro)");
+   PrintFormat("   %s WAE (Momentum): %d pt", 
                (score.waePoints > 0) ? "✅" : "❌",
                score.waePoints);
+   PrintFormat("   %s RSI OMA (Força): %d pt", 
+               (score.rsiomaPoints > 0) ? "✅" : "❌",
+               score.rsiomaPoints);
+   PrintFormat("   %s Currency Strength (Contexto): %d pt", 
+               (score.currencyStrengthPoints > 0) ? "✅" : "❌",
+               score.currencyStrengthPoints);
    PrintFormat("   📈 TOTAL: %d/%d pontos", score.totalPoints, score.requiredPoints);
    PrintFormat("   🎯 Classificação: %s",
                (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM (Máxima Qualidade)" :

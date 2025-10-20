@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Parametros.mqh                                                    |
-//| Nexus Confluence EA v4.1 - Sistema Multi-Timeframe Universal     |
+//| Nexus Confluence EA v4.12 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODOS os inputs e enumerações do EA       |
 //|                                                                   |
@@ -16,10 +16,10 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.11 - Correção SL + Gestão Básica                      |
+//| VERSÃO: 4.12 - Correções Hierarquia Filtros                     |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.11"
-#property version   "4.11"
+#property copyright "Nexus Confluence EA v4.12"
+#property version   "4.12"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -383,7 +383,7 @@ input group "══════════════════════�
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
 const int    EA_MAGIC_NUMBER = 20241015;  // Magic Number do EA
-const string EA_VERSION      = "4.11";    // Versão do EA
+const string EA_VERSION      = "4.12";    // Versão do EA (Correções Hierarquia Filtros)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

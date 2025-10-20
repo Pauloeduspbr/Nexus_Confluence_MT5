@@ -36,10 +36,11 @@
 
 //--- Variáveis globais do EA principal
 CTrade g_trade;
-double g_initialBalance = 0.0;
+double g_initialBalance = 0.0;      // Balance inicial (apenas referência)
+double g_highWaterMark = 0.0;       // 🔥 NOVO: Equity máximo atingido (HIGH WATER MARK)
 bool   g_tradingPaused  = false;
-datetime g_pauseTimestamp = 0;  // Quando foi pausado pela última vez
-int    g_pauseDay = 0;          // Dia que foi pausado (YYYYMMDD)
+datetime g_pauseTimestamp = 0;      // Quando foi pausado pela última vez
+int    g_pauseDay = 0;              // Dia que foi pausado (YYYYMMDD)
 int    g_lastReportMonth = -1;
 int    g_lastCleanupDay  = -1;
 
@@ -115,9 +116,10 @@ int OnInit()
    g_trade.SetTypeFilling(ORDER_FILLING_FOK);
    g_trade.SetAsyncMode(false);
 
-   // 8. Salvar saldo inicial
+   // 8. Salvar saldo inicial e equity máximo
    g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-   PrintFormat("💰 Saldo inicial: %.2f", g_initialBalance);
+   g_highWaterMark = AccountInfoDouble(ACCOUNT_EQUITY);  // 🔥 Inicializar com equity atual
+   PrintFormat("💰 Saldo inicial: %.2f | Equity máximo inicial: %.2f", g_initialBalance, g_highWaterMark);
 
    // 9. Configurar timer (1 hora)
    EventSetTimer(3600);
@@ -373,7 +375,17 @@ bool ValidateBasicConditions()
    // 4. Verificar drawdown máximo COM DESBLOQUEIO INTELIGENTE
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   double currentDrawdown = (g_initialBalance - equity) / g_initialBalance * 100.0;
+   
+   // 🔥 CORREÇÃO CRÍTICA v4.7: Usar HIGH WATER MARK (equity máximo atingido)
+   // Atualizar equity máximo se atual é maior
+   if(equity > g_highWaterMark)
+   {
+      g_highWaterMark = equity;
+      PrintFormat("💎 Novo equity máximo atingido: %.2f (anterior: %.2f)", equity, g_highWaterMark);
+   }
+   
+   // Calcular drawdown baseado no PICO de equity, não no balance inicial!
+   double currentDrawdown = (g_highWaterMark - equity) / g_highWaterMark * 100.0;
    
    // ✅ CORREÇÃO CRÍTICA v4.6: Desbloqueio por TEMPO + DIA + RECUPERAÇÃO
    if(g_tradingPaused)
@@ -453,7 +465,8 @@ bool ValidateBasicConditions()
                      EnumToString(currentTF), elapsedMinutes);
          PrintFormat("   Drawdown atual: %.2f%% | Limite bloqueio: %.2f%%", 
                      currentDrawdown, MaxDrawdownPercent);
-         PrintFormat("   Equity: %.2f | Balance inicial: %.2f", equity, g_initialBalance);
+         PrintFormat("   Equity atual: %.2f | Equity MÁXIMO: %.2f", equity, g_highWaterMark);
+         PrintFormat("   Balance inicial: %.2f", g_initialBalance);
          PrintFormat("════════════════════════════════════════════════════════════════");
          
          Alert("Nexus Confluence: Trading desbloqueado - ", reason);
@@ -469,7 +482,8 @@ bool ValidateBasicConditions()
    
    // ═══════════════════════════════════════════════════════════════
    // Verificar se deve BLOQUEAR agora
-   // 🔥 CORREÇÃO: Só bloqueia se DD for POSITIVO (perda real)
+   // 🔥 CORREÇÃO v4.7: Drawdown baseado em HIGH WATER MARK
+   // Só bloqueia se DD > 0 (perda desde o pico) E >= limite
    // ═══════════════════════════════════════════════════════════════
    if(currentDrawdown > 0 && currentDrawdown >= MaxDrawdownPercent)
      {
@@ -500,7 +514,9 @@ bool ValidateBasicConditions()
       PrintFormat("════════════════════════════════════════════════════════════════");
       PrintFormat("❌ TRADING PAUSADO: DRAWDOWN MÁXIMO ATINGIDO!");
       PrintFormat("   Drawdown ATUAL: %.2f%% >= %.2f%% (limite)", currentDrawdown, MaxDrawdownPercent);
-      PrintFormat("   Equity: %.2f | Balance inicial: %.2f", equity, g_initialBalance);
+      PrintFormat("   Equity atual: %.2f | Equity MÁXIMO: %.2f", equity, g_highWaterMark);
+      PrintFormat("   Perda desde pico: %.2f (%.2f%%)", g_highWaterMark - equity, currentDrawdown);
+      PrintFormat("   Balance inicial: %.2f", g_initialBalance);
       PrintFormat("   Timeframe: %s", EnumToString(currentTF));
       PrintFormat("   ");
       PrintFormat("   🔓 Será DESBLOQUEADO quando:");
@@ -511,7 +527,7 @@ bool ValidateBasicConditions()
       PrintFormat("   Bloqueado às: %s", TimeToString(g_pauseTimestamp, TIME_DATE|TIME_MINUTES));
       PrintFormat("════════════════════════════════════════════════════════════════");
       
-      Alert(StringFormat("Nexus: Trading pausado (DD %.1f%%). Desbloqueia: DD<%.1f%% OU timeout %dmin OU novo dia", 
+      Alert(StringFormat("Nexus: Trading pausado (DD %.1f%% desde pico). Desbloqueia: DD<%.1f%% OU timeout %dmin OU novo dia", 
                         currentDrawdown, safeLevel, unlockMinutes));
       return false;
      }

@@ -786,40 +786,62 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
                TimeframeToString(g_tfMacro2), macro2Value,
                TimeframeToString(g_tfMacro3), macro3Value);
    
-   // VALIDAÇÃO 1: MACRO-1 e MACRO-2 devem estar DEFINIDOS (não neutros)
-   if(macro1Value == 0 || macro2Value == 0)
+   // ✅ VALIDAÇÃO 1: Pelo menos UM dos MACRO deve estar DEFINIDO (não neutro)
+   if(macro1Value == 0 && macro2Value == 0)
    {
-      PrintFormat("⚠️ MACRO-1 ou MACRO-2 neutros/indefinidos - aguardar definição");
+      PrintFormat("⚠️ MACRO-1 e MACRO-2 AMBOS neutros - aguardar definição");
       return result;
    }
    
-   // ✅ CORREÇÃO CRÍTICA: VALIDAÇÃO 2 - Verificar DIREÇÃO (positivo/negativo), não valor exato
-   // +1 e +2 = AMBOS BULLISH (mesma direção)
-   // -1 e -2 = AMBOS BEARISH (mesma direção)
-   bool macro1Bullish = (macro1Value > 0);
-   bool macro2Bullish = (macro2Value > 0);
-   bool macro1Bearish = (macro1Value < 0);
-   bool macro2Bearish = (macro2Value < 0);
-   
-   // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
-   if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
+   // ✅ VALIDAÇÃO 2: Se ambos definidos, devem estar na MESMA DIREÇÃO
+   if(macro1Value != 0 && macro2Value != 0)
    {
-      PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
-                  macro1Value, macro2Value);
-      return result;
+      // Ambos definidos - verificar se mesma direção
+      bool macro1Bullish = (macro1Value > 0);
+      bool macro2Bullish = (macro2Value > 0);
+      bool macro1Bearish = (macro1Value < 0);
+      bool macro2Bearish = (macro2Value < 0);
+      
+      // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
+      if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
+      {
+         PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
+                     macro1Value, macro2Value);
+         return result;
+      }
+      
+      // ✅ MACRO-1 e MACRO-2 ALINHADOS NA MESMA DIREÇÃO!
+      result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+      result.h4Aligned = true;
+      result.h1Aligned = true;
+      
+      // Calcular força do alinhamento (ambos +2/-2 = máximo)
+      int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
+      
+      PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
+                  (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
+                  macro1Value, macro2Value, alignmentStrength);
    }
-   
-   // ✅ MACRO-1 e MACRO-2 ALINHADOS NA MESMA DIREÇÃO!
-   result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
-   result.h4Aligned = true;
-   result.h1Aligned = true;
-   
-   // Calcular força do alinhamento (ambos +2/-2 = máximo)
-   int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
-   
-   PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
-               (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
-               macro1Value, macro2Value, alignmentStrength);
+   else
+   {
+      // ✅ APENAS UM DEFINIDO - usar esse como direção (modo fallback)
+      if(macro1Value != 0)
+      {
+         result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+         result.h4Aligned = true;
+         result.h1Aligned = false;  // H1 neutro
+         PrintFormat("⚠️ FALLBACK: Apenas MACRO-1(%+d) definido, MACRO-2 neutro - usando MACRO-1 como direção",
+                     macro1Value);
+      }
+      else  // macro2Value != 0
+      {
+         result.direction = (macro2Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+         result.h4Aligned = false;  // H4 neutro
+         result.h1Aligned = true;
+         PrintFormat("⚠️ FALLBACK: Apenas MACRO-2(%+d) definido, MACRO-1 neutro - usando MACRO-2 como direção",
+                     macro2Value);
+      }
+   }
    
    // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)

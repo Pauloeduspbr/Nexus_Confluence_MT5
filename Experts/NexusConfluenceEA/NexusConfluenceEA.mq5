@@ -41,6 +41,7 @@ double g_highWaterMark = 0.0;       // 🔥 NOVO: Equity máximo atingido (HIGH 
 bool   g_tradingPaused  = false;
 datetime g_pauseTimestamp = 0;      // Quando foi pausado pela última vez
 int    g_pauseDay = 0;              // Dia que foi pausado (YYYYMMDD)
+int    g_lastResetDay = 0;          // 🔥 NOVO v4.8: Último dia que resetou (YYYYMMDD)
 int    g_lastReportMonth = -1;
 int    g_lastCleanupDay  = -1;
 
@@ -119,7 +120,14 @@ int OnInit()
    // 8. Salvar saldo inicial e equity máximo
    g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
    g_highWaterMark = AccountInfoDouble(ACCOUNT_EQUITY);  // 🔥 Inicializar com equity atual
-   PrintFormat("💰 Saldo inicial: %.2f | Equity máximo inicial: %.2f", g_initialBalance, g_highWaterMark);
+   
+   // 🔥 NOVO v4.8: Inicializar último dia de reset com dia atual
+   MqlDateTime dtInit;
+   TimeToStruct(TimeCurrent(), dtInit);
+   g_lastResetDay = dtInit.year * 10000 + dtInit.mon * 100 + dtInit.day;
+   
+   PrintFormat("💰 Saldo inicial: %.2f | Equity máximo inicial: %.2f | Último reset: %d", 
+               g_initialBalance, g_highWaterMark, g_lastResetDay);
 
    // 9. Configurar timer (1 hora)
    EventSetTimer(3600);
@@ -375,6 +383,47 @@ bool ValidateBasicConditions()
    // 4. Verificar drawdown máximo COM DESBLOQUEIO INTELIGENTE
    double equity = AccountInfoDouble(ACCOUNT_EQUITY);
    double balance = AccountInfoDouble(ACCOUNT_BALANCE);
+   
+   // ═══════════════════════════════════════════════════════════════
+   // 🔥 NOVO v4.8: RESET DIÁRIO OBRIGATÓRIO
+   // Todo dia às 00:00+ o EA reseta HWM e força desbloqueio
+   // ═══════════════════════════════════════════════════════════════
+   MqlDateTime dtNow;
+   TimeToStruct(TimeCurrent(), dtNow);
+   int todayDay = dtNow.year * 10000 + dtNow.mon * 100 + dtNow.day;
+   
+   if(todayDay != g_lastResetDay)
+   {
+      // NOVO DIA DETECTADO! Resetar tudo
+      bool wasBlocked = g_tradingPaused;
+      double oldHWM = g_highWaterMark;
+      
+      // RESET COMPLETO
+      g_highWaterMark = equity;        // HWM = equity atual
+      g_tradingPaused = false;         // Forçar desbloqueio
+      g_pauseTimestamp = 0;            // Limpar timestamp
+      g_pauseDay = 0;                  // Limpar dia pausado
+      g_lastResetDay = todayDay;       // Atualizar último reset
+      
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      PrintFormat("🔄 RESET DIÁRIO AUTOMÁTICO EXECUTADO!");
+      PrintFormat("   📅 Data: %02d/%02d/%04d %02d:%02d", 
+                  dtNow.day, dtNow.mon, dtNow.year, dtNow.hour, dtNow.min);
+      PrintFormat("   💎 High Water Mark: %.2f → %.2f (resetado para equity atual)", 
+                  oldHWM, g_highWaterMark);
+      PrintFormat("   🔓 Trading desbloqueado: %s", wasBlocked ? "SIM (estava bloqueado)" : "N/A (já estava OK)");
+      PrintFormat("   💰 Equity atual: %.2f", equity);
+      PrintFormat("   💰 Balance: %.2f", balance);
+      PrintFormat("   🎯 Novo dia, novas oportunidades!");
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      
+      if(SendAlerts && wasBlocked)
+      {
+         Alert("Nexus: Reset diário - Trading desbloqueado! Novo dia, novas oportunidades!");
+      }
+      
+      // Continuar validação normalmente
+   }
    
    // 🔥 CORREÇÃO CRÍTICA v4.7: Usar HIGH WATER MARK (equity máximo atingido)
    // Atualizar equity máximo se atual é maior

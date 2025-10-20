@@ -229,7 +229,7 @@ input group "══════════════════════�
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
 input double AccountRiskPercent       = 1.5;   // 📊 Risco padrão por trade (%)
 input double MaxRiskPremium           = 2.0;   // 🏆 Risco máximo setup PREMIUM (%)
-input double MaxDrawdownPercent       = 15.0;  // ⚠️ Drawdown máximo permitido (%)
+// 🔥 REMOVIDO v4.9: input double MaxDrawdownPercent = 15.0; // Bloqueio por drawdown DESABILITADO
 input int    MaxSimultaneousTrades    = 3;     // 🔢 Máximo de trades simultâneos
 input bool   EnableSecondaryHours     = true;  // 🕐 Habilitar horários secundários Forex
 input bool   EnableMorningB3          = false; // 🇧🇷 Habilitar sessão da manhã B3

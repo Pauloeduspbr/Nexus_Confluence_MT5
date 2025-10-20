@@ -743,11 +743,7 @@ bool ValidateInputParameters()
       return false;
      }
 
-   if(MaxDrawdownPercent <= 0 || MaxDrawdownPercent > 50)
-     {
-      PrintFormat("❌ MaxDrawdownPercent inválido: %.2f (deve ser 1-50%%)", MaxDrawdownPercent);
-      return false;
-     }
+   // 🔥 REMOVIDO v4.9: Validação MaxDrawdownPercent (bloqueio desabilitado)
 
    if(MaxSimultaneousTrades <= 0 || MaxSimultaneousTrades > 10)
      {
@@ -904,7 +900,6 @@ void PrintConfiguration()
    PrintFormat("📋 Configuração do EA:");
    PrintFormat("   Risco padrão: %.2f%%", AccountRiskPercent);
    PrintFormat("   Risco Premium: %.2f%%", MaxRiskPremium);
-   PrintFormat("   Drawdown máximo: %.2f%%", MaxDrawdownPercent);
    PrintFormat("   Trades simultâneos: %d", MaxSimultaneousTrades);
    PrintFormat("   Modo posições: %s", 
                (PositionControlMode == POSITION_MODE_SINGLE) ? "SINGLE" :

@@ -37,11 +37,6 @@
 //--- Variáveis globais do EA principal
 CTrade g_trade;
 double g_initialBalance = 0.0;      // Balance inicial (apenas referência)
-double g_highWaterMark = 0.0;       // 🔥 NOVO: Equity máximo atingido (HIGH WATER MARK)
-bool   g_tradingPaused  = false;
-datetime g_pauseTimestamp = 0;      // Quando foi pausado pela última vez
-int    g_pauseDay = 0;              // Dia que foi pausado (YYYYMMDD)
-int    g_lastResetDay = 0;          // 🔥 NOVO v4.8: Último dia que resetou (YYYYMMDD)
 int    g_lastReportMonth = -1;
 int    g_lastCleanupDay  = -1;
 
@@ -117,17 +112,9 @@ int OnInit()
    g_trade.SetTypeFilling(ORDER_FILLING_FOK);
    g_trade.SetAsyncMode(false);
 
-   // 8. Salvar saldo inicial e equity máximo
+   // 8. Salvar saldo inicial
    g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-   g_highWaterMark = AccountInfoDouble(ACCOUNT_EQUITY);  // 🔥 Inicializar com equity atual
-   
-   // 🔥 NOVO v4.8: Inicializar último dia de reset com dia atual
-   MqlDateTime dtInit;
-   TimeToStruct(TimeCurrent(), dtInit);
-   g_lastResetDay = dtInit.year * 10000 + dtInit.mon * 100 + dtInit.day;
-   
-   PrintFormat("💰 Saldo inicial: %.2f | Equity máximo inicial: %.2f | Último reset: %d", 
-               g_initialBalance, g_highWaterMark, g_lastResetDay);
+   PrintFormat("💰 Saldo inicial: %.2f", g_initialBalance);
 
    // 9. Configurar timer (1 hora)
    EventSetTimer(3600);
@@ -380,208 +367,7 @@ bool ValidateBasicConditions()
       return false;
      }
 
-   // 4. Verificar drawdown máximo COM DESBLOQUEIO INTELIGENTE
-   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   
-   // ═══════════════════════════════════════════════════════════════
-   // 🔥 NOVO v4.8: RESET DIÁRIO OBRIGATÓRIO
-   // Todo dia às 00:00+ o EA reseta HWM e força desbloqueio
-   // ═══════════════════════════════════════════════════════════════
-   MqlDateTime dtNow;
-   TimeToStruct(TimeCurrent(), dtNow);
-   int todayDay = dtNow.year * 10000 + dtNow.mon * 100 + dtNow.day;
-   
-   if(todayDay != g_lastResetDay)
-   {
-      // NOVO DIA DETECTADO! Resetar tudo
-      bool wasBlocked = g_tradingPaused;
-      double oldHWM = g_highWaterMark;
-      
-      // RESET COMPLETO
-      g_highWaterMark = equity;        // HWM = equity atual
-      g_tradingPaused = false;         // Forçar desbloqueio
-      g_pauseTimestamp = 0;            // Limpar timestamp
-      g_pauseDay = 0;                  // Limpar dia pausado
-      g_lastResetDay = todayDay;       // Atualizar último reset
-      
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      PrintFormat("🔄 RESET DIÁRIO AUTOMÁTICO EXECUTADO!");
-      PrintFormat("   📅 Data: %02d/%02d/%04d %02d:%02d", 
-                  dtNow.day, dtNow.mon, dtNow.year, dtNow.hour, dtNow.min);
-      PrintFormat("   💎 High Water Mark: %.2f → %.2f (resetado para equity atual)", 
-                  oldHWM, g_highWaterMark);
-      PrintFormat("   🔓 Trading desbloqueado: %s", wasBlocked ? "SIM (estava bloqueado)" : "N/A (já estava OK)");
-      PrintFormat("   💰 Equity atual: %.2f", equity);
-      PrintFormat("   💰 Balance: %.2f", balance);
-      PrintFormat("   🎯 Novo dia, novas oportunidades!");
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      
-      if(SendAlerts && wasBlocked)
-      {
-         Alert("Nexus: Reset diário - Trading desbloqueado! Novo dia, novas oportunidades!");
-      }
-      
-      // Continuar validação normalmente
-   }
-   
-   // 🔥 CORREÇÃO CRÍTICA v4.7: Usar HIGH WATER MARK (equity máximo atingido)
-   // Atualizar equity máximo se atual é maior
-   if(equity > g_highWaterMark)
-   {
-      g_highWaterMark = equity;
-      PrintFormat("💎 Novo equity máximo atingido: %.2f (anterior: %.2f)", equity, g_highWaterMark);
-   }
-   
-   // Calcular drawdown baseado no PICO de equity, não no balance inicial!
-   double currentDrawdown = (g_highWaterMark - equity) / g_highWaterMark * 100.0;
-   
-   // ✅ CORREÇÃO CRÍTICA v4.6: Desbloqueio por TEMPO + DIA + RECUPERAÇÃO
-   if(g_tradingPaused)
-     {
-      datetime currentTime = TimeCurrent();
-      
-      // Calcular tempo de bloqueio baseado no TIMEFRAME operacional
-      int unlockMinutes = 0;
-      ENUM_TIMEFRAMES currentTF = Period();
-      
-      switch(currentTF)
-        {
-         case PERIOD_M1:  unlockMinutes = 15;  break;  // M1: 15 minutos
-         case PERIOD_M5:  unlockMinutes = 30;  break;  // M5: 30 minutos
-         case PERIOD_M15: unlockMinutes = 60;  break;  // M15: 1 hora
-         case PERIOD_M30: unlockMinutes = 120; break;  // M30: 2 horas
-         case PERIOD_H1:  unlockMinutes = 240; break;  // H1: 4 horas
-         case PERIOD_H4:  unlockMinutes = 480; break;  // H4: 8 horas
-         default:         unlockMinutes = 60;  break;  // Padrão: 1 hora
-        }
-      
-      int elapsedMinutes = (int)((currentTime - g_pauseTimestamp) / 60);
-      
-      // ═══════════════════════════════════════════════════════════════
-      // VERIFICAR 3 CONDIÇÕES DE DESBLOQUEIO:
-      // ═══════════════════════════════════════════════════════════════
-      
-      // 1. Passou tempo suficiente baseado no timeframe
-      bool timeoutReached = (elapsedMinutes >= unlockMinutes);
-      
-      // 2. Iniciou novo dia (sempre desbloqueia)
-      MqlDateTime dt;
-      TimeToStruct(currentTime, dt);
-      int currentDay = dt.year * 10000 + dt.mon * 100 + dt.day;  // YYYYMMDD
-      bool newDayStarted = (currentDay != g_pauseDay);
-      
-      // 3. 🔥 NOVO: Drawdown voltou ao normal (abaixo do limite)
-      //    Considera "seguro" se DD < 50% do limite OU se DD é negativo (lucro)
-      double safeDrawdownLevel = MaxDrawdownPercent * 0.5;  // 50% do limite
-      bool drawdownRecovered = (currentDrawdown < safeDrawdownLevel);
-      
-      // DESBLOQUEAR se QUALQUER condição satisfeita
-      bool shouldUnlock = (timeoutReached || newDayStarted || drawdownRecovered);
-      
-      if(shouldUnlock)
-        {
-         g_tradingPaused = false;
-         g_pauseTimestamp = 0;
-         g_pauseDay = 0;
-         
-         string reason = "";
-         if(drawdownRecovered)
-           {
-            if(currentDrawdown < 0)
-              {
-               reason = StringFormat("conta LUCRATIVA (lucro: %.2f%%)", MathAbs(currentDrawdown));
-              }
-            else
-              {
-               reason = StringFormat("drawdown recuperou para %.2f%% (limite seguro: %.2f%%)", 
-                                   currentDrawdown, safeDrawdownLevel);
-              }
-           }
-         else if(newDayStarted)
-           {
-            reason = StringFormat("novo dia iniciado (%02d/%02d/%04d)", dt.day, dt.mon, dt.year);
-           }
-         else if(timeoutReached)
-           {
-            reason = StringFormat("timeout de %d minutos atingido", unlockMinutes);
-           }
-         
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         PrintFormat("✅ TRADING DESBLOQUEADO AUTOMATICAMENTE!");
-         PrintFormat("   Razão: %s", reason);
-         PrintFormat("   Timeframe: %s | Tempo bloqueado: %d min", 
-                     EnumToString(currentTF), elapsedMinutes);
-         PrintFormat("   Drawdown atual: %.2f%% | Limite bloqueio: %.2f%%", 
-                     currentDrawdown, MaxDrawdownPercent);
-         PrintFormat("   Equity atual: %.2f | Equity MÁXIMO: %.2f", equity, g_highWaterMark);
-         PrintFormat("   Balance inicial: %.2f", g_initialBalance);
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         
-         Alert("Nexus Confluence: Trading desbloqueado - ", reason);
-        }
-      else
-        {
-         int remainingMinutes = unlockMinutes - elapsedMinutes;
-         PrintFormat("⏸️ Trading pausado - Tempo restante: %d min | DD: %.2f%% (aguardando < %.2f%%)", 
-                     remainingMinutes, currentDrawdown, safeDrawdownLevel);
-         return false;
-        }
-     }
-   
-   // ═══════════════════════════════════════════════════════════════
-   // Verificar se deve BLOQUEAR agora
-   // 🔥 CORREÇÃO v4.7: Drawdown baseado em HIGH WATER MARK
-   // Só bloqueia se DD > 0 (perda desde o pico) E >= limite
-   // ═══════════════════════════════════════════════════════════════
-   if(currentDrawdown > 0 && currentDrawdown >= MaxDrawdownPercent)
-     {
-      g_tradingPaused = true;
-      g_pauseTimestamp = TimeCurrent();
-      
-      // Salvar dia do bloqueio
-      MqlDateTime dt;
-      TimeToStruct(g_pauseTimestamp, dt);
-      g_pauseDay = dt.year * 10000 + dt.mon * 100 + dt.day;
-      
-      // Calcular tempo de desbloqueio
-      int unlockMinutes = 0;
-      ENUM_TIMEFRAMES currentTF = Period();
-      switch(currentTF)
-        {
-         case PERIOD_M1:  unlockMinutes = 15;  break;
-         case PERIOD_M5:  unlockMinutes = 30;  break;
-         case PERIOD_M15: unlockMinutes = 60;  break;
-         case PERIOD_M30: unlockMinutes = 120; break;
-         case PERIOD_H1:  unlockMinutes = 240; break;
-         case PERIOD_H4:  unlockMinutes = 480; break;
-         default:         unlockMinutes = 60;  break;
-        }
-      
-      double safeLevel = MaxDrawdownPercent * 0.5;
-      
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      PrintFormat("❌ TRADING PAUSADO: DRAWDOWN MÁXIMO ATINGIDO!");
-      PrintFormat("   Drawdown ATUAL: %.2f%% >= %.2f%% (limite)", currentDrawdown, MaxDrawdownPercent);
-      PrintFormat("   Equity atual: %.2f | Equity MÁXIMO: %.2f", equity, g_highWaterMark);
-      PrintFormat("   Perda desde pico: %.2f (%.2f%%)", g_highWaterMark - equity, currentDrawdown);
-      PrintFormat("   Balance inicial: %.2f", g_initialBalance);
-      PrintFormat("   Timeframe: %s", EnumToString(currentTF));
-      PrintFormat("   ");
-      PrintFormat("   🔓 Será DESBLOQUEADO quando:");
-      PrintFormat("   1. ✅ Drawdown recuperar para < %.2f%% (50%% do limite)", safeLevel);
-      PrintFormat("   2. ⏰ Timeout de %d minutos (%d horas)", unlockMinutes, unlockMinutes/60);
-      PrintFormat("   3. 📅 Início do próximo dia (00:01)");
-      PrintFormat("   ");
-      PrintFormat("   Bloqueado às: %s", TimeToString(g_pauseTimestamp, TIME_DATE|TIME_MINUTES));
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      
-      Alert(StringFormat("Nexus: Trading pausado (DD %.1f%% desde pico). Desbloqueia: DD<%.1f%% OU timeout %dmin OU novo dia", 
-                        currentDrawdown, safeLevel, unlockMinutes));
-      return false;
-     }
-
-   PrintFormat("✅ Validações básicas OK (Drawdown: %.2f%%)", currentDrawdown);
+   PrintFormat("✅ Validações básicas OK");
    return true;
   }
 

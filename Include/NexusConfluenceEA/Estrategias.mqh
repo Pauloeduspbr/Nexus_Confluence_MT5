@@ -475,19 +475,19 @@ CSSignal GetCurrencyStrengthSignal(string symbol, TRADE_DIRECTION direction, ASS
       return result;
    }
    
-   // Buffers: 0 = Base Currency, 1 = Quote Currency
+   // 🔥 v4.26: Buffers usando candle FECHADO [1]
    double baseStrength[1], quoteStrength[1];
-   
-   if(CopyBuffer(g_handles.cs_oper, 0, 0, 1, baseStrength) != 1 ||
-      CopyBuffer(g_handles.cs_oper, 1, 0, 1, quoteStrength) != 1)
+
+   if(CopyBuffer(g_handles.cs_oper, 0, 1, 1, baseStrength) != 1 ||
+      CopyBuffer(g_handles.cs_oper, 1, 1, 1, quoteStrength) != 1)
    {
       PrintFormat("❌ Erro ao copiar buffer Currency Strength");
       return result;
    }
-   
+
    result.strength = MathAbs(baseStrength[0] - quoteStrength[0]);
    result.isValid = true;
-   
+
    // Lógica normal (Forex)
    if(assetClass != ASSET_CLASS_METALS)
    {
@@ -555,35 +555,36 @@ RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES
       return result;
    }
    
-   // Calcular inclinação linha vermelha (últimos 3 candles)
-   result.slope = (rsiRed[0] - rsiRed[2]) / 2.0;
-   result.strength = MathAbs(rsiRed[0] - rsiBlue[0]);
+   // 🔥 v4.26: Usar candle FECHADO [1] para cálculos
+   // Calcular inclinação linha vermelha (últimos 3 candles FECHADOS)
+   result.slope = (rsiRed[1] - rsiRed[2]) / 1.0;  // [1] vs [2] (1 candle de diferença)
+   result.strength = MathAbs(rsiRed[1] - rsiBlue[1]);
    result.isValid = true;
-   
-   // Verificar posição e inclinação
-   bool redAboveBlue = (rsiRed[0] > rsiBlue[0]);
+
+   // Verificar posição e inclinação no candle FECHADO
+   bool redAboveBlue = (rsiRed[1] > rsiBlue[1]);
    bool slopePositive = (result.slope > 0.5);  // Mínimo 0.5 de inclinação
    bool slopeNegative = (result.slope < -0.5);
-   
+
    // ✅ CORREÇÃO CRÍTICA v4.3: Validar zona de sobrecompra/sobrevenda
-   bool notOverbought = (rsiRed[0] < RSI_OPER_HighLevel);   // <70 (evita topos)
-   bool notOversold = (rsiRed[0] > RSI_OPER_LowLevel);      // >30 (evita fundos)
-   
+   bool notOverbought = (rsiRed[1] < RSI_OPER_HighLevel);   // <70 (evita topos)
+   bool notOversold = (rsiRed[1] > RSI_OPER_LowLevel);      // >30 (evita fundos)
+
    if(direction == TRADE_DIRECTION_BUY)
    {
       // Para compra: linha vermelha acima da azul + inclinação positiva + NÃO sobrecomprado
       result.isAligned = (redAboveBlue && slopePositive && notOverbought);
-      
+
       if(!notOverbought)
-         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f >= %.1f (sobrecompra)", rsiRed[0], RSI_OPER_HighLevel);
+         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f >= %.1f (sobrecompra)", rsiRed[1], RSI_OPER_HighLevel);
    }
    else if(direction == TRADE_DIRECTION_SELL)
    {
       // Para venda: linha vermelha abaixo da azul + inclinação negativa + NÃO sobrevendido
       result.isAligned = (!redAboveBlue && slopeNegative && notOversold);
-      
+
       if(!notOversold)
-         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f <= %.1f (sobrevenda)", rsiRed[0], RSI_OPER_LowLevel);
+         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f <= %.1f (sobrevenda)", rsiRed[1], RSI_OPER_LowLevel);
    }
    
    return result;
@@ -625,33 +626,36 @@ WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES ti
       return result;
    }
    
-   // Determinar cor do histograma (verde ou vermelho)
-   bool isGreen = (trendUp[0] > trendDown[0] && trendUp[0] > 0);
-   bool isRed = (trendDown[0] > trendUp[0] && trendDown[0] > 0);
-   
-   // Calcular força do histograma
-   double currentStrength = MathMax(trendUp[0], trendDown[0]);
+   // 🔥 v4.26: Usar candle FECHADO [1] para análise
+   // Determinar cor do histograma (verde ou vermelho) no candle FECHADO
+   bool isGreen = (trendUp[1] > trendDown[1] && trendUp[1] > 0);
+   bool isRed = (trendDown[1] > trendUp[1] && trendDown[1] > 0);
+
+   // Calcular força do histograma no candle FECHADO
+   double currentStrength = MathMax(trendUp[1], trendDown[1]);
    result.strength = currentStrength;
-   
-   // Verificar expansão (últimos 3 candles)
-   bool expanding = (currentStrength > MathMax(trendUp[1], trendDown[1]) &&
-                     MathMax(trendUp[1], trendDown[1]) > MathMax(trendUp[2], trendDown[2]));
+
+   // Verificar expansão (últimos 3 candles FECHADOS)
+   bool expanding = (MathMax(trendUp[1], trendDown[1]) > MathMax(trendUp[2], trendDown[2]));
    result.isExpanding = expanding;
-   
+
    // Verificar se está acima da linha de explosão
-   bool aboveExplosion = (currentStrength > explosion[0]);
-   
-   result.isValid = true;
-   
-   if(direction == TRADE_DIRECTION_BUY)
+   double explosion_val[1];
+   if(CopyBuffer(handle, 2, 1, 1, explosion_val) == 1)
    {
-      // Para compra: verde + expandindo + acima explosão
-      result.isAligned = (isGreen && expanding && aboveExplosion);
-   }
-   else if(direction == TRADE_DIRECTION_SELL)
-   {
-      // Para venda: vermelho + expandindo + acima explosão
-      result.isAligned = (isRed && expanding && aboveExplosion);
+      bool aboveExplosion = (currentStrength > explosion_val[0]);
+      result.isValid = true;
+
+      if(direction == TRADE_DIRECTION_BUY)
+      {
+         // Para compra: verde + expandindo + acima explosão
+         result.isAligned = (isGreen && expanding && aboveExplosion);
+      }
+      else if(direction == TRADE_DIRECTION_SELL)
+      {
+         // Para venda: vermelho + expandindo + acima explosão
+         result.isAligned = (isRed && expanding && aboveExplosion);
+      }
    }
    
    return result;
@@ -692,32 +696,33 @@ GGTrendBarSignal GetGGTrendBarSignal()
       return result;
    }
    
-   // 🔥 v4.23 CORREÇÃO CRÍTICA: SINCRONIZAÇÃO TEMPORAL
-   // BUG v4.21: Usava candle [1] para Multi-TF mas [0] para Micro
-   // Resultado: Dessincronização temporal - Multi-TF "atrasado" 1 candle
-   // SOLUÇÃO: Usar candle [0] para TUDO (Multi-TF + Micro sincronizados)
+   // 🔥 v4.26 CORREÇÃO CRÍTICA FINAL: LER CANDLE FECHADO [1]!
+   // PROBLEMA v4.23: Usava [0] = candle EM FORMAÇÃO (valores instáveis!)
+   // MOTIVO: EA executa em NOVO CANDLE, mas [0] acabou de abrir (valores iniciais)
+   // RESULTADO: Dessincronia - EA vê valores DIFERENTES dos sinais visuais
+   // SOLUÇÃO DEFINITIVA: LER CANDLE FECHADO [1] = valores CONFIRMADOS
 
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] CANDLE ATUAL [0] (SINCRONIZADO COM FILTROS MICRO):");
-   PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
-               gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
-
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] CANDLE FECHADO [1] (REFERÊNCIA):");
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.26] CANDLE FECHADO [1] (CONFIRMADO E ESTÁVEL):");
    PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
                gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1]);
 
-   // 🔥 v4.23: USAR CANDLE ATUAL [0] para SINCRONIZAR com filtros Micro
-   // Supertrend, WAE, RSI também leem [0] → TUDO NO MESMO TEMPO!
-   result.m1Value = (int)gg_m1[0];
-   result.m5Value = (int)gg_m5[0];
-   result.m15Value = (int)gg_m15[0];
-   result.m30Value = (int)gg_m30[0];
-   result.h1Value = (int)gg_h1[0];
-   result.h4Value = (int)gg_h4[0];
-   result.d1Value = (int)gg_d1[0];
-   result.w1Value = (int)gg_w1[0];
-   result.mn1Value = (int)gg_mn1[0];
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.26] CANDLE ATUAL [0] (EM FORMAÇÃO - NÃO USAR!):");
+   PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
+               gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
 
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] Valores convertidos (int) do candle [0] - SINCRONIZADO:");
+   // 🔥 v4.26: USAR CANDLE FECHADO [1] para SINCRONIZAR COM SINAIS VISUAIS
+   // Todos os filtros (GG, WAE, RSI, CS) agora leem [1] → MESMOS VALORES QUE APARECEM NO GRÁFICO!
+   result.m1Value = (int)gg_m1[1];
+   result.m5Value = (int)gg_m5[1];
+   result.m15Value = (int)gg_m15[1];
+   result.m30Value = (int)gg_m30[1];
+   result.h1Value = (int)gg_h1[1];
+   result.h4Value = (int)gg_h4[1];
+   result.d1Value = (int)gg_d1[1];
+   result.w1Value = (int)gg_w1[1];
+   result.mn1Value = (int)gg_mn1[1];
+
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.26] Valores convertidos (int) do candle [1] - CONFIRMADOS:");
    PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
                result.m1Value, result.m5Value, result.m15Value, result.m30Value,
                result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);

@@ -687,6 +687,18 @@ GGTrendBarSignal GetGGTrendBarSignal()
       return result;
    }
    
+   // 🔥 v4.20: LOG DETALHADO dos valores RAW lidos do indicador
+   PrintFormat("🔍 [DEBUG GG TRENDBAR] Valores RAW dos buffers:");
+   PrintFormat("   Buffer[0] M1  = %.0f", gg_m1[0]);
+   PrintFormat("   Buffer[1] M5  = %.0f", gg_m5[0]);
+   PrintFormat("   Buffer[2] M15 = %.0f", gg_m15[0]);
+   PrintFormat("   Buffer[3] M30 = %.0f", gg_m30[0]);
+   PrintFormat("   Buffer[4] H1  = %.0f", gg_h1[0]);
+   PrintFormat("   Buffer[5] H4  = %.0f", gg_h4[0]);
+   PrintFormat("   Buffer[6] D1  = %.0f", gg_d1[0]);
+   PrintFormat("   Buffer[7] W1  = %.0f", gg_w1[0]);
+   PrintFormat("   Buffer[8] MN1 = %.0f", gg_mn1[0]);
+   
    // Preencher valores (+1 = bullish, 0 = neutral, -1 = bearish)
    result.m1Value = (int)gg_m1[0];
    result.m5Value = (int)gg_m5[0];
@@ -697,6 +709,11 @@ GGTrendBarSignal GetGGTrendBarSignal()
    result.d1Value = (int)gg_d1[0];
    result.w1Value = (int)gg_w1[0];
    result.mn1Value = (int)gg_mn1[0];
+   
+   PrintFormat("🔍 [DEBUG GG TRENDBAR] Valores convertidos (int):");
+   PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
+               result.m1Value, result.m5Value, result.m15Value, result.m30Value,
+               result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);
    
    // Interpretação booleana
    result.h4Bullish = (result.h4Value == 1);
@@ -855,28 +872,33 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)
    {
-      if(macro3Value == macro1Value)  // Mesmo sinal
+      // 🔥 v4.20 CORREÇÃO CRÍTICA: Comparar M30 com a DIREÇÃO estabelecida, não com macro1Value!
+      int expectedValue = (result.direction == TRADE_DIRECTION_BUY) ? 1 : -1;
+      
+      if(macro3Value == expectedValue)  // MACRO-3 alinha com direção do trade
       {
          result.m30Aligned = true;
          PrintFormat("🏆 ALINHAMENTO PREMIUM: MACRO-1 + MACRO-2 + MACRO-3 = %s",
                      (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH");
       }
-      else if(macro3Value == -macro1Value)  // Oposto
+      else if(macro3Value == -expectedValue)  // MACRO-3 oposto à direção
       {
          result.m30Aligned = false;
          
          // CORREÇÃO CRÍTICA: MACRO-3 oposto NÃO deve rejeitar o trade!
          // Deve apenas impedir classificação PREMIUM, mas permite GOOD
-         if(AllowCautiousSetups)
+         if(AllowGoodSetups || AllowCautiousSetups)
          {
-            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO com cautela)");
+            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO)");
+            PrintFormat("   ⚠️ MACRO-3 divergente - não será PREMIUM mas pode ser GOOD");
          }
          else
          {
-            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO, mas não PREMIUM)");
+            PrintFormat("❌ MACRO-3 oposto E AllowGoodSetups=false - REJEITADO");
+            return result;  // Rejeitar se não permitir GOOD setups
          }
       }
-      else  // Neutro
+      else  // Neutro (macro3Value == 0)
       {
          result.m30Aligned = false;
          PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 neutro");
@@ -940,6 +962,15 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    
    // Verificar Supertrend no timeframe operacional
    TMSignal supertrend = GetSupertrendSignal(g_handles.st_oper, g_tfOperacional);
+   
+   // 🔥 v4.20: LOG DETALHADO do Supertrend
+   PrintFormat("🔍 [DEBUG SUPERTREND] Leitura do indicador:");
+   PrintFormat("   isValid: %s", supertrend.isValid ? "SIM" : "NÃO");
+   PrintFormat("   direction: %s", 
+               (supertrend.direction == TRADE_DIRECTION_BUY) ? "📈 BUY" :
+               (supertrend.direction == TRADE_DIRECTION_SELL) ? "📉 SELL" : "⚠️ NONE");
+   PrintFormat("   turnedRecently: %s", supertrend.turnedRecently ? "SIM (BÔNUS!)" : "NÃO");
+   PrintFormat("   strength: %.5f", supertrend.strength);
    
    if(!supertrend.isValid)
    {

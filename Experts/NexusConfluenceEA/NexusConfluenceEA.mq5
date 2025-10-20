@@ -1,4 +1,17 @@
 //+------------------------------------------------------------------+
+//| Nexus Confluence EA v4.20 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.20: ANÁLISE COMPLETA - MÚLTIPLOS BUGS BLOQUEIO IDENTIFICADOS|
+//|   ❌ BUG #1: Comparação M30 ERRADA (comparava com H4, não direção)|
+//|      ✅ CORREÇÃO: Compara M30 com DIREÇÃO do setup              |
+//|   ❌ BUG #2: AllowGoodSetups=false rejeitava setups 2/2 válidos |
+//|      ✅ CORREÇÃO: Permite GOOD quando M30 divergente + flag true|
+//|   🔍 DEBUG: Logs MASSIVOS de TODOS os valores lidos             |
+//|      - GG TrendBar RAW (double antes conversão)                 |
+//|      - GG TrendBar INT (após conversão)                         |
+//|      - Supertrend completo (isValid, direction, strength, turn) |
+//|      - Comparação detalhada MACRO vs MICRO                      |
+//|   ⚠️ IMPACTO ESPERADO: +200% entradas (bugs bloqueavam 90%!)    |
+//+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |

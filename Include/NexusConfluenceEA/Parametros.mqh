@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION      = "4.15";    // 🔥 CRÍTICO: Correções Backtest - Risco/Trailing/Proteções
+const string EA_VERSION      = "4.20";    // 🔥 ANÁLISE COMPLETA - Bugs bloqueio identificados e corrigidos
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

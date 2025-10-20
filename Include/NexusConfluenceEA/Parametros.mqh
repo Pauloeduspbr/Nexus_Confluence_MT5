@@ -16,10 +16,10 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.1 - Multi-Timeframe                                    |
+//| VERSÃO: 4.11 - Correção SL + Gestão Básica                      |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.1"
-#property version   "4.10"
+#property copyright "Nexus Confluence EA v4.11"
+#property version   "4.11"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -383,7 +383,7 @@ input group "══════════════════════�
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
 const int    EA_MAGIC_NUMBER = 20241015;  // Magic Number do EA
-const string EA_VERSION      = "4.1";     // Versão do EA
+const string EA_VERSION      = "4.11";    // Versão do EA
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

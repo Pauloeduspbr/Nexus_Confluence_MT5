@@ -1,22 +1,23 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.1 - Sistema Universal Multi-Timeframe     |
+//| Nexus Confluence EA v4.11 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |
 //| Descrição: Expert Advisor completo que implementa sistema        |
 //| multi-ativo com gestão de risco baseada em estrutura             |
 //| NOVO v4.1: Suporte a múltiplos timeframes (M1, M5, M15, M30,    |
 //|            H1, H4) com parâmetros independentes                  |
+//| NOVO v4.11: Correção crítica SL + Gestão de posições            |
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.1 - Multi-Timeframe Universal                         |
+//| Versão: 4.11 - Correção SL + Gestão Básica                      |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
 //| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
 //| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
 //|               Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.1                                                      |
+//| VERSÃO: 4.11                                                     |
 //+------------------------------------------------------------------+
 #property strict
 
@@ -281,6 +282,9 @@ void OnTick()
    PrintFormat("════════════════════════════════════════════════════════════════");
 
    ExecuteTrade(_Symbol, mtf.direction, risk, score.classification);
+   
+   // ETAPA 9: GESTÃO DE TRADES EXISTENTES (v4.11)
+   ManageExistingTrades();
   }
 
 

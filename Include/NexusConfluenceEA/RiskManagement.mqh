@@ -1,25 +1,32 @@
 //+------------------------------------------------------------------+
 //| RiskManagement.mqh                                               |
-//| Nexus Confluence EA v4.2 - Gestão de Risco e Posicionamento     |
+//| Nexus Confluence EA v4.11 - Gestão de Risco e Posicionamento    |
 //|                                                                   |
 //| PROPÓSITO: Calcular tamanho de posição, SL, TP, Breakeven       |
 //|            e Trailing Stop baseado em estrutura de preços        |
+//|                                                                   |
+//| NOVO v4.11: Correção crítica FindStructureSL()                   |
+//|             Implementação completa de gestão de posições         |
 //|                                                                   |
 //| FUNÇÕES PRINCIPAIS:                                              |
 //|   - CalculatePositionSize(): Calcula lote baseado em risco       |
 //|   - FindStructureSL(): Encontra último topo/fundo significativo  |
 //|   - CalculateTakeProfits(): Calcula TPs baseados em RR          |
 //|   - ValidateRiskCalculation(): Valida se cálculo é seguro       |
+//|   - ManageExistingTrades(): Gerencia trades abertos (NOVO)      |
+//|   - MoveToBreakeven(): Move SL para breakeven (NOVO)            |
+//|   - ExecutePartialClose(): Fecha parcialmente posição (NOVO)    |
+//|   - UpdateTrailingStop(): Atualiza trailing stop (NOVO)         |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (structs, enums, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.2 - Gestão de Risco Completa                          |
+//| VERSÃO: 4.11 - Correção SL + Gestão Completa                    |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.2"
-#property version   "4.20"
+#property copyright "Nexus Confluence EA v4.11"
+#property version   "4.11"
 #property strict
 
 #include "Parametros.mqh"
@@ -27,6 +34,8 @@
 //+------------------------------------------------------------------+
 //| FUNÇÃO: FindStructureSL                                          |
 //| Encontra último topo/fundo significativo para SL                |
+//|                                                                  |
+//| CORREÇÃO v4.11: Garante que SL sempre está na direção correta   |
 //|                                                                  |
 //| PARÂMETROS:                                                      |
 //|   - symbol: Símbolo a analisar                                  |
@@ -53,66 +62,111 @@ double FindStructureSL(string symbol, TRADE_DIRECTION direction, int lookbackBar
    
    if(direction == TRADE_DIRECTION_BUY)
    {
-      // Para COMPRA: Procurar último SWING LOW (fundo com confirmação)
-      // Buscar nos últimos 10-15 candles (mais recente = melhor)
+      // 🔥 CORREÇÃO: Para COMPRA, procurar swing low ABAIXO do preço atual
       int maxLookback = MathMin(15, lookbackBars);
       
-      // Começar do mais recente
+      // Procurar swing low VÁLIDO (abaixo do preço atual)
       for(int i = 2; i < maxLookback; i++)
       {
          // Verificar se é um swing low (mínimo local)
-         // Candle i tem low menor que i-1 e i+1
-         if(low[i] < low[i-1] && low[i] < low[i+1] && low[i] <= low[i-2] && low[i] <= low[i+2])
+         bool isSwingLow = (low[i] < low[i-1] && low[i] < low[i+1] && 
+                           low[i] <= low[i-2] && low[i] <= low[i+2]);
+         
+         // 🔥 VALIDAÇÃO CRÍTICA: Swing low DEVE estar ABAIXO do preço atual
+         bool isBelowPrice = (low[i] < currentPrice);
+         
+         if(isSwingLow && isBelowPrice)
          {
             slLevel = low[i];
-            PrintFormat("   📍 SL COMPRA: Swing Low encontrado no candle[%d] = %.5f", i, slLevel);
+            PrintFormat("   📍 SL COMPRA: Swing Low [%d] = %.5f (abaixo de %.5f ✅)", 
+                        i, slLevel, currentPrice);
             break;
          }
       }
       
-      // Se não encontrou swing, usar mínimo dos últimos 5 candles
-      if(slLevel == 0)
+      // Se não encontrou swing válido, usar mínimo recente
+      if(slLevel == 0 || slLevel >= currentPrice)
       {
          slLevel = low[ArrayMinimum(low, 0, MathMin(5, lookbackBars))];
-         PrintFormat("   📍 SL COMPRA: Usando mínimo recente (5 candles) = %.5f", slLevel);
+         PrintFormat("   📍 SL COMPRA: Mínimo recente (5 candles) = %.5f", slLevel);
+         
+         // 🔥 PROTEÇÃO FINAL: Se AINDA está acima/igual, forçar abaixo
+         if(slLevel >= currentPrice)
+         {
+            slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
+            PrintFormat("   ⚠️ SL FORÇADO %.1f%% abaixo: %.5f (preço: %.5f)", 
+                        SL_FallbackPercent, slLevel, currentPrice);
+         }
       }
       
-      // Adicionar buffer de segurança configurável
+      // Adicionar buffer de segurança
       double buffer = SL_BufferPoints * _Point;
       slLevel -= buffer;
       
-      PrintFormat("   🛡️ SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
-                  slLevel, currentPrice - slLevel, (currentPrice - slLevel)/_Point);
+      // 🔥 VALIDAÇÃO FINAL OBRIGATÓRIA
+      if(slLevel >= currentPrice)
+      {
+         PrintFormat("   � ERRO CRÍTICO: SL %.5f >= Preço %.5f após buffer!", slLevel, currentPrice);
+         slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
+         PrintFormat("   ✅ SL CORRIGIDO para %.5f (%.1f%% abaixo)", slLevel, SL_FallbackPercent);
+      }
+      
+      PrintFormat("   🛡️ SL FINAL: %.5f | Distância: %.5f (%.1f pontos) | Preço: %.5f", 
+                  slLevel, currentPrice - slLevel, (currentPrice - slLevel)/_Point, currentPrice);
    }
    else if(direction == TRADE_DIRECTION_SELL)
    {
-      // Para VENDA: Procurar último SWING HIGH (topo com confirmação)
+      // 🔥 CORREÇÃO: Para VENDA, procurar swing high ACIMA do preço atual
       int maxLookback = MathMin(15, lookbackBars);
       
+      // Procurar swing high VÁLIDO (acima do preço atual)
       for(int i = 2; i < maxLookback; i++)
       {
          // Verificar se é um swing high
-         if(high[i] > high[i-1] && high[i] > high[i+1] && high[i] >= high[i-2] && high[i] >= high[i+2])
+         bool isSwingHigh = (high[i] > high[i-1] && high[i] > high[i+1] && 
+                            high[i] >= high[i-2] && high[i] >= high[i+2]);
+         
+         // 🔥 VALIDAÇÃO CRÍTICA: Swing high DEVE estar ACIMA do preço atual
+         bool isAbovePrice = (high[i] > currentPrice);
+         
+         if(isSwingHigh && isAbovePrice)
          {
             slLevel = high[i];
-            PrintFormat("   📍 SL VENDA: Swing High encontrado no candle[%d] = %.5f", i, slLevel);
+            PrintFormat("   📍 SL VENDA: Swing High [%d] = %.5f (acima de %.5f ✅)", 
+                        i, slLevel, currentPrice);
             break;
          }
       }
       
-      // Se não encontrou swing, usar máximo dos últimos 5 candles
-      if(slLevel == 0)
+      // Se não encontrou swing válido, usar máximo recente
+      if(slLevel == 0 || slLevel <= currentPrice)
       {
          slLevel = high[ArrayMaximum(high, 0, MathMin(5, lookbackBars))];
-         PrintFormat("   📍 SL VENDA: Usando máximo recente (5 candles) = %.5f", slLevel);
+         PrintFormat("   📍 SL VENDA: Máximo recente (5 candles) = %.5f", slLevel);
+         
+         // 🔥 PROTEÇÃO FINAL: Se AINDA está abaixo/igual, forçar acima
+         if(slLevel <= currentPrice)
+         {
+            slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
+            PrintFormat("   ⚠️ SL FORÇADO %.1f%% acima: %.5f (preço: %.5f)", 
+                        SL_FallbackPercent, slLevel, currentPrice);
+         }
       }
       
-      // Adicionar buffer de segurança configurável
+      // Adicionar buffer de segurança
       double buffer = SL_BufferPoints * _Point;
       slLevel += buffer;
       
-      PrintFormat("   🛡️ SL FINAL (com buffer): %.5f | Distância do preço: %.5f (%.1f pontos)", 
-                  slLevel, slLevel - currentPrice, (slLevel - currentPrice)/_Point);
+      // 🔥 VALIDAÇÃO FINAL OBRIGATÓRIA
+      if(slLevel <= currentPrice)
+      {
+         PrintFormat("   � ERRO CRÍTICO: SL %.5f <= Preço %.5f após buffer!", slLevel, currentPrice);
+         slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
+         PrintFormat("   ✅ SL CORRIGIDO para %.5f (%.1f%% acima)", slLevel, SL_FallbackPercent);
+      }
+      
+      PrintFormat("   🛡️ SL FINAL: %.5f | Distância: %.5f (%.1f pontos) | Preço: %.5f", 
+                  slLevel, slLevel - currentPrice, (slLevel - currentPrice)/_Point, currentPrice);
    }
    
    return slLevel;
@@ -159,27 +213,15 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
          SymbolInfoDouble(symbol, SYMBOL_ASK) : 
          SymbolInfoDouble(symbol, SYMBOL_BID);
       
-      // Encontrar SL baseado em estrutura
-      double slLevel = FindStructureSL(symbol, direction, LookbackStructureBars);
-      if(slLevel == 0)
-      {
-         result.errorMessage = "Não foi possível encontrar nível de SL";
-         return result;
-      }
-      
-      // ✅ VALIDAR DIREÇÃO DO SL
-      if(slLevel >= currentPrice)
-      {
-         PrintFormat("   ⚠️ SL COMPRA acima do preço! Usando %.1f%% abaixo", SL_FallbackPercent);
-         slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
-      }
-      else if(direction == TRADE_DIRECTION_SELL && slLevel <= currentPrice)
-      {
-         PrintFormat("   ⚠️ SL VENDA abaixo do preço! Usando %.1f%% acima", SL_FallbackPercent);
-         slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
-      }
-      
-      result.positionSize = FixedLotSize;
+   // Encontrar SL baseado em estrutura (agora com validação interna)
+   double slLevel = FindStructureSL(symbol, direction, LookbackStructureBars);
+   if(slLevel == 0)
+   {
+      result.errorMessage = "Não foi possível encontrar nível de SL";
+      return result;
+   }
+   
+   // ✅ FindStructureSL() agora GARANTE que SL está na direção correta!      result.positionSize = FixedLotSize;
       result.stopLoss = slLevel;
       result.slDistance = MathAbs(currentPrice - slLevel);
       
@@ -243,7 +285,7 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       SymbolInfoDouble(symbol, SYMBOL_ASK) : 
       SymbolInfoDouble(symbol, SYMBOL_BID);
    
-   // Encontrar SL baseado em estrutura
+   // Encontrar SL baseado em estrutura (agora com validação interna completa)
    double slLevel = FindStructureSL(symbol, direction, LookbackStructureBars);
    if(slLevel == 0)
    {
@@ -252,33 +294,7 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
       return result;
    }
    
-   // ✅ VALIDAR DIREÇÃO DO SL (CRÍTICO!)
-   if(direction == TRADE_DIRECTION_BUY)
-   {
-      // Para COMPRA: SL DEVE estar ABAIXO do preço de entrada
-      if(slLevel >= currentPrice)
-      {
-         PrintFormat("   ⚠️ ERRO: SL COMPRA está ACIMA do preço de entrada!");
-         PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
-         
-         // Usar SL baseado em percentual configurável
-         slLevel = currentPrice * (1.0 - SL_FallbackPercent / 100.0);
-         PrintFormat("      ✅ Usando SL percentual: %.5f (%.1f%% abaixo)", slLevel, SL_FallbackPercent);
-      }
-   }
-   else // SELL
-   {
-      // Para VENDA: SL DEVE estar ACIMA do preço de entrada
-      if(slLevel <= currentPrice)
-      {
-         PrintFormat("   ⚠️ ERRO: SL VENDA está ABAIXO do preço de entrada!");
-         PrintFormat("      Preço entrada: %.5f | SL calculado: %.5f", currentPrice, slLevel);
-         
-         // Usar SL baseado em percentual configurável
-         slLevel = currentPrice * (1.0 + SL_FallbackPercent / 100.0);
-         PrintFormat("      ✅ Usando SL percentual: %.5f (%.1f%% acima)", slLevel, SL_FallbackPercent);
-      }
-   }
+   // ✅ FindStructureSL() agora GARANTE que SL está na direção correta!
    
    // Calcular distância SL em pontos
    double slDistance = MathAbs(currentPrice - slLevel);
@@ -415,6 +431,338 @@ bool ValidateRiskCalculation(const RiskCalculation &risk, string symbol)
    
    PrintFormat("✅ Validação de risco: OK");
    return true;
+}
+
+//+------------------------------------------------------------------+
+//| GESTÃO DE POSIÇÕES ABERTAS - v4.11                              |
+//+------------------------------------------------------------------+
+
+// Variáveis globais para rastreamento de trades
+struct TradeState
+{
+   ulong    ticket;
+   bool     movedToBreakeven;
+   bool     tp1Hit;
+   bool     tp2Hit;
+   bool     trailingActive;
+   datetime lastUpdate;
+};
+
+TradeState g_tradeStates[];
+
+//+------------------------------------------------------------------+
+//| Encontrar ou criar estado do trade                              |
+//+------------------------------------------------------------------+
+int FindOrCreateTradeState(ulong ticket)
+{
+   // Procurar se já existe
+   for(int i = 0; i < ArraySize(g_tradeStates); i++)
+   {
+      if(g_tradeStates[i].ticket == ticket)
+         return i;
+   }
+   
+   // Criar novo
+   int newSize = ArraySize(g_tradeStates) + 1;
+   ArrayResize(g_tradeStates, newSize);
+   
+   g_tradeStates[newSize-1].ticket = ticket;
+   g_tradeStates[newSize-1].movedToBreakeven = false;
+   g_tradeStates[newSize-1].tp1Hit = false;
+   g_tradeStates[newSize-1].tp2Hit = false;
+   g_tradeStates[newSize-1].trailingActive = false;
+   g_tradeStates[newSize-1].lastUpdate = TimeCurrent();
+   
+   return newSize-1;
+}
+
+//+------------------------------------------------------------------+
+//| Remover trade estado quando fechado                             |
+//+------------------------------------------------------------------+
+void RemoveTradeState(ulong ticket)
+{
+   for(int i = ArraySize(g_tradeStates) - 1; i >= 0; i--)
+   {
+      if(g_tradeStates[i].ticket == ticket)
+      {
+         // Remover movendo último elemento para esta posição
+         if(i < ArraySize(g_tradeStates) - 1)
+         {
+            g_tradeStates[i] = g_tradeStates[ArraySize(g_tradeStates) - 1];
+         }
+         ArrayResize(g_tradeStates, ArraySize(g_tradeStates) - 1);
+         break;
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| FUNÇÃO PRINCIPAL: Gerenciar todas as posições abertas           |
+//+------------------------------------------------------------------+
+void ManageExistingTrades()
+{
+   // Verificar cada posição aberta
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == 0)
+         continue;
+      
+      if(!PositionSelectByTicket(ticket))
+         continue;
+         
+      if(PositionGetInteger(POSITION_MAGIC) != EA_MAGIC_NUMBER)
+         continue;
+         
+      // Gerenciar este trade
+      ManageSingleTrade(ticket);
+   }
+   
+   // Limpar estados de trades que foram fechados
+   CleanupClosedTrades();
+}
+
+//+------------------------------------------------------------------+
+//| Limpar estados de trades fechados                               |
+//+------------------------------------------------------------------+
+void CleanupClosedTrades()
+{
+   for(int i = ArraySize(g_tradeStates) - 1; i >= 0; i--)
+   {
+      ulong ticket = g_tradeStates[i].ticket;
+      
+      // Verificar se posição ainda existe
+      if(!PositionSelectByTicket(ticket))
+      {
+         RemoveTradeState(ticket);
+      }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| Gerenciar um trade específico                                    |
+//+------------------------------------------------------------------+
+void ManageSingleTrade(ulong ticket)
+{
+   if(!PositionSelectByTicket(ticket))
+      return;
+   
+   // Obter informações da posição
+   double currentPrice = PositionGetDouble(POSITION_PRICE_CURRENT);
+   double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+   double currentSL = PositionGetDouble(POSITION_SL);
+   double currentTP = PositionGetDouble(POSITION_TP);
+   bool isLong = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
+   string symbol = PositionGetString(POSITION_SYMBOL);
+   
+   // Calcular lucro atual em RR
+   double slDistance = MathAbs(openPrice - currentSL);
+   if(slDistance == 0)
+      return; // SL inválido, não gerenciar
+      
+   double currentProfit = isLong ? (currentPrice - openPrice) : (openPrice - currentPrice);
+   double currentRR = currentProfit / slDistance;
+   
+   // Obter ou criar estado do trade
+   int stateIdx = FindOrCreateTradeState(ticket);
+   
+   // ════════════════════════════════════════════════════════════════
+   // 1. MOVER PARA BREAKEVEN quando atingir 1:1 RR
+   // ════════════════════════════════════════════════════════════════
+   if(!g_tradeStates[stateIdx].movedToBreakeven && currentRR >= 1.0)
+   {
+      if(MoveToBreakeven(ticket, openPrice, symbol))
+      {
+         g_tradeStates[stateIdx].movedToBreakeven = true;
+         PrintFormat("✅ Trade #%I64u: SL movido para BREAKEVEN (RR atual: %.2f)", ticket, currentRR);
+      }
+   }
+   
+   // ════════════════════════════════════════════════════════════════
+   // 2. TAKE PROFIT PARCIAL TP1
+   // ════════════════════════════════════════════════════════════════
+   if(EnablePartialTP && !g_tradeStates[stateIdx].tp1Hit && currentRR >= TP1_RR)
+   {
+      if(ExecutePartialClose(ticket, TP1_ClosePercent, symbol))
+      {
+         g_tradeStates[stateIdx].tp1Hit = true;
+         PrintFormat("🎯 Trade #%I64u: TP1 atingido! Fechados %.1f%% (RR: %.2f)", 
+                     ticket, TP1_ClosePercent, currentRR);
+      }
+   }
+   
+   // ════════════════════════════════════════════════════════════════
+   // 3. TAKE PROFIT PARCIAL TP2
+   // ════════════════════════════════════════════════════════════════
+   if(EnablePartialTP && g_tradeStates[stateIdx].tp1Hit && 
+      !g_tradeStates[stateIdx].tp2Hit && currentRR >= TP2_RR)
+   {
+      if(ExecutePartialClose(ticket, TP2_ClosePercent, symbol))
+      {
+         g_tradeStates[stateIdx].tp2Hit = true;
+         g_tradeStates[stateIdx].trailingActive = true; // Ativar trailing após TP2
+         PrintFormat("🎯 Trade #%I64u: TP2 atingido! Fechados %.1f%% | Trailing ATIVADO (RR: %.2f)", 
+                     ticket, TP2_ClosePercent, currentRR);
+      }
+   }
+   
+   // ════════════════════════════════════════════════════════════════
+   // 4. TRAILING STOP após TP1 ou quando configurado
+   // ════════════════════════════════════════════════════════════════
+   if(EnableTrailing && currentRR >= TrailingActivationRR)
+   {
+      // Ativar trailing automaticamente se atingiu RR mínimo
+      if(!g_tradeStates[stateIdx].trailingActive)
+      {
+         g_tradeStates[stateIdx].trailingActive = true;
+         PrintFormat("📈 Trade #%I64u: Trailing ATIVADO (RR: %.2f >= %.2f)", 
+                     ticket, currentRR, TrailingActivationRR);
+      }
+      
+      // Atualizar trailing stop
+      UpdateTrailingStop(ticket, currentPrice, currentSL, isLong, symbol);
+   }
+   
+   // Atualizar timestamp
+   g_tradeStates[stateIdx].lastUpdate = TimeCurrent();
+}
+
+//+------------------------------------------------------------------+
+//| Mover SL para breakeven                                         |
+//+------------------------------------------------------------------+
+bool MoveToBreakeven(ulong ticket, double openPrice, string symbol)
+{
+   // Adicionar pequeno spread ao breakeven (garantir lucro mínimo)
+   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double newSL = openPrice + (spread * 0.5); // Breakeven + metade do spread
+   
+   MqlTradeRequest request;
+   MqlTradeResult result;
+   
+   ZeroMemory(request);
+   request.action = TRADE_ACTION_SLTP;
+   request.position = ticket;
+   request.symbol = symbol;
+   request.sl = newSL;
+   request.tp = PositionGetDouble(POSITION_TP);
+   request.magic = EA_MAGIC_NUMBER;
+   
+   if(OrderSend(request, result))
+   {
+      if(result.retcode == TRADE_RETCODE_DONE)
+      {
+         return true;
+      }
+   }
+   
+   PrintFormat("⚠️ Falha ao mover para breakeven: %d - %s", result.retcode, result.comment);
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Fechar parcialmente a posição                                   |
+//+------------------------------------------------------------------+
+bool ExecutePartialClose(ulong ticket, double percentToClose, string symbol)
+{
+   if(!PositionSelectByTicket(ticket))
+      return false;
+   
+   double currentVolume = PositionGetDouble(POSITION_VOLUME);
+   double volumeToClose = currentVolume * (percentToClose / 100.0);
+   
+   // Normalizar volume
+   double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+   volumeToClose = MathFloor(volumeToClose / lotStep) * lotStep;
+   
+   // Validar volume mínimo
+   if(volumeToClose < minLot)
+   {
+      PrintFormat("⚠️ Volume parcial %.2f < mínimo %.2f, ajustando", volumeToClose, minLot);
+      volumeToClose = minLot;
+   }
+   
+   // Não fechar se volume maior que posição atual
+   if(volumeToClose > currentVolume)
+   {
+      volumeToClose = currentVolume;
+   }
+   
+   MqlTradeRequest request;
+   MqlTradeResult result;
+   
+   ZeroMemory(request);
+   request.action = TRADE_ACTION_DEAL;
+   request.position = ticket;
+   request.symbol = symbol;
+   request.volume = volumeToClose;
+   request.type = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY) ? 
+                  ORDER_TYPE_SELL : ORDER_TYPE_BUY;
+   request.price = (request.type == ORDER_TYPE_SELL) ? 
+                   SymbolInfoDouble(symbol, SYMBOL_BID) :
+                   SymbolInfoDouble(symbol, SYMBOL_ASK);
+   request.deviation = MaxSlippagePoints;
+   request.magic = EA_MAGIC_NUMBER;
+   
+   if(OrderSend(request, result))
+   {
+      if(result.retcode == TRADE_RETCODE_DONE)
+      {
+         PrintFormat("   ✅ Fechamento parcial: %.2f lots (%.1f%%) no preço %.5f", 
+                     volumeToClose, percentToClose, result.price);
+         return true;
+      }
+   }
+   
+   PrintFormat("⚠️ Falha no fechamento parcial: %d - %s", result.retcode, result.comment);
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Atualizar trailing stop                                         |
+//+------------------------------------------------------------------+
+void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, bool isLong, string symbol)
+{
+   double trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double newSL;
+   
+   if(isLong)
+   {
+      newSL = currentPrice - trailingDist;
+      
+      // Só mover SL para cima (proteção) e respeitar step mínimo
+      if(newSL <= currentSL || (newSL - currentSL) < stepDist)
+         return;
+   }
+   else
+   {
+      newSL = currentPrice + trailingDist;
+      
+      // Só mover SL para baixo (proteção) e respeitar step mínimo
+      if(newSL >= currentSL || (currentSL - newSL) < stepDist)
+         return;
+   }
+   
+   MqlTradeRequest request;
+   MqlTradeResult result;
+   
+   ZeroMemory(request);
+   request.action = TRADE_ACTION_SLTP;
+   request.position = ticket;
+   request.symbol = symbol;
+   request.sl = newSL;
+   request.tp = PositionGetDouble(POSITION_TP);
+   request.magic = EA_MAGIC_NUMBER;
+   
+   if(OrderSend(request, result))
+   {
+      if(result.retcode == TRADE_RETCODE_DONE)
+      {
+         PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts)", 
+                     currentSL, newSL, MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT));
+      }
+   }
 }
 
 //+------------------------------------------------------------------+

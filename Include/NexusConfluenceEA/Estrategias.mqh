@@ -662,32 +662,32 @@ GGTrendBarSignal GetGGTrendBarSignal()
    
    // GG TrendBar tem 18 buffers (9 TFs × 2)
    // Buffers de dados: 0=M1, 2=M5, 4=M15, 6=M30, 8=H1, 10=H4, 12=D1, 14=W1, 16=MN1
-   double m1[1], m5[1], m15[1], m30[1], h1[1], h4[1], d1[1], w1[1], mn1[1];
+   double gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1];
    
-   if(CopyBuffer(g_handles.gg_global, 0, 0, 1, m1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 2, 0, 1, m5) != 1 ||
-      CopyBuffer(g_handles.gg_global, 4, 0, 1, m15) != 1 ||
-      CopyBuffer(g_handles.gg_global, 6, 0, 1, m30) != 1 ||
-      CopyBuffer(g_handles.gg_global, 8, 0, 1, h1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 10, 0, 1, h4) != 1 ||
-      CopyBuffer(g_handles.gg_global, 12, 0, 1, d1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 14, 0, 1, w1) != 1 ||
-      CopyBuffer(g_handles.gg_global, 16, 0, 1, mn1) != 1)
+   if(CopyBuffer(g_handles.gg_global, 0, 0, 1, gg_m1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 2, 0, 1, gg_m5) != 1 ||
+      CopyBuffer(g_handles.gg_global, 4, 0, 1, gg_m15) != 1 ||
+      CopyBuffer(g_handles.gg_global, 6, 0, 1, gg_m30) != 1 ||
+      CopyBuffer(g_handles.gg_global, 8, 0, 1, gg_h1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 10, 0, 1, gg_h4) != 1 ||
+      CopyBuffer(g_handles.gg_global, 12, 0, 1, gg_d1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 14, 0, 1, gg_w1) != 1 ||
+      CopyBuffer(g_handles.gg_global, 16, 0, 1, gg_mn1) != 1)
    {
       PrintFormat("❌ Erro ao copiar buffers GG TrendBar");
       return result;
    }
    
    // Preencher valores (+1 = bullish, 0 = neutral, -1 = bearish)
-   result.m1Value = (int)m1[0];
-   result.m5Value = (int)m5[0];
-   result.m15Value = (int)m15[0];
-   result.m30Value = (int)m30[0];
-   result.h1Value = (int)h1[0];
-   result.h4Value = (int)h4[0];
-   result.d1Value = (int)d1[0];
-   result.w1Value = (int)w1[0];
-   result.mn1Value = (int)mn1[0];
+   result.m1Value = (int)gg_m1[0];
+   result.m5Value = (int)gg_m5[0];
+   result.m15Value = (int)gg_m15[0];
+   result.m30Value = (int)gg_m30[0];
+   result.h1Value = (int)gg_h1[0];
+   result.h4Value = (int)gg_h4[0];
+   result.d1Value = (int)gg_d1[0];
+   result.w1Value = (int)gg_w1[0];
+   result.mn1Value = (int)gg_mn1[0];
    
    // Interpretação booleana
    result.h4Bullish = (result.h4Value == 1);

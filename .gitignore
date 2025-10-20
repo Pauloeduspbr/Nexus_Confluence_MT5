@@ -81,3 +81,5 @@ LEIA_ISSO_URGENTE.md
 *.log
 *.md
 .gitignore
+STATUS_CORRECAO.txt
+*.txt

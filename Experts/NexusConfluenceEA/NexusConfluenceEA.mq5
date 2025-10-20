@@ -37,8 +37,6 @@
 //--- Variáveis globais do EA principal
 CTrade g_trade;
 double g_initialBalance = 0.0;      // Balance inicial (apenas referência)
-int    g_lastReportMonth = -1;
-int    g_lastCleanupDay  = -1;
 
 double g_pointValueCache = 0.0;
 ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
@@ -960,19 +958,44 @@ string GetDeinitReasonText(int reason)
   }
 
 //+------------------------------------------------------------------+
-//| Limpeza de logs antigos (placeholder)                           |
+//| Expert timer function (executado a cada hora)                   |
 //+------------------------------------------------------------------+
-void CleanupOldLogs()
+void OnTimer()
   {
-   // TODO: Implementar limpeza de logs
+   // Obter data/hora atual
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   // Verificação de integridade do sistema
+   ValidateSystemIntegrity();
+   
+   // Log periódico de status
+   if(dt.min == 0) // A cada hora cheia
+     {
+      PrintFormat("⏰ Status horário: %02d:00 | Posições abertas: %d | Saldo: %.2f",
+                  dt.hour,
+                  CountOpenTrades(),
+                  AccountInfoDouble(ACCOUNT_BALANCE));
+     }
   }
 
 //+------------------------------------------------------------------+
-//| Validação de integridade do sistema (placeholder)               |
+//| Limpeza de logs antigos                                         |
+//+------------------------------------------------------------------+
+void CleanupOldLogs()
+  {
+   // TODO: Implementar limpeza de logs antigos quando necessário
+   // Por enquanto, apenas placeholder para futuras implementações
+  }
+
+//+------------------------------------------------------------------+
+//| Validação de integridade do sistema                             |
 //+------------------------------------------------------------------+
 void ValidateSystemIntegrity()
   {
-   // TODO: Implementar validações periódicas
+   // Verificar se indicadores ainda estão válidos
+   // Reconectar se necessário
+   // Por enquanto, apenas placeholder para futuras implementações
   }
 
 //+------------------------------------------------------------------+

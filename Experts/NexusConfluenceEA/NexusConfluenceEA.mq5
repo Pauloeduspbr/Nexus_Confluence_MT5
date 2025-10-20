@@ -1,19 +1,26 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.22 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.22: CORREÇÕES CRÍTICAS IDENTIFICADAS EM ANÁLISE DE IMAGENS |
+//| Nexus Confluence EA v4.23 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.23: CORREÇÕES CRÍTICAS - ORDENS NÃO ABRINDO (USDJPY)      |
 //|                                                                  |
-//|   ❌ BUG #1: Validação SL máximo não rejeitava (v4.21)          |
-//|      Problema: SL_MaxDistancePoints=500 mas permitia 800!        |
-//|      Resultado: TP's absurdos (120-240 pips), nunca atingidos   |
-//|      ✅ CORREÇÃO: Agora REJEITA se SL > 300 pontos (30 pips)    |
+//|   ❌ BUG #1: DESSINCRONIZAÇÃO TEMPORAL (CRÍTICO!)               |
+//|      Problema: GG TrendBar lia candle [1], filtros micro [0]    |
+//|      Resultado: Multi-TF "atrasado" 1 candle, conflito com Micro|
+//|      Evidência: Imagens USDJPY com sinais mas sem trades        |
+//|      ✅ CORREÇÃO: GG TrendBar agora lê [0] = TUDO SINCRONIZADO  |
 //|                                                                  |
-//|   ❌ BUG #2: RSI OMA podia ser ignorado se isValid=false        |
-//|      Evidência: Imagem 6 - RSI bullish mas EA vendeu!           |
-//|      ✅ CORREÇÃO: RSI OMA agora OBRIGATÓRIO - rejeita se inválido|
+//|   ❌ BUG #2: M30 divergente REJEITAVA setup válido              |
+//|      Problema: AllowGoodSetups=false + M30 oposto = REJEITADO   |
+//|      Resultado: H4+H1 alinhados mas M30 oposto = SEM TRADE      |
+//|      ✅ CORREÇÃO: M30 só define PREMIUM vs GOOD (não rejeita)   |
 //|                                                                  |
-//|   📊 AJUSTES: SL máximo 500→300 pontos (Forex razoável)         |
+//|   📊 AJUSTE #1: ATR ranges para pares JPY                       |
+//|      USDJPY: 5-80 pips (era 10-100)                             |
+//|      Outros JPY minor: 8-120 pips (era 15-150)                  |
 //|                                                                  |
-//|   ⚠️ IMPACTO ESPERADO: Menos trades, mas mais qualidade         |
+//|   📊 AJUSTE #2: Logs de debug detalhados                        |
+//|      Mostra valores [0] vs [1], direção, filtros que falharam   |
+//|                                                                  |
+//|   ⚠️ IMPACTO ESPERADO: ORDENS DEVEM ABRIR EM SINAIS VÁLIDOS!    |
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
@@ -51,7 +58,7 @@
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.17 - Correções Críticas 5 Bugs                       |
+//| Versão: 4.23 - Correção Crítica Abertura Ordens USDJPY         |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
@@ -905,18 +912,39 @@ bool ValidateATR(const string symbol, ASSET_CLASS assetClass)
    // Definir ranges ideais por classe de ativo (em pips/pontos)
    double minATR = 0, maxATR = 0;
    
+   // 🔥 v4.23 CORREÇÃO: Ajustes específicos para pares JPY
+   // USDJPY tem ATR menor que EUR/USD (ex: 50-60 pips vs 80-100 pips)
+   // Detectar se é par JPY analisando o símbolo
+   bool isJPYPair = (StringFind(symbol, "JPY") >= 0);
+
    switch(assetClass)
      {
       case ASSET_CLASS_FOREX_MAJOR:
-         minATR = 10 * point * 10;   // 10 pips
-         maxATR = 100 * point * 10;  // 100 pips
+         if(isJPYPair)
+         {
+            minATR = 5 * point * 10;    // 5 pips (JPY menos volátil)
+            maxATR = 80 * point * 10;   // 80 pips (JPY range menor)
+         }
+         else
+         {
+            minATR = 10 * point * 10;   // 10 pips
+            maxATR = 100 * point * 10;  // 100 pips
+         }
          break;
-         
+
       case ASSET_CLASS_FOREX_MINOR:
-         minATR = 15 * point * 10;   // 15 pips
-         maxATR = 150 * point * 10;  // 150 pips
+         if(isJPYPair)
+         {
+            minATR = 8 * point * 10;    // 8 pips
+            maxATR = 120 * point * 10;  // 120 pips
+         }
+         else
+         {
+            minATR = 15 * point * 10;   // 15 pips
+            maxATR = 150 * point * 10;  // 150 pips
+         }
          break;
-         
+
       case ASSET_CLASS_FOREX_EXOTIC:
          minATR = 30 * point * 10;   // 30 pips
          maxATR = 300 * point * 10;  // 300 pips

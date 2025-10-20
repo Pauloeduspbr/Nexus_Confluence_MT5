@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.14 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.23 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -19,16 +19,20 @@
 //| NOVO v4.12: Supertrend obrigatório + Hierarquia otimizada       |
 //| NOVO v4.13: Limpeza total (handles + gráfico + objetos)         |
 //| 🔥 CRÍTICO v4.14: CORREÇÃO LÓGICA SUPERTREND (DBL_MAX)         |
+//| 🔥 CRÍTICO v4.23: SINCRONIZAÇÃO TEMPORAL + M30 LOGIC            |
+//|   - GG TrendBar agora lê candle [0] (era [1])                   |
+//|   - M30 divergente não rejeita mais (só PREMIUM vs GOOD)        |
+//|   - Logs de debug detalhados para diagnóstico                   |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.14 - Correção Crítica Leitura Supertrend             |
+//| VERSÃO: 4.23 - Correção Crítica Abertura Ordens                 |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.14"
-#property version   "4.14"
+#property copyright "Nexus Confluence EA v4.23"
+#property version   "4.23"
 #property strict
 
 // Incluir primeiro o arquivo de parâmetros
@@ -688,29 +692,32 @@ GGTrendBarSignal GetGGTrendBarSignal()
       return result;
    }
    
-   // 🔥 v4.21: COMPARAR CANDLE ATUAL [0] vs CANDLE FECHADO [1]
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] CANDLE ATUAL [0] (pode estar incompleto):");
+   // 🔥 v4.23 CORREÇÃO CRÍTICA: SINCRONIZAÇÃO TEMPORAL
+   // BUG v4.21: Usava candle [1] para Multi-TF mas [0] para Micro
+   // Resultado: Dessincronização temporal - Multi-TF "atrasado" 1 candle
+   // SOLUÇÃO: Usar candle [0] para TUDO (Multi-TF + Micro sincronizados)
+
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] CANDLE ATUAL [0] (SINCRONIZADO COM FILTROS MICRO):");
    PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
                gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
-   
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] CANDLE FECHADO [1] (VALORES CONFIRMADOS - USADO PELO EA):");
+
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] CANDLE FECHADO [1] (REFERÊNCIA):");
    PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
                gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1]);
-   
-   // 🔥 v4.21: USAR CANDLE FECHADO [1] para garantir valores CONFIRMADOS
-   // Problema v4.20: Timeframes superiores (M30/H1/H4) podem não ter atualizado no candle atual [0]
-   // Solução: Usar último candle FECHADO [1] que tem valores definitivos
-   result.m1Value = (int)gg_m1[1];
-   result.m5Value = (int)gg_m5[1];
-   result.m15Value = (int)gg_m15[1];
-   result.m30Value = (int)gg_m30[1];
-   result.h1Value = (int)gg_h1[1];
-   result.h4Value = (int)gg_h4[1];
-   result.d1Value = (int)gg_d1[1];
-   result.w1Value = (int)gg_w1[1];
-   result.mn1Value = (int)gg_mn1[1];
-   
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.21] Valores convertidos (int) do candle [1]:");
+
+   // 🔥 v4.23: USAR CANDLE ATUAL [0] para SINCRONIZAR com filtros Micro
+   // Supertrend, WAE, RSI também leem [0] → TUDO NO MESMO TEMPO!
+   result.m1Value = (int)gg_m1[0];
+   result.m5Value = (int)gg_m5[0];
+   result.m15Value = (int)gg_m15[0];
+   result.m30Value = (int)gg_m30[0];
+   result.h1Value = (int)gg_h1[0];
+   result.h4Value = (int)gg_h4[0];
+   result.d1Value = (int)gg_d1[0];
+   result.w1Value = (int)gg_w1[0];
+   result.mn1Value = (int)gg_mn1[0];
+
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.23] Valores convertidos (int) do candle [0] - SINCRONIZADO:");
    PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
                result.m1Value, result.m5Value, result.m15Value, result.m30Value,
                result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);
@@ -807,15 +814,29 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       }
    }
    
-   PrintFormat("📊 GG TrendBar - MACRO-1(%s)=%+d | MACRO-2(%s)=%+d | MACRO-3(%s)=%+d",
+   // 🔥 v4.23 DEBUG DETALHADO: Análise completa dos timeframes
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("📊 GG TrendBar - LEITURA DOS TIMEFRAMES:");
+   PrintFormat("   MACRO-1 (%s): %+d %s",
                TimeframeToString(g_tfMacro1), macro1Value,
+               (macro1Value > 0) ? "🟢 BULLISH" : (macro1Value < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+   PrintFormat("   MACRO-2 (%s): %+d %s",
                TimeframeToString(g_tfMacro2), macro2Value,
-               TimeframeToString(g_tfMacro3), macro3Value);
-   
+               (macro2Value > 0) ? "🟢 BULLISH" : (macro2Value < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+   if(g_numNiveisMacro == 3)
+   {
+      PrintFormat("   MACRO-3 (%s): %+d %s",
+                  TimeframeToString(g_tfMacro3), macro3Value,
+                  (macro3Value > 0) ? "🟢 BULLISH" : (macro3Value < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+   }
+   PrintFormat("────────────────────────────────────────────────────────────────");
+
    // ✅ VALIDAÇÃO 1: Pelo menos UM dos MACRO deve estar DEFINIDO (não neutro)
    if(macro1Value == 0 && macro2Value == 0)
    {
-      PrintFormat("⚠️ MACRO-1 e MACRO-2 AMBOS neutros - aguardar definição");
+      PrintFormat("❌ REJEIÇÃO ETAPA 1: MACRO-1 e MACRO-2 AMBOS NEUTROS");
+      PrintFormat("   Aguardando definição de tendência nos timeframes macro");
+      PrintFormat("════════════════════════════════════════════════════════════════");
       return result;
    }
    
@@ -831,8 +852,13 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
       if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
       {
-         PrintFormat("⚠️ MACRO-1(%+d) e MACRO-2(%+d) em direções OPOSTAS - aguardar alinhamento",
-                     macro1Value, macro2Value);
+         PrintFormat("❌ REJEIÇÃO ETAPA 2: TIMEFRAMES EM DIREÇÕES OPOSTAS");
+         PrintFormat("   MACRO-1 (%s): %s", TimeframeToString(g_tfMacro1),
+                     macro1Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
+         PrintFormat("   MACRO-2 (%s): %s", TimeframeToString(g_tfMacro2),
+                     macro2Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
+         PrintFormat("   Aguardando alinhamento entre os timeframes macro");
+         PrintFormat("════════════════════════════════════════════════════════════════");
          return result;
       }
       
@@ -872,9 +898,9 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)
    {
-      // 🔥 v4.20 CORREÇÃO CRÍTICA: Comparar M30 com a DIREÇÃO estabelecida, não com macro1Value!
+      // 🔥 v4.23 CORREÇÃO CRÍTICA: M30 divergente NÃO deve rejeitar, apenas impede PREMIUM
       int expectedValue = (result.direction == TRADE_DIRECTION_BUY) ? 1 : -1;
-      
+
       if(macro3Value == expectedValue)  // MACRO-3 alinha com direção do trade
       {
          result.m30Aligned = true;
@@ -884,19 +910,13 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       else if(macro3Value == -expectedValue)  // MACRO-3 oposto à direção
       {
          result.m30Aligned = false;
-         
-         // CORREÇÃO CRÍTICA: MACRO-3 oposto NÃO deve rejeitar o trade!
-         // Deve apenas impedir classificação PREMIUM, mas permite GOOD
-         if(AllowGoodSetups || AllowCautiousSetups)
-         {
-            PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto (ACEITO)");
-            PrintFormat("   ⚠️ MACRO-3 divergente - não será PREMIUM mas pode ser GOOD");
-         }
-         else
-         {
-            PrintFormat("❌ MACRO-3 oposto E AllowGoodSetups=false - REJEITADO");
-            return result;  // Rejeitar se não permitir GOOD setups
-         }
+
+         // 🔥 v4.23: M30 OPOSTO = SETUP GOOD (NÃO REJEITAR!)
+         // BUG v4.21: Rejeitava se AllowGoodSetups=false mesmo com H4+H1 válidos
+         // CORREÇÃO: M30 só define PREMIUM vs GOOD, não válido vs inválido
+         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto");
+         PrintFormat("   ⚠️ MACRO-3 divergente - será classificado como GOOD (não PREMIUM)");
+         // NÃO retornar aqui! Continuar validação (será GOOD se 2/3 filtros)
       }
       else  // Neutro (macro3Value == 0)
       {
@@ -914,9 +934,16 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    // Estrutura válida (por ora, simplificado)
    result.structureValid = true;
    result.isValid = true;
-   
+
+   // 🔥 v4.23 LOG RESUMO FINAL DO ALINHAMENTO
+   PrintFormat("────────────────────────────────────────────────────────────────");
+   PrintFormat("✅ MULTI-TIMEFRAME APROVADO:");
+   PrintFormat("   Direção: %s", (result.direction == TRADE_DIRECTION_BUY) ? "🟢 COMPRA" : "🔴 VENDA");
+   PrintFormat("   H4 Alinhado: %s", result.h4Aligned ? "✅" : "❌");
+   PrintFormat("   H1 Alinhado: %s", result.h1Aligned ? "✅" : "❌");
+   PrintFormat("   M30 Alinhado: %s (determina PREMIUM vs GOOD)", result.m30Aligned ? "✅" : "❌");
    PrintFormat("════════════════════════════════════════════════════════════════");
-   
+
    return result;
 }
 

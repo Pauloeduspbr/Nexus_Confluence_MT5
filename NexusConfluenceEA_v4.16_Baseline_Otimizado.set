@@ -1,0 +1,188 @@
+; Nexus Confluence EA v4.16 - Configuração Otimizada Baseline
+; Data: 20/10/2025
+; Objetivo: Corrigir PF 1.10/DD 55% para PF 1.5+/DD <20%
+; Perfil: Conservador com TP's estendidos
+
+; ═══════════════════════════════════════════════════════════════
+; 💰 GESTÃO DE RISCO - CONSERVADOR
+; ═══════════════════════════════════════════════════════════════
+AccountRiskPercent=0.5        ; Reduzido para controlar DD
+MaxRiskPremium=1.0            ; Máximo apenas em PREMIUM 3/3
+MaxDailyDrawdown=3.0          ; Pausa se perder 3% no dia
+MaxWeeklyDrawdown=5.0         ; Pausa se perder 5% na semana
+MaxConsecutiveLosses=3        ; Pausa após 3 perdas seguidas
+MaxSimultaneousTrades=3       ; Máximo 3 posições abertas
+FixedLotSize=0.0              ; Automático por risco %
+
+; ═══════════════════════════════════════════════════════════════
+; 🛡️ STOP LOSS ESTRUTURAL - PARAMETRIZADO
+; ═══════════════════════════════════════════════════════════════
+SL_UseStructure=true          ; Usar estrutura de preços
+SL_StructureCandles=50        ; Analisar últimos 50 candles
+SL_StructureStrength=2.0      ; Swing forte (2x ATR)
+SL_SafetyMultiplier=1.2       ; +20% margem de segurança
+SL_BufferPoints=10.0          ; Buffer adicional 10 pontos
+SL_FallbackPercent=0.3        ; 0.3% do preço se estrutura falhar
+SL_MinDistancePoints=50.0     ; Mínimo 50 pontos
+SL_MaxDistancePoints=500.0    ; Máximo 500 pontos
+
+; ═══════════════════════════════════════════════════════════════
+; 🎯 TAKE PROFIT DINÂMICO - BASEADO EM ATR
+; ═══════════════════════════════════════════════════════════════
+EnablePartialTP=true          ; Saídas parciais ATIVAS
+TP_UseATR=true                ; TPs baseados em ATR
+TP1_RR=1.5                    ; 🔥 v4.16: 1.0→1.5 (melhorar payoff)
+TP2_RR=3.0                    ; 🔥 v4.16: 2.0→3.0 (capturar movimento)
+TP3_RR=5.0                    ; 🔥 v4.16: 3.0→5.0 (movimentos grandes)
+UseTP3=false                  ; TP3 desabilitado por padrão
+
+; TPs baseados em ATR (se TP_UseATR=true)
+TP1_ATRMultiplier=2.0         ; TP1 = 2x ATR
+TP2_ATRMultiplier=4.0         ; TP2 = 4x ATR
+TP3_ATRMultiplier=6.0         ; TP3 = 6x ATR
+TP_MinRRRatio=1.2             ; Rejeitar se RR < 1:1.2
+
+; Percentuais de fechamento
+TP1_ClosePercent=40.0         ; 🔥 v4.16: 50→40% (deixar correr mais)
+TP2_ClosePercent=40.0         ; 🔥 v4.16: 30→40% (equilíbrio)
+TP3_ClosePercent=20.0         ; Fechar restante
+
+; ═══════════════════════════════════════════════════════════════
+; 📈 TRAILING STOP AVANÇADO
+; ═══════════════════════════════════════════════════════════════
+EnableTrailing=true           ; Trailing ATIVO
+TrailingUseATR=true           ; Baseado em ATR
+TrailingATRMultiplier=2.5     ; 2.5x ATR
+TrailingDistancePoints=200.0  ; Fallback se ATR desabilitado
+TrailingStepPoints=50.0       ; Passo mínimo 50 pontos
+TrailingActivationRR=1.5      ; Ativar após 1.5:1
+TrailingStartAfterTP=true     ; 🔥 v4.16: Só após TP1 fechado
+TrailingMinProfit=0.5         ; 🔥 v4.16: Lucro mín 0.5% para ativar
+TrailingMaxRisk=0.2           ; 🔥 v4.16: Risco máx 0.2%
+
+; ═══════════════════════════════════════════════════════════════
+; 🛡️ BREAKEVEN E PROTEÇÃO DE LUCRO
+; ═══════════════════════════════════════════════════════════════
+EnableBreakeven=true          ; 🔥 v4.16: ATIVO
+BreakevenAfterRR=1.0          ; Mover BE após 1:1
+BreakevenPlusPoints=5.0       ; BE + 5 pontos (lucro mínimo)
+EnableProfitLock=true         ; 🔥 v4.16: Travar lucro
+LockProfitAfterRR=2.0         ; Travar após 2:1
+LockProfitPercent=50.0        ; Travar 50% do lucro flutuante
+
+; ═══════════════════════════════════════════════════════════════
+; 💰 RISCO ADAPTATIVO - DESABILITADO (Conservador)
+; ═══════════════════════════════════════════════════════════════
+UseAdaptiveSizing=false       ; Desabilitado (testar primeiro fixo)
+WinStreakMultiplier=1.2       ; Se ativar: +20% após ganhos
+WinStreakThreshold=2          ; 2 ganhos para aumentar
+LossStreakDivisor=0.5         ; Se ativar: -50% após perdas
+LossStreakThreshold=2         ; 2 perdas para reduzir
+MaxPositionMultiplier=2.0     ; Máximo 2x lote base
+MaxDailyLoss=5.0              ; Perda máx 5% dia (pausa)
+MaxWeeklyLoss=10.0            ; Perda máx 10% semana (pausa)
+ReduceRiskAfterLoss=true      ; Reduzir risco após perdas
+RiskReductionFactor=0.5       ; Reduzir 50%
+RecoveryMode=false            ; Modo recuperação OFF
+
+; ═══════════════════════════════════════════════════════════════
+; 🎯 QUALIDADE DE SETUP (Confluência)
+; ═══════════════════════════════════════════════════════════════
+MinConfluenceScore=75         ; 🔥 v4.16: Pontuação mínima 75/100
+RequireSupertrend=true        ; Supertrend OBRIGATÓRIO
+RequireADXConfirmation=false  ; ADX opcional (testar depois)
+MinADXStrength=20.0           ; Se RequireADX=true
+RequireVolumeConfirm=false    ; Volume opcional
+VolumeMultiplier=1.2          ; 1.2x volume médio
+
+; ═══════════════════════════════════════════════════════════════
+; ⏰ HORÁRIOS - LONDRES/NY OVERLAP (10-16h BR)
+; ═══════════════════════════════════════════════════════════════
+UseCustomTradingHours=true    ; Horários customizados ATIVOS
+CustomStartHour=10            ; Início 10:00 BR
+CustomStartMinute=0
+CustomEndHour=16              ; Fim 16:00 BR
+CustomEndMinute=0
+
+; Dias da semana
+TradeOnMonday=true
+TradeOnTuesday=true
+TradeOnWednesday=true
+TradeOnThursday=true
+TradeOnFriday=true
+TradeOnSaturday=false
+TradeOnSunday=false
+
+; ═══════════════════════════════════════════════════════════════
+; 📊 FILTROS E VALIDAÇÕES
+; ═══════════════════════════════════════════════════════════════
+AllowGoodSetups=false         ; 🔥 Apenas PREMIUM 3/3
+AllowCautiousSetups=false     ; Sem setups cautelosos
+ValidateATRRange=true         ; Validar ATR
+UseADXFilter=false            ; ADX filter OFF (testar depois)
+ADX_Period=14
+ADX_MinTrend=25.0
+AvoidNews=true                ; Evitar notícias
+MaxSpreadMultiplier=5.0       ; 5x spread tolerância (testes)
+
+; ═══════════════════════════════════════════════════════════════
+; 🛡️ PROTEÇÕES GERAIS
+; ═══════════════════════════════════════════════════════════════
+MaxSlippagePoints=30          ; Desvio máximo 30 pontos
+LookbackStructureBars=80      ; 80 candles para estrutura
+BrokerGMTOffset=2             ; GMT+2 (inverno)
+SendAlerts=true               ; Notificações ATIVAS
+EnableSecondaryHours=true     ; Horários secundários Forex
+EnableMorningB3=false         ; Sessão manhã B3 OFF
+
+; ═══════════════════════════════════════════════════════════════
+; 🎯 MODO DE POSIÇÕES
+; ═══════════════════════════════════════════════════════════════
+PositionControlMode=2         ; PROTECTED (múltiplas com limite)
+
+; ═══════════════════════════════════════════════════════════════
+; 📝 NOTAS DE CONFIGURAÇÃO
+; ═══════════════════════════════════════════════════════════════
+; Esta configuração visa CORRIGIR os problemas da v4.15:
+; 
+; PROBLEMA 1: DD 55% → SOLUÇÃO: Risco 0.5%, Proteções ativas
+; PROBLEMA 2: Payoff 0.36 → SOLUÇÃO: TP1=1.5, TP2=3.0, TP3=5.0
+; PROBLEMA 3: Perdas > Ganhos → SOLUÇÃO: TP_MinRRRatio=1.2
+; PROBLEMA 4: 95 trades/16m → SOLUÇÃO: MinConfluenceScore=75
+;
+; MUDANÇAS PRINCIPAIS v4.15 → v4.16:
+; ✅ TP1_RR: 1.0 → 1.5 (+50%)
+; ✅ TP2_RR: 2.0 → 3.0 (+50%)
+; ✅ TP3_RR: 3.0 → 5.0 (+67%)
+; ✅ TP1_ClosePercent: 50% → 40% (deixar correr mais)
+; ✅ TP2_ClosePercent: 30% → 40% (equilíbrio)
+; ✅ Breakeven: Ativo após TP1
+; ✅ Lock Profit: 50% após 2:1
+; ✅ Trailing: Só após TP1 fechado
+; ✅ Risco Adaptativo: Disponível (mas OFF por padrão)
+;
+; RESULTADOS ESPERADOS:
+; - Profit Factor: 1.10 → 1.5+
+; - Drawdown: 55% → <20%
+; - Payoff: 0.36 → 1.5+
+; - Win Rate: ~51% (manter)
+; - Trades/mês: 6 → 8-12
+;
+; VALIDAÇÃO OBRIGATÓRIA:
+; ✅ PF > 1.3
+; ✅ DD < 25%
+; ✅ Payoff > 1.0
+; ✅ Sharpe > 1.0
+; ✅ Recovery Factor > 2.0
+;
+; PRÓXIMOS PASSOS:
+; 1. Backtest baseline com esta config
+; 2. Otimizar AccountRiskPercent (0.3-1.5)
+; 3. Otimizar TP_ATRMultipliers (1.5-6.0)
+; 4. Otimizar MinConfluenceScore (60-90)
+; 5. Validar out-of-sample
+; 6. Walk-forward 4 períodos
+; 7. Demo 30 dias
+; 8. Real se tudo OK
+;
+; ═══════════════════════════════════════════════════════════════

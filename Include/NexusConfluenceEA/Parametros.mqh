@@ -1,25 +1,22 @@
 //+------------------------------------------------------------------+
 //| Parametros.mqh                                                    |
-//| Nexus Confluence EA v4.12 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.16 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODOS os inputs e enumerações do EA       |
+//| 🔥 v4.16: PARAMETRIZAÇÃO TOTAL - Zero Hardcode                  |
 //|                                                                   |
 //| ORGANIZAÇÃO:                                                      |
 //|   1. Enumerações (enums)                                         |
 //|   2. Estruturas de dados (structs)                               |
-//|   3. Inputs gerais do EA                                         |
-//|   4. Inputs dos indicadores por timeframe:                       |
-//|      - MACRO-1 (timeframe mais longo)                            |
-//|      - MACRO-2 (timeframe intermediário)                         |
-//|      - MACRO-3 (timeframe curto) - pode não existir em H1/H4    |
-//|      - OPERACIONAL (timeframe atual do gráfico)                  |
+//|   3. Inputs gerais do EA (35+ novos parâmetros)                 |
+//|   4. Inputs dos indicadores por timeframe                        |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.12 - Correções Hierarquia Filtros                     |
+//| VERSÃO: 4.16 - Parametrização Completa para Otimização         |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.12"
-#property version   "4.12"
+#property copyright "Nexus Confluence EA v4.16"
+#property version   "4.16"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -269,16 +266,24 @@ input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço
 input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
 input double SL_MaxDistancePoints     = 500.0;  // 📊 Distância máxima SL (pontos)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
+input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
+input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
+input double SL_SafetyMultiplier      = 1.2;    // 🛡️ Margem de segurança (1.0 = exato, 1.2 = +20%)
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
-input double TP1_RR                   = 1.0;    // 🎯 TP1 Risk/Reward
-input double TP2_RR                   = 2.0;    // 🎯 TP2 Risk/Reward
-input double TP3_RR                   = 3.0;    // 🎯 TP3 Risk/Reward (opcional)
+input double TP1_RR                   = 1.5;    // 🎯 TP1 Risk/Reward - 🔥 v4.16: 1.0→1.5
+input double TP2_RR                   = 3.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.16: 2.0→3.0
+input double TP3_RR                   = 5.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.16: 3.0→5.0
 input bool   UseTP3                   = false;  // 🎯 Ativar TP3
-input double TP1_ClosePercent         = 50.0;   // 📊 % posição fechar no TP1
-input double TP2_ClosePercent         = 30.0;   // 📊 % posição fechar no TP2
+input double TP1_ClosePercent         = 40.0;   // 📊 % posição fechar no TP1 - 🔥 v4.16: 50→40
+input double TP2_ClosePercent         = 40.0;   // 📊 % posição fechar no TP2 - 🔥 v4.16: 30→40
 input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP3 (restante)
+input bool   TP_UseATR                = true;   // 📊 Usar ATR para cálculo de TP (dinâmico)
+input double TP1_ATRMultiplier        = 2.0;    // 📊 TP1 = X vezes ATR (se TP_UseATR=true)
+input double TP2_ATRMultiplier        = 4.0;    // 📊 TP2 = X vezes ATR (se TP_UseATR=true)
+input double TP3_ATRMultiplier        = 6.0;    // 📊 TP3 = X vezes ATR (se TP_UseATR=true)
+input double TP_MinRRRatio            = 1.2;    // 🎯 RR mínimo aceitável (rejeitar se SL/TP < X)
 
 input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
 input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
@@ -287,6 +292,9 @@ input double TrailingStepPoints       = 50.0;   // 📏 Passo mínimo trailing (
 input double TrailingActivationRR     = 1.5;    // 🎯 Ativar após RR (ex: 1.5 = após 1.5:1)
 input bool   TrailingUseATR           = true;   // 📊 Usar ATR para calcular trailing - 🔥 v4.15: ATIVADO
 input double TrailingATRMultiplier    = 2.5;    // 📊 Multiplicador ATR (se ativo) - 🔥 v4.15: 2.0→2.5
+input bool   TrailingStartAfterTP     = true;   // 🎯 Iniciar trailing apenas após TP1 fechado
+input double TrailingMinProfit        = 0.5;    // 💰 Lucro mínimo % para ativar trailing
+input double TrailingMaxRisk          = 0.2;    // 🛡️ Risco máximo % permitido no trailing
 
 input group "=== 🛡️ PROTEÇÕES ==="
 input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
@@ -294,10 +302,39 @@ input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estru
 input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
 input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
 
+input group "=== 🎯 BREAKEVEN E PROTEÇÃO DE LUCRO ==="
+input bool   EnableBreakeven          = true;   // 🛡️ Mover SL para breakeven
+input double BreakevenAfterRR         = 1.0;    // 🎯 Mover BE após X:1 RR - 🔥 v4.16: após TP1 fechado
+input double BreakevenPlusPoints      = 5.0;    // 📏 BE + X pontos (garantir lucro mínimo)
+input bool   EnableProfitLock         = true;   // 🔒 Travar lucro parcial
+input double LockProfitAfterRR        = 2.0;    // 🎯 Travar lucro após X:1 RR
+input double LockProfitPercent        = 50.0;   // 📊 % do lucro flutuante a travar
+
+input group "=== 💰 CONTROLE DE RISCO AVANÇADO ==="
+input bool   UseAdaptiveSizing        = false;  // 📊 Tamanho de posição adaptativo
+input double WinStreakMultiplier      = 1.2;    // 📈 Multiplicar lote após X ganhos seguidos
+input int    WinStreakThreshold       = 2;      // 🎯 Quantos ganhos para aumentar lote
+input double LossStreakDivisor        = 0.5;    // 📉 Dividir lote após X perdas seguidas
+input int    LossStreakThreshold      = 2;      // 🎯 Quantas perdas para reduzir lote
+input double MaxPositionMultiplier    = 2.0;    // 🛡️ Limite máximo de multiplicação (2x = dobro do lote base)
+input double MaxDailyLoss             = 5.0;    // 🛑 Perda máxima diária % (pausa trading)
+input double MaxWeeklyLoss            = 10.0;   // 🛑 Perda máxima semanal % (pausa trading)
+input bool   ReduceRiskAfterLoss      = true;   // 📉 Reduzir risco após perdas consecutivas
+input double RiskReductionFactor      = 0.5;    // 📊 Fator de redução (0.5 = metade do risco)
+input bool   RecoveryMode             = false;  // 🔄 Modo recuperação gradual após drawdown
+
 input group "=== 📊 FILTRO ADX (Trending Markets) - 🔥 v4.15 ==="
 input bool   UseADXFilter             = false; // 📊 Habilitar filtro ADX (mercados trending)
 input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
+
+input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
+input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 (75 = bom, 90 = excelente)
+input bool   RequireSupertrend        = true;  // ⚠️ Supertrend obrigatório sempre
+input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
+input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true
+input bool   RequireVolumeConfirm     = false; // 📊 Requer volume acima da média
+input double VolumeMultiplier         = 1.2;   // 📊 Volume deve ser X vezes a média
 
 input group "=== 📊 CONTROLE DE POSIÇÕES ==="
 input POSITION_CONTROL_MODE PositionControlMode = POSITION_MODE_SINGLE; // 🔢 Modo de controle de posições

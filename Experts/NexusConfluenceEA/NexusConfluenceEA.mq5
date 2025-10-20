@@ -1,5 +1,5 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.15 - Sistema Universal Multi-Timeframe    |
+//| Nexus Confluence EA v4.16 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
 //|                                                                  |
 //| Descrição: Expert Advisor completo que implementa sistema        |
@@ -17,10 +17,19 @@
 //|   - Breakeven apenas após TP1 fechado                           |
 //|   - Trailing dinâmico 2.5x ATR                                 |
 //|   - Horários Londres/NY overlap apenas                          |
+//| 🔥 v4.16: PARAMETRIZAÇÃO TOTAL - ZERO HARDCODE                 |
+//|   - 35+ novos parâmetros ajustáveis                            |
+//|   - SL estrutural 100% configurável                            |
+//|   - TP dinâmico baseado em ATR                                  |
+//|   - Trailing adaptativo por RR                                  |
+//|   - Sistema de risco adaptativo                                 |
+//|   - Controle granular de drawdown                              |
+//|   - Breakeven/Lock profit parametrizados                        |
+//|   - Qualidade de setup ajustável                                |
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.15 - Correções Análise Crítica Backtest              |
+//| Versão: 4.16 - Parametrização Total                            |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |

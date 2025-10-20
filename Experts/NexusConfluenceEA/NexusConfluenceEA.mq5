@@ -442,46 +442,94 @@ bool ValidateBasicConditions()
 //+------------------------------------------------------------------+
 bool ValidateDrawdownProtection()
   {
+   static int lastDay = -1;      // Último dia processado
+   static int lastWeek = -1;     // Última semana processada
+   
    double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
    MqlDateTime dt;
    TimeToStruct(TimeCurrent(), dt);
    
-   // Verificar se está pausado por perdas consecutivas
+   // ════════════════════════════════════════════════════════════════
+   // RESET AUTOMÁTICO DIÁRIO (00:00 ou novo dia detectado)
+   // ════════════════════════════════════════════════════════════════
+   if(lastDay != dt.day)
+     {
+      // 🔥 NOVO DIA DETECTADO - Resetar TUDO
+      if(lastDay != -1) // Não resetar na primeira execução
+        {
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         PrintFormat("📅 NOVO DIA DETECTADO: %02d/%02d/%04d", dt.day, dt.mon, dt.year);
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         
+         // Resetar drawdown diário
+         g_dailyStartBalance = currentBalance;
+         g_dailyDrawdownHit = false;
+         
+         // 🔥 DESBLOQUEIO AUTOMÁTICO POR PERDAS CONSECUTIVAS
+         if(g_pauseUntilTime > 0 && TimeCurrent() >= g_pauseUntilTime)
+           {
+            PrintFormat("🔓 DESBLOQUEIO AUTOMÁTICO: Perdas consecutivas (%d) resetadas - Novo dia!", g_consecutiveLosses);
+            g_consecutiveLosses = 0;
+            g_pauseUntilTime = 0;
+           }
+         
+         PrintFormat("   💰 Balance inicial dia: $%.2f", g_dailyStartBalance);
+         PrintFormat("   🔄 Perdas consecutivas: %d (resetado)", g_consecutiveLosses);
+         PrintFormat("════════════════════════════════════════════════════════════════");
+        }
+      else
+        {
+         // Primeira execução - inicializar
+         g_dailyStartBalance = currentBalance;
+         g_weeklyStartBalance = currentBalance;
+        }
+      
+      lastDay = dt.day;
+     }
+   
+   // ════════════════════════════════════════════════════════════════
+   // RESET AUTOMÁTICO SEMANAL (Segunda-feira)
+   // ════════════════════════════════════════════════════════════════
+   int currentWeek = dt.day_of_year / 7; // Semana do ano
+   if(dt.day_of_week == 1 && lastWeek != currentWeek)
+     {
+      if(lastWeek != -1)
+        {
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         PrintFormat("📅 NOVA SEMANA DETECTADA: Semana %d de %04d", currentWeek, dt.year);
+         PrintFormat("════════════════════════════════════════════════════════════════");
+         
+         g_weeklyStartBalance = currentBalance;
+         g_weeklyDrawdownHit = false;
+         g_consecutiveLosses = 0; // Reset semanal também
+         g_pauseUntilTime = 0;    // Garantir desbloqueio
+         
+         PrintFormat("   💰 Balance inicial semana: $%.2f", g_weeklyStartBalance);
+         PrintFormat("   🔄 Contadores zerados para nova semana");
+         PrintFormat("════════════════════════════════════════════════════════════════");
+        }
+      
+      lastWeek = currentWeek;
+     }
+   
+   // ════════════════════════════════════════════════════════════════
+   // VERIFICAR SE ESTÁ PAUSADO POR PERDAS CONSECUTIVAS
+   // ════════════════════════════════════════════════════════════════
    if(TimeCurrent() < g_pauseUntilTime)
      {
-      PrintFormat("⏸️ EA PAUSADO até %s (perdas consecutivas: %d)", 
-                  TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES), 
-                  g_consecutiveLosses);
+      int minutesRemaining = (int)((g_pauseUntilTime - TimeCurrent()) / 60);
+      PrintFormat("⏸️ EA PAUSADO: %d perdas consecutivas | Tempo restante: %d minutos (%s)", 
+                  g_consecutiveLosses,
+                  minutesRemaining,
+                  TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
       return false;
      }
    
-   // Resetar contadores no início do dia (00:00)
-   if(dt.hour == 0 && dt.min == 0)
+   // Se tempo de pausa expirou, liberar
+   if(g_pauseUntilTime > 0 && TimeCurrent() >= g_pauseUntilTime)
      {
-      MqlDateTime dtYesterday;
-      TimeToStruct(TimeCurrent() - 86400, dtYesterday);
-      
-      if(g_dailyStartBalance == 0.0 || dt.day != dtYesterday.day)
-        {
-         g_dailyStartBalance = currentBalance;
-         g_dailyDrawdownHit = false;
-         PrintFormat("📅 Novo dia: Balance inicial = %.2f", g_dailyStartBalance);
-        }
-     }
-   
-   // Resetar contadores no início da semana (Segunda 00:00)
-   if(dt.day_of_week == 1 && dt.hour == 0 && dt.min == 0)
-     {
-      MqlDateTime dtLastWeek;
-      TimeToStruct(TimeCurrent() - 604800, dtLastWeek);
-      
-      if(g_weeklyStartBalance == 0.0 || dt.day != dtLastWeek.day)
-        {
-         g_weeklyStartBalance = currentBalance;
-         g_weeklyDrawdownHit = false;
-         g_consecutiveLosses = 0;
-         PrintFormat("📅 Nova semana: Balance inicial = %.2f", g_weeklyStartBalance);
-        }
+      PrintFormat("🔓 DESBLOQUEIO: Tempo de pausa expirado - EA liberado para operar");
+      g_pauseUntilTime = 0;
      }
    
    // Inicializar se primeira execução

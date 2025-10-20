@@ -1,12 +1,13 @@
 //+------------------------------------------------------------------+
 //| RiskManagement.mqh                                               |
-//| Nexus Confluence EA v4.11 - Gestão de Risco e Posicionamento    |
+//| Nexus Confluence EA v4.15 - Gestão de Risco e Posicionamento    |
 //|                                                                   |
 //| PROPÓSITO: Calcular tamanho de posição, SL, TP, Breakeven       |
 //|            e Trailing Stop baseado em estrutura de preços        |
 //|                                                                   |
 //| NOVO v4.11: Correção crítica FindStructureSL()                   |
 //|             Implementação completa de gestão de posições         |
+//| NOVO v4.15: Proteção drawdown + Registro perdas consecutivas    |
 //|                                                                   |
 //| FUNÇÕES PRINCIPAIS:                                              |
 //|   - CalculatePositionSize(): Calcula lote baseado em risco       |
@@ -23,13 +24,24 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.11 - Correção SL + Gestão Completa                    |
+//| VERSÃO: 4.15 - Proteções Drawdown                               |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.11"
-#property version   "4.11"
+#property copyright "Nexus Confluence EA v4.15"
+#property version   "4.15"
 #property strict
 
 #include "Parametros.mqh"
+
+//+------------------------------------------------------------------+
+//| VARIÁVEIS EXTERNAS (declaradas no arquivo principal)            |
+//+------------------------------------------------------------------+
+extern double g_dailyStartBalance;
+extern double g_weeklyStartBalance;
+extern int    g_consecutiveLosses;
+extern datetime g_lastTradeCloseTime;
+extern datetime g_pauseUntilTime;
+extern bool   g_dailyDrawdownHit;
+extern bool   g_weeklyDrawdownHit;
 
 //+------------------------------------------------------------------+
 //| FUNÇÃO: FindStructureSL                                          |
@@ -555,9 +567,14 @@ void CleanupClosedTrades()
                      // Verificar se atingiu limite de perdas consecutivas
                      if(g_consecutiveLosses >= MaxConsecutiveLosses)
                        {
-                        g_pauseUntilTime = TimeCurrent() + 86400; // Pausar 24 horas
-                        string msg = StringFormat("🚨 %d PERDAS CONSECUTIVAS! Trading PAUSADO por 24 horas até %s",
+                        // 🔥 v4.15: TEMPO DE PAUSA ADAPTADO AO TIMEFRAME
+                        int pauseSeconds = CalculatePauseTime(Period());
+                        g_pauseUntilTime = TimeCurrent() + pauseSeconds;
+                        
+                        string pauseDuration = FormatPauseDuration(pauseSeconds);
+                        string msg = StringFormat("🚨 %d PERDAS CONSECUTIVAS! Trading PAUSADO por %s até %s",
                                                   g_consecutiveLosses,
+                                                  pauseDuration,
                                                   TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
                         PrintFormat("%s", msg);
                         if(SendAlerts) SendNotification(msg);
@@ -571,6 +588,7 @@ void CleanupClosedTrades()
                         PrintFormat("📈 Trade #%I64u fechou em GANHO (%.2f) - Perdas consecutivas RESETADAS (era %d)",
                                     ticket, profit, g_consecutiveLosses);
                         g_consecutiveLosses = 0;
+                        g_pauseUntilTime = 0; // Limpar pausa
                        }
                     }
                   
@@ -809,6 +827,53 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
          PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts)", 
                      currentSL, newSL, MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT));
       }
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 🔥 v4.15: Calcular tempo de pausa baseado no timeframe          |
+//+------------------------------------------------------------------+
+int CalculatePauseTime(ENUM_TIMEFRAMES timeframe)
+{
+   // Lógica: Pausar por múltiplos do timeframe operacional
+   // Quanto maior o TF, maior a pausa (mais trades por período)
+   
+   int pauseMultiplier = 10; // Número de candles de pausa
+   
+   switch(timeframe)
+   {
+      case PERIOD_M1:  return pauseMultiplier * 60;       // 10 minutos
+      case PERIOD_M5:  return pauseMultiplier * 5 * 60;   // 50 minutos
+      case PERIOD_M15: return pauseMultiplier * 15 * 60;  // 2.5 horas
+      case PERIOD_M30: return pauseMultiplier * 30 * 60;  // 5 horas
+      case PERIOD_H1:  return pauseMultiplier * 3600;     // 10 horas
+      case PERIOD_H4:  return pauseMultiplier * 4 * 3600; // 40 horas (~2 dias)
+      case PERIOD_D1:  return 86400 * 3;                  // 3 dias
+      default:         return 86400;                      // 24 horas padrão
+   }
+}
+
+//+------------------------------------------------------------------+
+//| 🔥 v4.15: Formatar duração da pausa para exibição               |
+//+------------------------------------------------------------------+
+string FormatPauseDuration(int seconds)
+{
+   if(seconds < 3600)
+   {
+      int minutes = seconds / 60;
+      return StringFormat("%d minutos", minutes);
+   }
+   else if(seconds < 86400)
+   {
+      int hours = seconds / 3600;
+      int minutes = (seconds % 3600) / 60;
+      return StringFormat("%d horas e %d minutos", hours, minutes);
+   }
+   else
+   {
+      int days = seconds / 86400;
+      int hours = (seconds % 86400) / 3600;
+      return StringFormat("%d dias e %d horas", days, hours);
    }
 }
 

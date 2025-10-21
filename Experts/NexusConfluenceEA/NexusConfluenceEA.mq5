@@ -218,14 +218,21 @@ void OnDeinit(const int reason)
 void OnTick()
   {
    // ═══════════════════════════════════════════════════════════════
-   // VERIFICAÇÃO CRÍTICA: Só executar em NOVO CANDLE
+   // 🔥 v4.27: GESTÃO DE TRADES A CADA TICK (breakeven/trailing)
+   // ═══════════════════════════════════════════════════════════════
+   // IMPORTANTE: Executar ANTES do check de novo candle para
+   // que breakeven e trailing atualizem a cada tick!
+   ManageExistingTrades();
+
+   // ═══════════════════════════════════════════════════════════════
+   // VERIFICAÇÃO CRÍTICA: Só executar ANÁLISE em NOVO CANDLE
    // ═══════════════════════════════════════════════════════════════
    datetime currentCandleTime = iTime(_Symbol, Period(), 0);
-   
-   // Se ainda é o mesmo candle, NÃO processar (evita logs por segundo)
+
+   // Se ainda é o mesmo candle, NÃO processar análise (evita logs por segundo)
    if(currentCandleTime == g_lastCandleTime)
    {
-      return; // Aguardar próximo candle
+      return; // Aguardar próximo candle para nova análise
    }
    
    // Novo candle detectado! Atualizar timestamp
@@ -418,9 +425,6 @@ void OnTick()
    PrintFormat("════════════════════════════════════════════════════════════════");
 
    ExecuteTrade(_Symbol, mtf.direction, risk, score.classification);
-   
-   // ETAPA 9: GESTÃO DE TRADES EXISTENTES (v4.11)
-   ManageExistingTrades();
   }
 
 

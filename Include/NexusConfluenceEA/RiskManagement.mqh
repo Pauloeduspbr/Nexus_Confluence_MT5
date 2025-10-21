@@ -737,17 +737,28 @@ void ManageSingleTrade(ulong ticket)
 }
 
 //+------------------------------------------------------------------+
-//| Mover SL para breakeven                                         |
+//| Mover SL para breakeven - 🔥 v4.27: USA BreakevenPlusPoints     |
 //+------------------------------------------------------------------+
 bool MoveToBreakeven(ulong ticket, double openPrice, string symbol)
 {
-   // Adicionar pequeno spread ao breakeven (garantir lucro mínimo)
+   // 🔥 v4.27: Calcular breakeven com parâmetros configuráveis
    double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double newSL = openPrice + (spread * 0.5); // Breakeven + metade do spread
-   
+   double plusPoints = BreakevenPlusPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+
+   // ✅ CORRIGIDO: Breakeven + spread + pontos extras
+   double newSL = openPrice + (spread * 0.5) + plusPoints;
+
+   bool isLong = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
+
+   // Para SELL, inverter lógica
+   if(!isLong)
+   {
+      newSL = openPrice - (spread * 0.5) - plusPoints;
+   }
+
    MqlTradeRequest request;
    MqlTradeResult result;
-   
+
    ZeroMemory(request);
    request.action = TRADE_ACTION_SLTP;
    request.position = ticket;
@@ -755,15 +766,17 @@ bool MoveToBreakeven(ulong ticket, double openPrice, string symbol)
    request.sl = newSL;
    request.tp = PositionGetDouble(POSITION_TP);
    request.magic = EA_MAGIC_NUMBER;
-   
+
    if(OrderSend(request, result))
    {
       if(result.retcode == TRADE_RETCODE_DONE)
       {
+         PrintFormat("   ✅ Breakeven: SL %.5f → %.5f (entrada + spread + %.1f pts)",
+                     PositionGetDouble(POSITION_SL), newSL, BreakevenPlusPoints);
          return true;
       }
    }
-   
+
    PrintFormat("⚠️ Falha ao mover para breakeven: %d - %s", result.retcode, result.comment);
    return false;
 }

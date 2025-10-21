@@ -1,28 +1,27 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.24 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.24: CORREÇÃO CRÍTICA - SISTEMA DE BLOQUEIO EXCESSIVO      |
+//| Nexus Confluence EA v4.27 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.27: SIMPLIFICAÇÃO RSI OMA - ENTRADAS MAIS RÁPIDAS        |
 //|                                                                  |
-//|   ❌ BUG #1: BLOQUEIO EXCESSIVO POR PERDAS CONSECUTIVAS         |
-//|      Problema: H4 pausava por 40h, D1 por 3 dias!               |
-//|      Resultado: EA bloqueado por dias, perdendo oportunidades   |
-//|      ✅ CORREÇÃO: NUNCA pausa por mais de 12 horas!             |
-//|                  M15: 3h | M30: 5h | H1: 8h | H4: 12h          |
+//|   ✅ MUDANÇA #1: RSI OMA SIMPLIFICADO                           |
+//|      REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)    |
+//|      REMOVIDO: Validação de zona (overbought/oversold)          |
+//|      CRITÉRIO ATUAL: Apenas posição relativa das linhas         |
+//|      MOTIVO: Filtros atrasavam entradas válidas                 |
 //|                                                                  |
-//|   ❌ BUG #2: Reset apenas à meia-noite (não início do pregão)   |
-//|      Problema: Bloqueio continuava durante todo pregão seguinte |
-//|      Resultado: EA inativo mesmo após novo dia                  |
-//|      ✅ CORREÇÃO: Reset automático no início do pregão          |
-//|                  Detecta CustomStartHour ou 09:00 padrão        |
+//|      BUY:  Linha vermelha > Linha azul                          |
+//|      SELL: Linha vermelha < Linha azul                          |
 //|                                                                  |
-//|   ✅ PROTEÇÃO ADICIONAL #1: Forçar desbloqueio se > 12h         |
-//|      Se pausa exceder 12h, desbloqueio automático forçado       |
+//|   📊 MANTIDO v4.26: Sincronização temporal perfeita             |
+//|      - Todos indicadores leem candle FECHADO [1]                |
+//|      - Valores EA = Valores visuais no gráfico                  |
+//|      - GG TrendBar, WAE, RSI, CS sincronizados                  |
 //|                                                                  |
-//|   ✅ PROTEÇÃO ADICIONAL #2: Logs visíveis a cada novo candle    |
-//|      Mostra tempo restante + horário de liberação               |
+//|   📊 MANTIDO v4.24: Sistema de bloqueio otimizado               |
+//|      - Bloqueio máximo 12h (M15: 3h, M30: 5h, H1: 8h, H4: 12h) |
+//|      - Reset automático no início do pregão                     |
+//|      - Logs visíveis a cada novo candle                         |
 //|                                                                  |
-//|   📊 MANTIDO v4.23: Sincronização temporal + M30 logic + ATR JPY|
-//|                                                                  |
-//|   ⚠️ IMPACTO ESPERADO: EA NUNCA FICARÁ BLOQUEADO POR MAIS DE 12H|
+//|   ⚠️ IMPACTO ESPERADO: ENTRADAS MAIS RÁPIDAS SEM ATRASOS!      |
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |
@@ -60,14 +59,14 @@
 //|                                                                  |
 //| Autor: GitHub Copilot                                            |
 //| Data: Outubro 2025                                               |
-//| Versão: 4.24 - Correção Crítica Sistema Bloqueio Excessivo     |
+//| Versão: 4.27 - Simplificação RSI OMA (Entradas Mais Rápidas)   |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
 //| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
 //| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
 //|               Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.13                                                     |
+//| VERSÃO: 4.27                                                     |
 //+------------------------------------------------------------------+
 #property strict
 

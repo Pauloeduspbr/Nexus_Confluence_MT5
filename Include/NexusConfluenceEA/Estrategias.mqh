@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.23 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.27 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -23,16 +23,21 @@
 //|   - GG TrendBar agora lê candle [0] (era [1])                   |
 //|   - M30 divergente não rejeita mais (só PREMIUM vs GOOD)        |
 //|   - Logs de debug detalhados para diagnóstico                   |
+//| 🔥 v4.27: SIMPLIFICAÇÃO RSI OMA - ENTRADAS MAIS RÁPIDAS        |
+//|   - REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)     |
+//|   - REMOVIDO: Validação de zona (overbought/oversold)           |
+//|   - CRITÉRIO ATUAL: Apenas posição relativa das linhas          |
+//|   - MOTIVO: Filtros removidos atrasavam entradas válidas        |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.23 - Correção Crítica Abertura Ordens                 |
+//| VERSÃO: 4.27 - Simplificação RSI OMA (Entradas Mais Rápidas)   |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.26"
-#property version   "4.26"
+#property copyright "Nexus Confluence EA v4.27"
+#property version   "4.27"
 #property strict
 
 // Incluir primeiro o arquivo de parâmetros
@@ -555,36 +560,32 @@ RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES
       return result;
    }
    
-   // 🔥 v4.26: Usar candle FECHADO [1] para cálculos
-   // Calcular inclinação linha vermelha (últimos 3 candles FECHADOS)
+   // 🔥 v4.27: SIMPLIFICAÇÃO - Remover filtros que atrasam entradas
+   // Calcular inclinação e força apenas para LOG (não para validação)
    result.slope = (rsiRed[1] - rsiRed[2]) / 1.0;  // [1] vs [2] (1 candle de diferença)
    result.strength = MathAbs(rsiRed[1] - rsiBlue[1]);
    result.isValid = true;
 
-   // Verificar posição e inclinação no candle FECHADO
+   // Verificar APENAS posição relativa das linhas (sem inclinação, sem zonas)
    bool redAboveBlue = (rsiRed[1] > rsiBlue[1]);
-   bool slopePositive = (result.slope > 0.5);  // Mínimo 0.5 de inclinação
-   bool slopeNegative = (result.slope < -0.5);
 
-   // ✅ CORREÇÃO CRÍTICA v4.3: Validar zona de sobrecompra/sobrevenda
-   bool notOverbought = (rsiRed[1] < RSI_OPER_HighLevel);   // <70 (evita topos)
-   bool notOversold = (rsiRed[1] > RSI_OPER_LowLevel);      // >30 (evita fundos)
-
+   // ✅ v4.27 SIMPLIFICADO: Apenas posição das linhas (sem slope, sem overbought/oversold)
+   // MOTIVO: Filtros de inclinação e zona atrasam entradas desnecessariamente
    if(direction == TRADE_DIRECTION_BUY)
    {
-      // Para compra: linha vermelha acima da azul + inclinação positiva + NÃO sobrecomprado
-      result.isAligned = (redAboveBlue && slopePositive && notOverbought);
+      // Para compra: APENAS linha vermelha acima da azul
+      result.isAligned = redAboveBlue;
 
-      if(!notOverbought)
-         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f >= %.1f (sobrecompra)", rsiRed[1], RSI_OPER_HighLevel);
+      PrintFormat("   🔍 RSI OMA BUY: Red=%.1f %s Blue=%.1f | Slope=%.2f | Strength=%.2f",
+                  rsiRed[1], redAboveBlue ? ">" : "<=", rsiBlue[1], result.slope, result.strength);
    }
    else if(direction == TRADE_DIRECTION_SELL)
    {
-      // Para venda: linha vermelha abaixo da azul + inclinação negativa + NÃO sobrevendido
-      result.isAligned = (!redAboveBlue && slopeNegative && notOversold);
+      // Para venda: APENAS linha vermelha abaixo da azul
+      result.isAligned = !redAboveBlue;
 
-      if(!notOversold)
-         PrintFormat("   ⚠️ RSI OMA rejeitado: RSI=%.1f <= %.1f (sobrevenda)", rsiRed[1], RSI_OPER_LowLevel);
+      PrintFormat("   🔍 RSI OMA SELL: Red=%.1f %s Blue=%.1f | Slope=%.2f | Strength=%.2f",
+                  rsiRed[1], !redAboveBlue ? "<" : ">=", rsiBlue[1], result.slope, result.strength);
    }
    
    return result;

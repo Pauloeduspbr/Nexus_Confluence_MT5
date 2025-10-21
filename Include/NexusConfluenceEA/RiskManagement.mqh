@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| RiskManagement.mqh                                               |
-//| Nexus Confluence EA v4.24 - Gestão de Risco e Posicionamento    |
+//| Nexus Confluence EA v4.27 - Gestão de Risco e Posicionamento    |
 //|                                                                   |
 //| PROPÓSITO: Calcular tamanho de posição, SL, TP, Breakeven       |
 //|            e Trailing Stop baseado em estrutura de preços        |
@@ -9,6 +9,11 @@
 //|             Implementação completa de gestão de posições         |
 //| NOVO v4.15: Proteção drawdown + Registro perdas consecutivas    |
 //| 🔥 v4.24: Limites de pausa (máx 12h) + Reset no pregão         |
+//| 🔥 v4.27: CORREÇÃO CRÍTICA - Lógica Múltiplas Ordens vs Única  |
+//|           - Verifica EnablePartialTP para decidir comportamento |
+//|           - EnablePartialTP=true: BE/Trailing após TP1          |
+//|           - EnablePartialTP=false: BE/Trailing direto em RR     |
+//|           - TPs altos (15:1, 20:1, 25:1) para ordem única       |
 //|                                                                   |
 //| FUNÇÕES PRINCIPAIS:                                              |
 //|   - CalculatePositionSize(): Calcula lote baseado em risco       |
@@ -26,10 +31,10 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.24 - Sistema Bloqueio Limitado                        |
+//| VERSÃO: 4.27 - Lógica Ordem Única vs Múltiplas                 |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.26"
-#property version   "4.26"
+#property copyright "Nexus Confluence EA v4.27"
+#property version   "4.27"
 #property strict
 
 #include "Parametros.mqh"
@@ -649,16 +654,32 @@ void ManageSingleTrade(ulong ticket)
    }
    
    // ════════════════════════════════════════════════════════════════
-   // 2. MOVER PARA BREAKEVEN - 🔥 v4.15: APENAS APÓS TP1 FECHADO
+   // 2. MOVER PARA BREAKEVEN - 🔥 v4.27: LÓGICA CORRIGIDA - Múltiplas ordens vs Ordem Única
    // ════════════════════════════════════════════════════════════════
-   if(!g_tradeStates[stateIdx].movedToBreakeven && 
-      g_tradeStates[stateIdx].tp1Hit &&              // 🔥 NOVO: Só após TP1 fechado
-      currentRR >= 1.2)                              // 🔥 NOVO: Em 1.2:1, não 1.0
+   if(EnableBreakeven && !g_tradeStates[stateIdx].movedToBreakeven)
    {
-      if(MoveToBreakeven(ticket, openPrice, symbol))
+      bool canMoveToBreakeven = false;
+
+      if(EnablePartialTP)
       {
-         g_tradeStates[stateIdx].movedToBreakeven = true;
-         PrintFormat("✅ Trade #%I64u: SL movido para BREAKEVEN após TP1 (RR atual: %.2f)", ticket, currentRR);
+         // ✅ MODO MÚLTIPLAS ORDENS: Move BE APENAS após TP1 fechado
+         canMoveToBreakeven = (g_tradeStates[stateIdx].tp1Hit && currentRR >= BreakevenAfterRR);
+      }
+      else
+      {
+         // ✅ MODO ORDEM ÚNICA: Move BE quando atingir RR configurado (sem depender de TP)
+         canMoveToBreakeven = (currentRR >= BreakevenAfterRR);
+      }
+
+      if(canMoveToBreakeven)
+      {
+         if(MoveToBreakeven(ticket, openPrice, symbol))
+         {
+            g_tradeStates[stateIdx].movedToBreakeven = true;
+            PrintFormat("✅ Trade #%I64u: SL movido para BREAKEVEN (RR: %.2f >= %.2f) [%s]",
+                        ticket, currentRR, BreakevenAfterRR,
+                        EnablePartialTP ? "após TP1" : "ordem única");
+         }
       }
    }
    
@@ -678,20 +699,37 @@ void ManageSingleTrade(ulong ticket)
    }
    
    // ════════════════════════════════════════════════════════════════
-   // 4. TRAILING STOP após TP1 ou quando configurado
+   // 4. TRAILING STOP - 🔥 v4.27: LÓGICA CORRIGIDA - Múltiplas ordens vs Ordem Única
    // ════════════════════════════════════════════════════════════════
    if(EnableTrailing && currentRR >= TrailingActivationRR)
    {
-      // Ativar trailing automaticamente se atingiu RR mínimo
-      if(!g_tradeStates[stateIdx].trailingActive)
+      bool canActivateTrailing = false;
+
+      if(EnablePartialTP && TrailingStartAfterTP)
       {
-         g_tradeStates[stateIdx].trailingActive = true;
-         PrintFormat("📈 Trade #%I64u: Trailing ATIVADO (RR: %.2f >= %.2f)", 
-                     ticket, currentRR, TrailingActivationRR);
+         // ✅ MODO MÚLTIPLAS ORDENS com trailing após TP: Espera TP1 fechado
+         canActivateTrailing = g_tradeStates[stateIdx].tp1Hit;
       }
-      
-      // Atualizar trailing stop
-      UpdateTrailingStop(ticket, currentPrice, currentSL, isLong, symbol);
+      else
+      {
+         // ✅ MODO ORDEM ÚNICA ou trailing independente: Ativa quando atingir RR
+         canActivateTrailing = true;
+      }
+
+      if(canActivateTrailing)
+      {
+         // Ativar trailing automaticamente se atingiu RR mínimo
+         if(!g_tradeStates[stateIdx].trailingActive)
+         {
+            g_tradeStates[stateIdx].trailingActive = true;
+            PrintFormat("📈 Trade #%I64u: Trailing ATIVADO (RR: %.2f >= %.2f) [%s]",
+                        ticket, currentRR, TrailingActivationRR,
+                        EnablePartialTP ? "múltiplas ordens" : "ordem única");
+         }
+
+         // Atualizar trailing stop
+         UpdateTrailingStop(ticket, currentPrice, currentSL, isLong, symbol);
+      }
    }
    
    // Atualizar timestamp

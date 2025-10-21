@@ -828,18 +828,67 @@ bool ExecutePartialClose(ulong ticket, double percentToClose, string symbol)
 }
 
 //+------------------------------------------------------------------+
-//| Atualizar trailing stop                                         |
+//| Atualizar trailing stop - 🔥 v4.27: IMPLEMENTADO uso de ATR    |
 //+------------------------------------------------------------------+
 void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, bool isLong, string symbol)
 {
-   double trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   double trailingDist;
+   double stepDist;
+
+   // 🔥 v4.27: IMPLEMENTAR uso de ATR para trailing dinâmico
+   if(TrailingUseATR)
+   {
+      // Calcular ATR no M15 (timeframe operacional)
+      int atrHandle = iATR(symbol, PERIOD_M15, 14);
+      if(atrHandle == INVALID_HANDLE)
+      {
+         PrintFormat("⚠️ Erro ao criar handle ATR para trailing, usando pontos fixos");
+         trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+         stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+      }
+      else
+      {
+         double atr[];
+         ArraySetAsSeries(atr, true);
+
+         if(CopyBuffer(atrHandle, 0, 0, 1, atr) == 1)
+         {
+            // ✅ Usar ATR multiplicado pelo parâmetro configurável
+            trailingDist = atr[0] * TrailingATRMultiplier;
+            stepDist = atr[0] * 0.3; // Step = 30% do ATR
+
+            // Garantir valores mínimos razoáveis
+            double minDist = 100.0 * SymbolInfoDouble(symbol, SYMBOL_POINT); // Mínimo 10 pontos
+            if(trailingDist < minDist)
+               trailingDist = minDist;
+
+            PrintFormat("   📊 Trailing ATR: %.5f | Distância: %.5f (%.1f pts) | Step: %.5f (%.1f pts)",
+                        atr[0], trailingDist, trailingDist/SymbolInfoDouble(symbol, SYMBOL_POINT),
+                        stepDist, stepDist/SymbolInfoDouble(symbol, SYMBOL_POINT));
+         }
+         else
+         {
+            PrintFormat("⚠️ Erro ao ler ATR, usando pontos fixos");
+            trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+            stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+         }
+
+         IndicatorRelease(atrHandle);
+      }
+   }
+   else
+   {
+      // ✅ Usar pontos fixos configurados
+      trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+      stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   }
+
    double newSL;
-   
+
    if(isLong)
    {
       newSL = currentPrice - trailingDist;
-      
+
       // Só mover SL para cima (proteção) e respeitar step mínimo
       if(newSL <= currentSL || (newSL - currentSL) < stepDist)
          return;
@@ -847,15 +896,15 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
    else
    {
       newSL = currentPrice + trailingDist;
-      
+
       // Só mover SL para baixo (proteção) e respeitar step mínimo
       if(newSL >= currentSL || (currentSL - newSL) < stepDist)
          return;
    }
-   
+
    MqlTradeRequest request;
    MqlTradeResult result;
-   
+
    ZeroMemory(request);
    request.action = TRADE_ACTION_SLTP;
    request.position = ticket;
@@ -863,13 +912,15 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
    request.sl = newSL;
    request.tp = PositionGetDouble(POSITION_TP);
    request.magic = EA_MAGIC_NUMBER;
-   
+
    if(OrderSend(request, result))
    {
       if(result.retcode == TRADE_RETCODE_DONE)
       {
-         PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts)", 
-                     currentSL, newSL, MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT));
+         PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts) [%s]",
+                     currentSL, newSL,
+                     MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT),
+                     TrailingUseATR ? "ATR" : "fixo");
       }
    }
 }

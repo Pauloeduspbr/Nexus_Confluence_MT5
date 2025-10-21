@@ -1,0 +1,188 @@
+; saved automatically by Claude Code - v4.27
+; NEXUS CONFLUENCE EA - CONFIGURAÇÃO ORDEM ÚNICA + TRAILING CONSERVADOR
+;
+; 🎯 MODO: ORDEM ÚNICA (EnablePartialTP=false)
+; 📈 TP ALTO: 15:1, 20:1, 25:1 (busca movimentos grandes)
+; 🛡️ BREAKEVEN: 0.8:1 (protege cedo, não depende de TP)
+; 📊 TRAILING: ATR dinâmico, conservador (menos agressivo)
+;
+; ════════════════════════════════════════════════════════
+; 🎯 NEXUS CONFLUENCE v4.27 - ORDEM ÚNICA
+; ════════════════════════════════════════════════════════
+; === ⚙️ CONFIGURAÇÕES GERAIS ===
+AccountRiskPercent=0.5||0.5||0.1||5.0||N
+MaxRiskPremium=1.0||1.0||0.1||5.0||N
+MaxDailyDrawdown=3.0||3.0||0.5||10.0||N
+MaxWeeklyDrawdown=5.0||5.0||1.0||20.0||N
+MaxConsecutiveLosses=3||3||1||10||N
+MaxSimultaneousTrades=3||3||1||10||N
+EnableSecondaryHours=true||false||0||true||N
+EnableMorningB3=false||false||0||true||N
+AvoidNews=true||false||0||true||N
+ValidateATRRange=true||false||0||true||N
+SendAlerts=true||false||0||true||N
+AllowCautiousSetups=false||false||0||true||N
+AllowGoodSetups=true||false||0||true||N
+; === 💰 GESTÃO DE LOTE ===
+FixedLotSize=0.0||0.0||0.000000||0.000000||N
+; === 📅 FILTRO SEMANAL - Dias da Semana ===
+TradeOnMonday=true||false||0||true||N
+TradeOnTuesday=true||false||0||true||N
+TradeOnWednesday=true||false||0||true||N
+TradeOnThursday=true||false||0||true||N
+TradeOnFriday=true||false||0||true||N
+TradeOnSaturday=false||false||0||true||N
+TradeOnSunday=false||false||0||true||N
+; === ⏰ HORÁRIOS CUSTOMIZÁVEIS (para otimização) ===
+UseCustomTradingHours=true||false||0||true||Y
+CustomStartHour=0||10||1||100||N
+CustomStartMinute=0||0||1||10||N
+CustomEndHour=23||16||1||160||N
+CustomEndMinute=59||0||1||10||N
+; === ⚠️ CONFIGURAÇÃO DE STOP LOSS ===
+SL_BufferPoints=10.0||10.0||1.000000||100.000000||N
+SL_FallbackPercent=0.3||0.3||0.1||1.0||N
+SL_MinDistancePoints=80||50.0||10.0||200.0||N
+SL_MaxDistancePoints=300||500.0||100.0||2000.0||N
+SL_UseStructure=true||false||0||true||N
+SL_StructureCandles=50||50||20||100||N
+SL_StructureStrength=2.0||2.0||1.0||5.0||N
+SL_SafetyMultiplier=1.2||1.2||1.0||2.0||N
+; === 🎯 CONFIGURAÇÃO DE TAKE PROFIT ===
+; 🔥 MODO ORDEM ÚNICA: TPs altos (15:1, 20:1, 25:1) - NÃO ALTERAR!
+EnablePartialTP=false||false||0||true||N
+TP1_RR=15||1.5||0.5||5.0||N
+TP2_RR=20||3.0||1.0||10.0||N
+TP3_RR=25||5.0||2.0||20.0||N
+UseTP3=false||false||0||true||N
+TP1_ClosePercent=30||40.0||10.0||100.0||N
+TP2_ClosePercent=50||40.0||10.0||100.0||N
+TP3_ClosePercent=20.0||20.0||10.0||100.0||N
+TP_UseATR=true||false||0||true||N
+TP1_ATRMultiplier=10||2.0||0.5||10.0||N
+TP2_ATRMultiplier=15||4.0||1.0||20.0||N
+TP3_ATRMultiplier=18||6.0||2.0||30.0||N
+TP_MinRRRatio=1.2||1.2||0.5||3.0||N
+; === 📈 CONFIGURAÇÃO DE TRAILING STOP ===
+; 🔥 v4.27: TRAILING CONSERVADOR (menos agressivo)
+; ✅ TrailingUseATR agora FUNCIONA (implementado!)
+EnableTrailing=true||false||0||true||N
+TrailingDistancePoints=600.0||200.0||50.0||1000.0||N
+TrailingStepPoints=150.0||50.0||10.0||200.0||N
+TrailingActivationRR=2.5||1.5||0.5||5.0||N
+TrailingUseATR=true||false||0||true||Y
+TrailingATRMultiplier=3.5||2.5||1.0||10.0||N
+TrailingStartAfterTP=false||false||0||true||N
+TrailingMinProfit=0.5||0.5||0.1||5.0||N
+TrailingMaxRisk=0.2||0.2||0.020000||2.000000||N
+; === 🛡️ PROTEÇÕES ===
+MaxSlippagePoints=30||30||5||100||N
+LookbackStructureBars=80||80||20||200||N
+BrokerGMTOffset=2||2||-12||12||N
+MaxSpreadMultiplier=5.0||5.0||1.0||100.0||N
+; === 🎯 BREAKEVEN E PROTEÇÃO DE LUCRO ===
+; 🔥 v4.27: BREAKEVEN agora FUNCIONA (modo ordem única)
+; ✅ Ativa em 0.8:1 SEM depender de TP
+EnableBreakeven=true||false||0||true||N
+BreakevenAfterRR=0.8||1.0||0.5||3.0||N
+BreakevenPlusPoints=5.0||5.0||0.500000||50.000000||N
+EnableProfitLock=true||false||0||true||N
+LockProfitAfterRR=2.0||2.0||1.0||5.0||N
+LockProfitPercent=50.0||50.0||10.0||100.0||N
+; === 💰 CONTROLE DE RISCO AVANÇADO ===
+UseAdaptiveSizing=false||false||0||true||N
+WinStreakMultiplier=1.2||1.2||1.0||3.0||N
+WinStreakThreshold=2||2||1||10||N
+LossStreakDivisor=0.5||0.5||0.1||1.0||N
+LossStreakThreshold=2||2||1||10||N
+MaxPositionMultiplier=2.0||2.0||1.0||5.0||N
+MaxDailyLoss=5.0||5.0||1.0||20.0||N
+MaxWeeklyLoss=10.0||10.0||2.0||50.0||N
+ReduceRiskAfterLoss=true||false||0||true||N
+RiskReductionFactor=0.5||0.5||0.1||1.0||N
+RecoveryMode=false||false||0||true||N
+; === 📊 FILTRO ADX (Trending Markets) - 🔥 v4.15 ===
+UseADXFilter=false||false||0||true||N
+ADX_Period=14||14||5||50||N
+ADX_MinTrend=25.0||25.0||10.0||50.0||N
+; === 🎯 QUALIDADE DE SETUP (Confluência) ===
+MinConfluenceScore=60||75||50||100||N
+RequireSupertrend=false||false||0||true||N
+RequireADXConfirmation=false||false||0||true||N
+MinADXStrength=20.0||20.0||10.0||50.0||N
+RequireVolumeConfirm=false||false||0||true||N
+VolumeMultiplier=1.2||1.2||1.0||3.0||N
+; === 📊 CONTROLE DE POSIÇÕES ===
+PositionControlMode=0||0||0||2||Y
+; === 📁 INDICADORES - Caminhos dos Arquivos ===
+IndicatorsBasePath=NexusConfluenceEA\
+GGTrendBarIndicator=GG_TrendBar_Indicator
+TrendMagicIndicator=TrendMagic_MT5
+CurrencyStrengthIndicator=CurrencyStrengthMeter_MT5
+RSIOMAIndicator=RSIOMA_v2HHLSX_MT5
+WAEIndicator=WaddahAttarExplosion_Professional
+; === 📈 SUPERTREND (Trend Magic Operacional) - Tendência Local ===
+ST_OPER_CCI_Period=50||50||30||100||N
+ST_OPER_ATR_Period=5||5||3||10||N
+ST_OPER_ATR_Multiplier=1.0||1.0||0.5||3.0||N
+; === 💱 CURRENCY STRENGTH - OPERACIONAL ===
+CS_CalculationPeriod=24||24||12||48||N
+CS_SmoothingPeriod=5||5||3||10||N
+CS_ShowInPercent=true||false||0||true||N
+; === 📊 RSI OMA (Operacional) - Força Relativa ===
+RSI_OPER_Period=14||14||10||20||N
+RSI_OPER_MA_Period=9||9||5||15||N
+RSI_OPER_MA_Method=0||0||0||3||Y
+RSI_OPER_HighLevel=70.0||90.0||50.0||100.0||N
+RSI_OPER_LowLevel=30.0||10.0||1.000000||100.000000||N
+RSI_OPER_ShowLevels=true||false||0||true||N
+; === 💥 WAE (Operacional) - Momentum ===
+WAE_OPER_FastMA=20||20||10||30||N
+WAE_OPER_SlowMA=40||40||30||60||N
+WAE_OPER_BBLength=20||20||15||30||N
+WAE_OPER_BBMultiplier=2.0||2.0||1.5||3.0||N
+WAE_OPER_Sensitivity=150||150||100||200||N
+; === 📊 GG TRENDBAR - GLOBAL ===
+GG_UpColor=65280
+GG_DownColor=255
+GG_FlatColor=65535
+GG_TextColor=16776960
+GG_Corner=0||0||0||3||N
+GG_CreateVisualObjects=true||false||0||true||N
+GG_ADX_Period=14||14||10||20||N
+GG_ADX_Price=1||1||0||7||Y
+GG_Step_Psar=0.02||0.02||0.01||0.05||N
+GG_Max_Psar=0.2||0.2||0.1||0.5||N
+; ════════════════════════════════════════════════════════
+; 🔐 IDENTIFICAÇÃO DO EA
+; ════════════════════════════════════════════════════════
+EA_MAGIC_NUMBER=20241015||20241015||1000000||99999999||N
+; ════════════════════════════════════════════════════════
+; ✅ FIM - v4.27 ORDEM ÚNICA + TRAILING CONSERVADOR
+;
+; 📋 RESUMO DA CONFIGURAÇÃO:
+;
+; MODO: Ordem Única (EnablePartialTP=false)
+; - Mantém volume completo até TP final ou trailing
+; - TPs: 15:1, 20:1, 25:1 (altos, busca movimentos grandes)
+;
+; BREAKEVEN: 0.8:1 ✅ AGORA FUNCIONA!
+; - Ativa quando lucro >= 0.8:1
+; - NÃO depende de TP ser atingido
+; - Protege trade automaticamente
+;
+; TRAILING: Conservador (menos agressivo) ✅ ATR IMPLEMENTADO!
+; - TrailingUseATR=true (agora funciona!)
+; - TrailingATRMultiplier=3.5 (distância baseada em 3.5x ATR)
+; - TrailingDistancePoints=600 (60 pontos se ATR desabilitado)
+; - TrailingStepPoints=150 (15 pontos, move menos)
+; - TrailingActivationRR=2.5 (ativa em 2.5:1)
+; - TrailingStartAfterTP=false (não depende de TP)
+;
+; FLUXO ESPERADO:
+; 1. Trade abre com SL estrutural
+; 2. Preço atinge 0.8:1 → Breakeven ativa (SL → entrada)
+; 3. Preço atinge 2.5:1 → Trailing ativa
+; 4. SL acompanha preço com distância de 3.5x ATR
+; 5. Trade fecha em TP (15:1) ou trailing stop
+; ════════════════════════════════════════════════════════

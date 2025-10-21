@@ -23,11 +23,18 @@
 //|   - GG TrendBar agora lê candle [0] (era [1])                   |
 //|   - M30 divergente não rejeita mais (só PREMIUM vs GOOD)        |
 //|   - Logs de debug detalhados para diagnóstico                   |
-//| 🔥 v4.27: SIMPLIFICAÇÃO RSI OMA - ENTRADAS MAIS RÁPIDAS        |
-//|   - REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)     |
-//|   - REMOVIDO: Validação de zona (overbought/oversold)           |
-//|   - CRITÉRIO ATUAL: Apenas posição relativa das linhas          |
-//|   - MOTIVO: Filtros removidos atrasavam entradas válidas        |
+//| 🔥 v4.27: SIMPLIFICAÇÃO RSI OMA + CORREÇÃO SUPERTREND          |
+//|   ✅ CORREÇÃO #1: RSI OMA SIMPLIFICADO                          |
+//|      - REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)  |
+//|      - REMOVIDO: Validação de zona (overbought/oversold)        |
+//|      - CRITÉRIO: Apenas posição relativa das linhas             |
+//|      - MOTIVO: Filtros atrasavam entradas válidas               |
+//|                                                                  |
+//|   ✅ CORREÇÃO #2: SUPERTREND SINCRONIZADO (CRÍTICO!)            |
+//|      - PROBLEMA: Lia buffer [0] (candle em formação)            |
+//|      - CORREÇÃO: Agora lê buffer [1] (candle fechado)           |
+//|      - IMPACTO: TODOS indicadores sincronizados!                |
+//|      - GG/WAE/RSI/CS/SUPERTREND = todos leem [1]                |
 //|                                                                   |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
@@ -384,23 +391,25 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
    }
    
    // DEBUG: Mostrar valores dos buffers
-   PrintFormat("📊 Supertrend %s - Buffers [0]Up=%.5f [0]Down=%.5f [1]Up=%.5f [1]Down=%.5f", 
+   PrintFormat("📊 Supertrend %s - Buffers [0]Up=%.5f [0]Down=%.5f [1]Up=%.5f [1]Down=%.5f",
                TimeframeToString(timeframe),
                bufferUp[0], bufferDown[0],
                bufferUp[1], bufferDown[1]);
-   
+
    // 🔥 CORREÇÃO CRÍTICA v4.14: TrendMagic usa DBL_MAX para buffer INATIVO!
+   // 🔥 CORREÇÃO CRÍTICA v4.27: LER CANDLE FECHADO [1] (sincronizar com outros indicadores)
    // - bufferUp pequeno (< 1e10) = Linha UP ATIVA (tendência BULLISH)
    // - bufferDown pequeno (< 1e10) = Linha DOWN ATIVA (tendência BEARISH)
    // - Valor gigante (DBL_MAX ~1.7e308) = Linha INATIVA
-   
+
    double DBL_MAX_LIMIT = 1.0e10; // Threshold para detectar DBL_MAX
-   
-   // Determinar direção atual (qual linha tem valor VÁLIDO/PEQUENO)
-   bool currentBullish = (bufferUp[0] < DBL_MAX_LIMIT && bufferUp[0] > 0);
-   bool currentBearish = (bufferDown[0] < DBL_MAX_LIMIT && bufferDown[0] > 0);
-   
-   // Verificar se mudou de cor recentemente (últimos 2 candles)
+
+   // 🔥 v4.27: USAR CANDLE FECHADO [1] ao invés de [0] para sincronizar com GG/WAE/RSI/CS
+   // Determinar direção atual (qual linha tem valor VÁLIDO/PEQUENO) no candle FECHADO
+   bool currentBullish = (bufferUp[1] < DBL_MAX_LIMIT && bufferUp[1] > 0);
+   bool currentBearish = (bufferDown[1] < DBL_MAX_LIMIT && bufferDown[1] > 0);
+
+   // Verificar se mudou de cor recentemente (últimos 3 candles FECHADOS)
    bool wasBullish = (bufferUp[2] < DBL_MAX_LIMIT && bufferUp[2] > 0);
    bool wasBearish = (bufferDown[2] < DBL_MAX_LIMIT && bufferDown[2] > 0);
    
@@ -414,18 +423,18 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
       result.turnedRecently = true;
    }
    
-   // Definir direção
+   // Definir direção usando candle FECHADO [1]
    if(currentBullish && !currentBearish)
    {
       result.direction = TRADE_DIRECTION_BUY;
-      result.strength = bufferUp[0];
+      result.strength = bufferUp[1];  // 🔥 v4.27: Usar candle FECHADO [1]
       result.isValid = true;
       PrintFormat("   ✅ %s = BULLISH (BUY)", TimeframeToString(timeframe));
    }
    else if(currentBearish && !currentBullish)
    {
       result.direction = TRADE_DIRECTION_SELL;
-      result.strength = bufferDown[0];
+      result.strength = bufferDown[1];  // 🔥 v4.27: Usar candle FECHADO [1]
       result.isValid = true;
       PrintFormat("   ✅ %s = BEARISH (SELL)", TimeframeToString(timeframe));
    }

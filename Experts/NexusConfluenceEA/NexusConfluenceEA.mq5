@@ -1,27 +1,31 @@
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.27 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.27: SIMPLIFICAÇÃO RSI OMA - ENTRADAS MAIS RÁPIDAS        |
+//| 🔥 v4.27: SIMPLIFICAÇÃO RSI + CORREÇÃO CRÍTICA SUPERTREND      |
 //|                                                                  |
-//|   ✅ MUDANÇA #1: RSI OMA SIMPLIFICADO                           |
+//|   ✅ CORREÇÃO #1: RSI OMA SIMPLIFICADO                          |
 //|      REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)    |
 //|      REMOVIDO: Validação de zona (overbought/oversold)          |
-//|      CRITÉRIO ATUAL: Apenas posição relativa das linhas         |
-//|      MOTIVO: Filtros atrasavam entradas válidas                 |
-//|                                                                  |
+//|      CRITÉRIO: Apenas posição relativa das linhas               |
 //|      BUY:  Linha vermelha > Linha azul                          |
 //|      SELL: Linha vermelha < Linha azul                          |
 //|                                                                  |
-//|   📊 MANTIDO v4.26: Sincronização temporal perfeita             |
-//|      - Todos indicadores leem candle FECHADO [1]                |
-//|      - Valores EA = Valores visuais no gráfico                  |
-//|      - GG TrendBar, WAE, RSI, CS sincronizados                  |
+//|   🔥 CORREÇÃO #2: SUPERTREND SINCRONIZADO (CRÍTICO!)            |
+//|      ❌ PROBLEMA: Supertrend lia buffer [0] (candle em formação)|
+//|      ✅ CORREÇÃO: Agora lê buffer [1] (candle fechado)          |
+//|      ✅ IMPACTO: SINCRONIZAÇÃO 100% PERFEITA!                   |
+//|                                                                  |
+//|   ✅ TODOS INDICADORES SINCRONIZADOS v4.27:                     |
+//|      • GG TrendBar: candle FECHADO [1] ✓                        |
+//|      • Supertrend: candle FECHADO [1] ✓ (CORRIGIDO!)            |
+//|      • WAE: candle FECHADO [1] ✓                                |
+//|      • RSI OMA: candle FECHADO [1] ✓                            |
+//|      • Currency Strength: candle FECHADO [1] ✓                  |
+//|      → VALORES EA = SINAIS VISUAIS NO GRÁFICO!                  |
 //|                                                                  |
 //|   📊 MANTIDO v4.24: Sistema de bloqueio otimizado               |
 //|      - Bloqueio máximo 12h (M15: 3h, M30: 5h, H1: 8h, H4: 12h) |
-//|      - Reset automático no início do pregão                     |
-//|      - Logs visíveis a cada novo candle                         |
 //|                                                                  |
-//|   ⚠️ IMPACTO ESPERADO: ENTRADAS MAIS RÁPIDAS SEM ATRASOS!      |
+//|   ⚠️ IMPACTO: ENTRADAS RÁPIDAS + SINCRONIZAÇÃO PERFEITA!       |
 //+------------------------------------------------------------------+
 //| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
 //| Baseado no Sistema de Trading Profissional v4.0                  |

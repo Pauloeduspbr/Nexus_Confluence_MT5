@@ -434,7 +434,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.27";    // 🔥 v4.27: RSI OMA SIMPLIFICADO - Entradas mais rápidas (removido slope + overbought/oversold)
+const string EA_VERSION = "4.27";    // 🔥 v4.27: RSI SIMPLES + SUPERTREND [1] - Sincronização 100% completa!
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

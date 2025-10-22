@@ -1,11 +1,11 @@
 //+------------------------------------------------------------------+
-//| WaddahAttarExplosion_Professional.mq5 v2.0 OTIMIZADO            |
-//| WAE usando iMACD + iBands nativos - CONFIÁVEL                    |
-//| OTIMIZAÇÃO: CopyBuffer incremental (90% redução latência!)      |
+//| WaddahAttarExplosion_Professional.mq5 v2.2 ROBUSTO              |
+//| WAE usando iMACD + iBands nativos - SEM ERROS                   |
+//| CORREÇÃO: Retry logic + validação inteligente de buffers        |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Adaptive Flow Systems"
 #property link      "https://adaptiveflow.systems"
-#property version   "2.00"
+#property version   "2.20"
 #property strict
 
 #property indicator_separate_window
@@ -105,82 +105,112 @@ int OnCalculate(const int rates_total,
     if(rates_total < InpSlowMA)
         return 0;
 
-    //--- 🔥 OTIMIZAÇÃO v2.0: CALCULAR APENAS BARRAS NOVAS/MODIFICADAS
-    int start = prev_calculated - 1;
-    if(start < InpSlowMA) start = InpSlowMA;
-    
-    //--- 🔥 COPIAR APENAS O NECESSÁRIO (+5 barras segurança para cálculos)
-    int bars_needed = (rates_total - start) + 5;
-    bars_needed = MathMin(bars_needed, rates_total);  // Não exceder total
-    
-    //--- Log de economia (debug)
-    static int total_bars_would_copy = 0;
-    static int total_bars_actual_copy = 0;
-    total_bars_would_copy += rates_total;
-    total_bars_actual_copy += bars_needed;
-    
-    static int calc_count = 0;
-    calc_count++;
-    if(calc_count >= 100)
+    //--- 🔥 v2.1: Determinar quantas barras calcular
+    int limit;
+    if(prev_calculated == 0)
     {
-        double savings = 100.0 * (1.0 - (double)total_bars_actual_copy / total_bars_would_copy);
-        Print(StringFormat("🔥 WAE OTIMIZADO: %.1f%% economia em CopyBuffer!", savings));
-        total_bars_would_copy = 0;
-        total_bars_actual_copy = 0;
-        calc_count = 0;
+        // Primeira execução: calcular todas as barras
+        limit = rates_total - InpSlowMA;  // Começar de onde temos dados suficientes
+        // Inicializar buffers
+        ArrayInitialize(g_buf_trend_up, 0.0);
+        ArrayInitialize(g_buf_trend_down, 0.0);
+        ArrayInitialize(g_buf_explosion_line, EMPTY_VALUE);
+        ArrayInitialize(g_buf_dead_zone, 0.0);
     }
-
-    // Copiar APENAS barras necessárias (não todo histórico!)
+    else if(prev_calculated == rates_total)
+    {
+        // Tick no candle atual: recalcular apenas [0]
+        limit = 0;
+    }
+    else
+    {
+        // Novo candle: calcular desde a última barra calculada
+        limit = rates_total - prev_calculated;
+    }
+    
+    //--- 🔥 Calcular barras necessárias para CopyBuffer
+    // Precisamos de dados suficientes para calcular os indicadores base
+    int bars_to_copy = limit + InpSlowMA + 10;  // +10 segurança extra
+    if(bars_to_copy > rates_total) bars_to_copy = rates_total;
+    if(bars_to_copy < InpSlowMA) bars_to_copy = InpSlowMA;
+    
+    //--- Arrays temporários
     double macd_main[], macd_signal[], bb_upper[], bb_lower[];
     ArraySetAsSeries(macd_main, true);
     ArraySetAsSeries(macd_signal, true);
     ArraySetAsSeries(bb_upper, true);
     ArraySetAsSeries(bb_lower, true);
 
-    if(CopyBuffer(g_handle_macd, 0, 0, bars_needed, macd_main) <= 0)
+    //--- 🔥 Copiar buffers com retry (indicadores podem não estar prontos)
+    int copy_result = 0;
+    int max_attempts = 3;
+    
+    for(int attempt = 0; attempt < max_attempts; attempt++)
     {
-        Print("ERROR: Failed to copy MACD main");
-        return 0;
+        copy_result = CopyBuffer(g_handle_macd, 0, 0, bars_to_copy, macd_main);
+        if(copy_result > 0) break;
+        Sleep(10);  // Aguardar indicador ficar pronto
     }
-    if(CopyBuffer(g_handle_macd, 1, 0, bars_needed, macd_signal) <= 0)
+    if(copy_result <= 0)
+        return prev_calculated;  // Retornar prev para tentar novamente no próximo tick
+    
+    for(int attempt = 0; attempt < max_attempts; attempt++)
     {
-        Print("ERROR: Failed to copy MACD signal");
-        return 0;
+        copy_result = CopyBuffer(g_handle_macd, 1, 0, bars_to_copy, macd_signal);
+        if(copy_result > 0) break;
+        Sleep(10);
     }
-    if(CopyBuffer(g_handle_bb, 1, 0, bars_needed, bb_upper) <= 0)
+    if(copy_result <= 0)
+        return prev_calculated;
+    
+    for(int attempt = 0; attempt < max_attempts; attempt++)
     {
-        Print("ERROR: Failed to copy BB upper");
-        return 0;
+        copy_result = CopyBuffer(g_handle_bb, 1, 0, bars_to_copy, bb_upper);
+        if(copy_result > 0) break;
+        Sleep(10);
     }
-    if(CopyBuffer(g_handle_bb, 2, 0, bars_needed, bb_lower) <= 0)
+    if(copy_result <= 0)
+        return prev_calculated;
+    
+    for(int attempt = 0; attempt < max_attempts; attempt++)
     {
-        Print("ERROR: Failed to copy BB lower");
-        return 0;
+        copy_result = CopyBuffer(g_handle_bb, 2, 0, bars_to_copy, bb_lower);
+        if(copy_result > 0) break;
+        Sleep(10);
+    }
+    if(copy_result <= 0)
+        return prev_calculated;
+
+    //--- Validar tamanho mínimo dos arrays copiados
+    int min_required = InpSlowMA;
+    if(ArraySize(macd_main) < min_required || 
+       ArraySize(macd_signal) < min_required ||
+       ArraySize(bb_upper) < min_required || 
+       ArraySize(bb_lower) < min_required)
+    {
+        // Dados insuficientes, mas não é erro fatal - aguardar próximo tick
+        return prev_calculated;
     }
 
-    // Validar tamanho dos arrays copiados
-    if(ArraySize(macd_main) < InpSlowMA || ArraySize(bb_upper) < InpSlowMA)
+    //--- 🔥 LOOP CORRETO: De limit até 0 (mais recente para mais antigo)
+    for(int i = limit; i >= 0; i--)
     {
-        Print("ERROR: Insufficient data copied from indicators");
-        return 0;
-    }
+        //--- Garantir que índices estão dentro dos limites de TODOS os arrays
+        if(i >= ArraySize(macd_main) || 
+           i >= ArraySize(macd_signal) ||
+           i >= ArraySize(bb_upper) || 
+           i >= ArraySize(bb_lower))
+        {
+            continue;  // Pular esta barra
+        }
 
-    // Copiar Close para normalização
-    ArraySetAsSeries(close, true);
-
-    // Loop processa apenas start até 0 (barras novas/modificadas)
-    for(int i = start; i >= 0; i--)
-    {
-        // Validar índice dentro dos limites dos arrays
-        if(i >= ArraySize(macd_main) || i >= ArraySize(bb_upper))
-            continue;
-
-        // MACD Histogram
+        //--- MACD Histogram
         double histogram = macd_main[i] - macd_signal[i];
 
-        // Trend Power
+        //--- Trend Power
         double trend_power = histogram * InpSensitivity;
 
+        //--- Preencher buffers Up/Down
         if(trend_power >= 0)
         {
             g_buf_trend_up[i] = trend_power;
@@ -192,19 +222,20 @@ int OnCalculate(const int rates_total,
             g_buf_trend_down[i] = MathAbs(trend_power);
         }
 
-        // Explosion Line - Fórmula ajustada para visibilidade
+        //--- Explosion Line
         double bb_width = bb_upper[i] - bb_lower[i];
-        
-        // Usar BB Width direto (sem normalização) vezes sensitivity dividido por escala
-        // Isso mantém a Explosion Line proporcional aos histogramas
         g_buf_explosion_line[i] = (bb_width * InpSensitivity) / 50.0;
 
-        // Dead Zone: ambos abaixo da explosion line
+        //--- Dead Zone
         if(g_buf_trend_up[i] < g_buf_explosion_line[i] && 
            g_buf_trend_down[i] < g_buf_explosion_line[i])
+        {
             g_buf_dead_zone[i] = 1.0;
+        }
         else
+        {
             g_buf_dead_zone[i] = 0.0;
+        }
     }
 
     return(rates_total);

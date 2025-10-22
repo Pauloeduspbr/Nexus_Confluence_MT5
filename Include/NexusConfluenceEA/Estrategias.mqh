@@ -127,6 +127,27 @@ struct BufferCache {
 
 BufferCache g_bufferCache;
 
+// 🔥 Arrays e variáveis temporárias GLOBAIS para UpdateBufferCache (workaround compilador MQL5)
+int g_temp_idx;  // Índice para loops
+double g_temp_wae_up[3];
+double g_temp_wae_down[3];
+double g_temp_wae_exp[1];
+double g_temp_rsi_red[3];
+double g_temp_rsi_blue[3];
+double g_temp_cs_base[1];
+double g_temp_cs_quote[1];
+double g_temp_supertrend_up[3];
+double g_temp_supertrend_down[3];
+double g_temp_gg_m1[2];
+double g_temp_gg_m5[2];
+double g_temp_gg_m15[2];
+double g_temp_gg_m30[2];
+double g_temp_gg_h1[2];
+double g_temp_gg_h4[2];
+double g_temp_gg_d1[2];
+double g_temp_gg_w1[2];
+double g_temp_gg_mn1[2];
+
 //+------------------------------------------------------------------+
 //| 🔥 FUNÇÃO: UpdateBufferCache                                     |
 //| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
@@ -136,129 +157,115 @@ bool UpdateBufferCache()
 {
     datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 0);
     
-    // 🔥 Verificar se já atualizou neste candle
     if(g_bufferCache.lastUpdate == currentBar && g_bufferCache.isValid)
     {
-        // Cache ainda válido, não precisa atualizar
         return true;
     }
     
-    // 🔥 Atualizar cache com TODAS as chamadas CopyBuffer de UMA VEZ
     bool success = true;
-    int i; // Declarar índice usado em loops
     
-    // Usar arrays temporários para CopyBuffer (não funciona direto em struct)
-    // MQL5 requer declaração de arrays em linhas separadas
-    double temp_wae_up[3];
-    double temp_wae_down[3];
-    double temp_wae_exp[1];
-    double temp_rsi_red[3];
-    double temp_rsi_blue[3];
-    double temp_cs_base[1];
-    double temp_cs_quote[1];
-    double temp_trend_up[3];
-    double temp_trend_down[3];
-    double temp_gg_m1[2];
-    double temp_gg_m5[2];
-    double temp_gg_m15[2];
-    double temp_gg_m30[2];
-    double temp_gg_h1[2];
-    double temp_gg_h4[2];
-    double temp_gg_d1[2];
-    double temp_gg_w1[2];
-    double temp_gg_mn1[2];
-    
-    // 1. WAE (3 buffers)
+    // 1. WAE
     if(g_handles.wae_oper != INVALID_HANDLE)
     {
-        success = success && (CopyBuffer(g_handles.wae_oper, 0, 0, 3, temp_wae_up) == 3);
-        success = success && (CopyBuffer(g_handles.wae_oper, 1, 0, 3, temp_wae_down) == 3);
-        success = success && (CopyBuffer(g_handles.wae_oper, 2, 0, 1, temp_wae_exp) == 1);
-        
-        // Copiar para struct (sempre tentar, erro será tratado por success)
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.wae_trendUp[i] = temp_wae_up[i];
-            g_bufferCache.wae_trendDown[i] = temp_wae_down[i];
+        if(CopyBuffer(g_handles.wae_oper, 0, 0, 3, g_temp_wae_up) == 3 &&
+           CopyBuffer(g_handles.wae_oper, 1, 0, 3, g_temp_wae_down) == 3 &&
+           CopyBuffer(g_handles.wae_oper, 2, 0, 1, g_temp_wae_exp) == 1)
+        {
+            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            {
+                g_bufferCache.wae_trendUp[g_temp_idx] = g_temp_wae_up[g_temp_idx];
+                g_bufferCache.wae_trendDown[g_temp_idx] = g_temp_wae_down[g_temp_idx];
+            }
+            g_bufferCache.wae_explosion[0] = g_temp_wae_exp[0];
         }
-        g_bufferCache.wae_explosion[0] = temp_wae_exp[0];
+        else success = false;
     }
     
-    // 2. RSI OMA (2 buffers)
+    // 2. RSI OMA
     if(g_handles.rsi_oper != INVALID_HANDLE)
     {
-        success = success && (CopyBuffer(g_handles.rsi_oper, 0, 0, 3, temp_rsi_red) == 3);
-        success = success && (CopyBuffer(g_handles.rsi_oper, 1, 0, 3, temp_rsi_blue) == 3);
-        
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.rsi_red[i] = temp_rsi_red[i];
-            g_bufferCache.rsi_blue[i] = temp_rsi_blue[i];
+        if(CopyBuffer(g_handles.rsi_oper, 0, 0, 3, g_temp_rsi_red) == 3 &&
+           CopyBuffer(g_handles.rsi_oper, 1, 0, 3, g_temp_rsi_blue) == 3)
+        {
+            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            {
+                g_bufferCache.rsi_red[g_temp_idx] = g_temp_rsi_red[g_temp_idx];
+                g_bufferCache.rsi_blue[g_temp_idx] = g_temp_rsi_blue[g_temp_idx];
+            }
         }
+        else success = false;
     }
     
-    // 3. Currency Strength (2 buffers)
+    // 3. Currency Strength
     if(g_handles.cs_oper != INVALID_HANDLE)
     {
-        success = success && (CopyBuffer(g_handles.cs_oper, 0, 1, 1, temp_cs_base) == 1);
-        success = success && (CopyBuffer(g_handles.cs_oper, 1, 1, 1, temp_cs_quote) == 1);
-        
-        g_bufferCache.cs_base[0] = temp_cs_base[0];
-        g_bufferCache.cs_quote[0] = temp_cs_quote[0];
-    }
-    
-    // 4. Supertrend (2 buffers)
-    if(g_handles.supertrend_oper != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.supertrend_oper, 0, 0, 3, temp_trend_up) == 3);
-        success = success && (CopyBuffer(g_handles.supertrend_oper, 1, 0, 3, temp_trend_down) == 3);
-        
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.trend_up[i] = temp_trend_up[i];
-            g_bufferCache.trend_down[i] = temp_trend_down[i];
+        if(CopyBuffer(g_handles.cs_oper, 0, 1, 1, g_temp_cs_base) == 1 &&
+           CopyBuffer(g_handles.cs_oper, 1, 1, 1, g_temp_cs_quote) == 1)
+        {
+            g_bufferCache.cs_base[0] = g_temp_cs_base[0];
+            g_bufferCache.cs_quote[0] = g_temp_cs_quote[0];
         }
+        else success = false;
     }
     
-    // 5. GG TrendBar (9 timeframes)
+    // 4. Supertrend (TrendMagic)
+    if(g_handles.st_oper != INVALID_HANDLE)
+    {
+        if(CopyBuffer(g_handles.st_oper, 0, 0, 3, g_temp_supertrend_up) == 3 &&
+           CopyBuffer(g_handles.st_oper, 1, 0, 3, g_temp_supertrend_down) == 3)
+        {
+            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            {
+                g_bufferCache.trend_up[g_temp_idx] = g_temp_supertrend_up[g_temp_idx];
+                g_bufferCache.trend_down[g_temp_idx] = g_temp_supertrend_down[g_temp_idx];
+            }
+        }
+        else success = false;
+    }
+    
+    // 5. GG TrendBar
     if(g_handles.gg_global != INVALID_HANDLE)
     {
-        success = success && (CopyBuffer(g_handles.gg_global, 0, 0, 2, temp_gg_m1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 2, 0, 2, temp_gg_m5) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 4, 0, 2, temp_gg_m15) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 6, 0, 2, temp_gg_m30) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 8, 0, 2, temp_gg_h1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 10, 0, 2, temp_gg_h4) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 12, 0, 2, temp_gg_d1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 14, 0, 2, temp_gg_w1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 16, 0, 2, temp_gg_mn1) == 2);
-        
-        for(i = 0; i < 2; i++) {
-            g_bufferCache.gg_m1[i] = temp_gg_m1[i];
-            g_bufferCache.gg_m5[i] = temp_gg_m5[i];
-            g_bufferCache.gg_m15[i] = temp_gg_m15[i];
-            g_bufferCache.gg_m30[i] = temp_gg_m30[i];
-            g_bufferCache.gg_h1[i] = temp_gg_h1[i];
-            g_bufferCache.gg_h4[i] = temp_gg_h4[i];
-            g_bufferCache.gg_d1[i] = temp_gg_d1[i];
-            g_bufferCache.gg_w1[i] = temp_gg_w1[i];
-            g_bufferCache.gg_mn1[i] = temp_gg_mn1[i];
+        if(CopyBuffer(g_handles.gg_global, 0, 0, 2, g_temp_gg_m1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 2, 0, 2, g_temp_gg_m5) == 2 &&
+           CopyBuffer(g_handles.gg_global, 4, 0, 2, g_temp_gg_m15) == 2 &&
+           CopyBuffer(g_handles.gg_global, 6, 0, 2, g_temp_gg_m30) == 2 &&
+           CopyBuffer(g_handles.gg_global, 8, 0, 2, g_temp_gg_h1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 10, 0, 2, g_temp_gg_h4) == 2 &&
+           CopyBuffer(g_handles.gg_global, 12, 0, 2, g_temp_gg_d1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 14, 0, 2, g_temp_gg_w1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 16, 0, 2, g_temp_gg_mn1) == 2)
+        {
+            for(g_temp_idx = 0; g_temp_idx < 2; g_temp_idx++)
+            {
+                g_bufferCache.gg_m1[g_temp_idx] = g_temp_gg_m1[g_temp_idx];
+                g_bufferCache.gg_m5[g_temp_idx] = g_temp_gg_m5[g_temp_idx];
+                g_bufferCache.gg_m15[g_temp_idx] = g_temp_gg_m15[g_temp_idx];
+                g_bufferCache.gg_m30[g_temp_idx] = g_temp_gg_m30[g_temp_idx];
+                g_bufferCache.gg_h1[g_temp_idx] = g_temp_gg_h1[g_temp_idx];
+                g_bufferCache.gg_h4[g_temp_idx] = g_temp_gg_h4[g_temp_idx];
+                g_bufferCache.gg_d1[g_temp_idx] = g_temp_gg_d1[g_temp_idx];
+                g_bufferCache.gg_w1[g_temp_idx] = g_temp_gg_w1[g_temp_idx];
+                g_bufferCache.gg_mn1[g_temp_idx] = g_temp_gg_mn1[g_temp_idx];
+            }
         }
+        else success = false;
     }
     
-    // Atualizar estado do cache
     g_bufferCache.isValid = success;
     g_bufferCache.lastUpdate = currentBar;
     
-    // Log de performance (apenas a cada 50 chamadas)
     static int updateCount = 0;
     updateCount++;
     if(updateCount >= 50)
     {
-        Print("🔥 BUFFER CACHE: 50 atualizações completas (1 CopyBuffer/candle vs múltiplos antes)");
+        Print("🔥 BUFFER CACHE: 50 updates (19 CopyBuffer → 1/candle)");
         updateCount = 0;
     }
     
     if(!success)
     {
-        PrintFormat("❌ Erro ao atualizar Buffer Cache no candle %s", TimeToString(currentBar));
+        PrintFormat("❌ Buffer Cache Error: %s", TimeToString(currentBar));
     }
     
     return success;
@@ -847,23 +854,20 @@ WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES ti
    bool expanding = (MathMax(trendUp[1], trendDown[1]) > MathMax(trendUp[2], trendDown[2]));
    result.isExpanding = expanding;
 
-   // Verificar se está acima da linha de explosão
-   double explosion_val[1];
-   if(CopyBuffer(handle, 2, 1, 1, explosion_val) == 1)
-   {
-      bool aboveExplosion = (currentStrength > explosion_val[0]);
-      result.isValid = true;
+   // 🔥 OTIMIZADO: Usar valor em cache da linha de explosão ao invés de CopyBuffer
+   double explosion_val = explosion[0];
+   bool aboveExplosion = (currentStrength > explosion_val);
+   result.isValid = true;
 
-      if(direction == TRADE_DIRECTION_BUY)
-      {
-         // Para compra: verde + expandindo + acima explosão
-         result.isAligned = (isGreen && expanding && aboveExplosion);
-      }
-      else if(direction == TRADE_DIRECTION_SELL)
-      {
-         // Para venda: vermelho + expandindo + acima explosão
-         result.isAligned = (isRed && expanding && aboveExplosion);
-      }
+   if(direction == TRADE_DIRECTION_BUY)
+   {
+      // Para compra: verde + expandindo + acima explosão
+      result.isAligned = (isGreen && expanding && aboveExplosion);
+   }
+   else if(direction == TRADE_DIRECTION_SELL)
+   {
+      // Para venda: vermelho + expandindo + acima explosão
+      result.isAligned = (isRed && expanding && aboveExplosion);
    }
    
    return result;

@@ -87,184 +87,6 @@ int             g_numNiveisMacro = 3;           // 2 ou 3 níveis macro
 IndicatorHandles g_handles;
 
 //+------------------------------------------------------------------+
-//| 🔥 OTIMIZAÇÃO v2.0: BUFFER CACHE GLOBAL                          |
-//| Evita múltiplas chamadas CopyBuffer no mesmo frame              |
-//| UpdateBufferCache() é chamado 1x por candle novo                |
-//| GetXXXSignal() lê do cache ao invés de CopyBuffer               |
-//+------------------------------------------------------------------+
-struct BufferCache {
-    datetime lastUpdate;         // Timestamp da última atualização
-    bool isValid;               // Cache válido?
-    
-    // WAE (3 buffers × 3 barras)
-    double wae_trendUp[3];
-    double wae_trendDown[3];
-    double wae_explosion[1];
-    
-    // RSI OMA (2 buffers × 3 barras)
-    double rsi_red[3];
-    double rsi_blue[3];
-    
-    // Currency Strength (2 buffers × 1 barra)
-    double cs_base[1];
-    double cs_quote[1];
-    
-    // Supertrend (2 buffers × 3 barras)
-    double trend_up[3];
-    double trend_down[3];
-    
-    // GG TrendBar (9 timeframes × 2 barras)
-    double gg_m1[2];
-    double gg_m5[2];
-    double gg_m15[2];
-    double gg_m30[2];
-    double gg_h1[2];
-    double gg_h4[2];
-    double gg_d1[2];
-    double gg_w1[2];
-    double gg_mn1[2];
-};
-
-BufferCache g_bufferCache;
-
-//+------------------------------------------------------------------+
-//| 🔥 FUNÇÃO: UpdateBufferCache                                     |
-//| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
-//| Retorna true se sucesso, false se erro                          |
-//+------------------------------------------------------------------+
-bool UpdateBufferCache()
-{
-    datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 0);
-    
-    // 🔥 Verificar se já atualizou neste candle
-    if(g_bufferCache.lastUpdate == currentBar && g_bufferCache.isValid)
-    {
-        // Cache ainda válido, não precisa atualizar
-        return true;
-    }
-    
-    // 🔥 Atualizar cache com TODAS as chamadas CopyBuffer de UMA VEZ
-    bool success = true;
-    int i; // Declarar índice usado em loops
-    
-    // Usar arrays temporários para CopyBuffer (não funciona direto em struct)
-    // MQL5 requer declaração de arrays em linhas separadas
-    double temp_wae_up[3];
-    double temp_wae_down[3];
-    double temp_wae_exp[1];
-    double temp_rsi_red[3];
-    double temp_rsi_blue[3];
-    double temp_cs_base[1];
-    double temp_cs_quote[1];
-    double temp_trend_up[3];
-    double temp_trend_down[3];
-    double temp_gg_m1[2];
-    double temp_gg_m5[2];
-    double temp_gg_m15[2];
-    double temp_gg_m30[2];
-    double temp_gg_h1[2];
-    double temp_gg_h4[2];
-    double temp_gg_d1[2];
-    double temp_gg_w1[2];
-    double temp_gg_mn1[2];
-    
-    // 1. WAE (3 buffers)
-    if(g_handles.wae_oper != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.wae_oper, 0, 0, 3, temp_wae_up) == 3);
-        success = success && (CopyBuffer(g_handles.wae_oper, 1, 0, 3, temp_wae_down) == 3);
-        success = success && (CopyBuffer(g_handles.wae_oper, 2, 0, 1, temp_wae_exp) == 1);
-        
-        // Copiar para struct (sempre tentar, erro será tratado por success)
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.wae_trendUp[i] = temp_wae_up[i];
-            g_bufferCache.wae_trendDown[i] = temp_wae_down[i];
-        }
-        g_bufferCache.wae_explosion[0] = temp_wae_exp[0];
-    }
-    
-    // 2. RSI OMA (2 buffers)
-    if(g_handles.rsi_oper != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.rsi_oper, 0, 0, 3, temp_rsi_red) == 3);
-        success = success && (CopyBuffer(g_handles.rsi_oper, 1, 0, 3, temp_rsi_blue) == 3);
-        
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.rsi_red[i] = temp_rsi_red[i];
-            g_bufferCache.rsi_blue[i] = temp_rsi_blue[i];
-        }
-    }
-    
-    // 3. Currency Strength (2 buffers)
-    if(g_handles.cs_oper != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.cs_oper, 0, 1, 1, temp_cs_base) == 1);
-        success = success && (CopyBuffer(g_handles.cs_oper, 1, 1, 1, temp_cs_quote) == 1);
-        
-        g_bufferCache.cs_base[0] = temp_cs_base[0];
-        g_bufferCache.cs_quote[0] = temp_cs_quote[0];
-    }
-    
-    // 4. Supertrend (2 buffers)
-    if(g_handles.supertrend_oper != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.supertrend_oper, 0, 0, 3, temp_trend_up) == 3);
-        success = success && (CopyBuffer(g_handles.supertrend_oper, 1, 0, 3, temp_trend_down) == 3);
-        
-        for(i = 0; i < 3; i++) {
-            g_bufferCache.trend_up[i] = temp_trend_up[i];
-            g_bufferCache.trend_down[i] = temp_trend_down[i];
-        }
-    }
-    
-    // 5. GG TrendBar (9 timeframes)
-    if(g_handles.gg_global != INVALID_HANDLE)
-    {
-        success = success && (CopyBuffer(g_handles.gg_global, 0, 0, 2, temp_gg_m1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 2, 0, 2, temp_gg_m5) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 4, 0, 2, temp_gg_m15) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 6, 0, 2, temp_gg_m30) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 8, 0, 2, temp_gg_h1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 10, 0, 2, temp_gg_h4) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 12, 0, 2, temp_gg_d1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 14, 0, 2, temp_gg_w1) == 2);
-        success = success && (CopyBuffer(g_handles.gg_global, 16, 0, 2, temp_gg_mn1) == 2);
-        
-        for(i = 0; i < 2; i++) {
-            g_bufferCache.gg_m1[i] = temp_gg_m1[i];
-            g_bufferCache.gg_m5[i] = temp_gg_m5[i];
-            g_bufferCache.gg_m15[i] = temp_gg_m15[i];
-            g_bufferCache.gg_m30[i] = temp_gg_m30[i];
-            g_bufferCache.gg_h1[i] = temp_gg_h1[i];
-            g_bufferCache.gg_h4[i] = temp_gg_h4[i];
-            g_bufferCache.gg_d1[i] = temp_gg_d1[i];
-            g_bufferCache.gg_w1[i] = temp_gg_w1[i];
-            g_bufferCache.gg_mn1[i] = temp_gg_mn1[i];
-        }
-    }
-    
-    // Atualizar estado do cache
-    g_bufferCache.isValid = success;
-    g_bufferCache.lastUpdate = currentBar;
-    
-    // Log de performance (apenas a cada 50 chamadas)
-    static int updateCount = 0;
-    updateCount++;
-    if(updateCount >= 50)
-    {
-        Print("🔥 BUFFER CACHE: 50 atualizações completas (1 CopyBuffer/candle vs múltiplos antes)");
-        updateCount = 0;
-    }
-    
-    if(!success)
-    {
-        PrintFormat("❌ Erro ao atualizar Buffer Cache no candle %s", TimeToString(currentBar));
-    }
-    
-    return success;
-}
-
-//+------------------------------------------------------------------+
 //| FUNÇÃO: DefineMultiTimeframes                                    |
 //| Define os timeframes macro conforme o TF operacional do gráfico |
 //|                                                                  |
@@ -558,20 +380,14 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
       return result;
    }
    
-   // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer
-   if(!g_bufferCache.isValid)
-   {
-      PrintFormat("❌ Cache inválido ao ler Supertrend (%s)", EnumToString(timeframe));
-      return result;
-   }
-   
-   // Usar dados do cache global (copiar manualmente)
+   // Buffers: 0 = Up (azul), 1 = Down (vermelho)
    double bufferUp[3], bufferDown[3];
-   int i;
-   for(i = 0; i < 3; i++)
+   
+   if(CopyBuffer(handle, 0, 0, 3, bufferUp) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, bufferDown) != 3)
    {
-      bufferUp[i] = g_bufferCache.trend_up[i];
-      bufferDown[i] = g_bufferCache.trend_down[i];
+      PrintFormat("❌ Erro ao copiar buffer Supertrend (%s)", EnumToString(timeframe));
+      return result;
    }
    
    // DEBUG: Mostrar valores dos buffers
@@ -673,17 +489,15 @@ CSSignal GetCurrencyStrengthSignal(string symbol, TRADE_DIRECTION direction, ASS
       return result;
    }
    
-   // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer
-   if(!g_bufferCache.isValid)
+   // 🔥 v4.26: Buffers usando candle FECHADO [1]
+   double baseStrength[1], quoteStrength[1];
+
+   if(CopyBuffer(g_handles.cs_oper, 0, 1, 1, baseStrength) != 1 ||
+      CopyBuffer(g_handles.cs_oper, 1, 1, 1, quoteStrength) != 1)
    {
-      PrintFormat("❌ Cache inválido ao ler Currency Strength");
+      PrintFormat("❌ Erro ao copiar buffer Currency Strength");
       return result;
    }
-   
-   // Usar dados do cache global (copiar manualmente)
-   double baseStrength[1], quoteStrength[1];
-   baseStrength[0] = g_bufferCache.cs_base[0];
-   quoteStrength[0] = g_bufferCache.cs_quote[0];
 
    result.strength = MathAbs(baseStrength[0] - quoteStrength[0]);
    result.isValid = true;
@@ -745,20 +559,14 @@ RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES
       return result;
    }
    
-   // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer
-   if(!g_bufferCache.isValid)
-   {
-      PrintFormat("❌ Cache inválido ao ler RSI OMA (%s)", EnumToString(timeframe));
-      return result;
-   }
-   
-   // Usar dados do cache global (copiar manualmente para manter compatibilidade)
+   // Buffers: 0 = RSI (linha vermelha), 1 = MA (linha azul)
    double rsiRed[3], rsiBlue[3];
-   int i;
-   for(i = 0; i < 3; i++)
+   
+   if(CopyBuffer(handle, 0, 0, 3, rsiRed) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, rsiBlue) != 3)
    {
-      rsiRed[i] = g_bufferCache.rsi_red[i];
-      rsiBlue[i] = g_bufferCache.rsi_blue[i];
+      PrintFormat("❌ Erro ao copiar buffer RSI OMA (%s)", EnumToString(timeframe));
+      return result;
    }
    
    // 🔥 v4.27: SIMPLIFICAÇÃO - Remover filtros que atrasam entradas
@@ -816,23 +624,17 @@ WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES ti
       return result;
    }
    
-   // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer
-   // Cache já foi atualizado em UpdateBufferCache() no início do frame
-   if(!g_bufferCache.isValid)
+   // Buffers: 0 = Trend Up (verde), 1 = Trend Down (vermelho),
+   //          2 = Explosion Line (amarela), 3 = Dead Zone
+   double trendUp[3], trendDown[3], explosion[1];
+   
+   if(CopyBuffer(handle, 0, 0, 3, trendUp) != 3 ||
+      CopyBuffer(handle, 1, 0, 3, trendDown) != 3 ||
+      CopyBuffer(handle, 2, 0, 1, explosion) != 1)
    {
-      PrintFormat("❌ Cache inválido ao ler WAE (%s)", EnumToString(timeframe));
+      PrintFormat("❌ Erro ao copiar buffer WAE (%s)", EnumToString(timeframe));
       return result;
    }
-   
-   // Usar dados do cache global (copiar manualmente para evitar problemas com tipos)
-   double trendUp[3], trendDown[3], explosion[1];
-   int i;
-   for(i = 0; i < 3; i++)
-   {
-      trendUp[i] = g_bufferCache.wae_trendUp[i];
-      trendDown[i] = g_bufferCache.wae_trendDown[i];
-   }
-   explosion[0] = g_bufferCache.wae_explosion[0];
    
    // 🔥 v4.26: Usar candle FECHADO [1] para análise
    // Determinar cor do histograma (verde ou vermelho) no candle FECHADO
@@ -885,28 +687,23 @@ GGTrendBarSignal GetGGTrendBarSignal()
       return result;
    }
    
-   // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer (9 chamadas → 0 chamadas!)
-   if(!g_bufferCache.isValid)
-   {
-      PrintFormat("❌ Cache inválido ao ler GG TrendBar");
-      return result;
-   }
-   
-   // Usar dados do cache global (copiar manualmente todos os 9 timeframes)
+   // GG TrendBar tem 18 buffers (9 TFs × 2)
+   // Buffers de dados: 0=M1, 2=M5, 4=M15, 6=M30, 8=H1, 10=H4, 12=D1, 14=W1, 16=MN1
+   // 🔥 v4.21: LER CANDLE FECHADO [1] ao invés do atual [0] para garantir valores CONFIRMADOS
    double gg_m1[2], gg_m5[2], gg_m15[2], gg_m30[2], gg_h1[2], gg_h4[2], gg_d1[2], gg_w1[2], gg_mn1[2];
-   int i;
    
-   for(i = 0; i < 2; i++)
+   if(CopyBuffer(g_handles.gg_global, 0, 0, 2, gg_m1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 2, 0, 2, gg_m5) != 2 ||
+      CopyBuffer(g_handles.gg_global, 4, 0, 2, gg_m15) != 2 ||
+      CopyBuffer(g_handles.gg_global, 6, 0, 2, gg_m30) != 2 ||
+      CopyBuffer(g_handles.gg_global, 8, 0, 2, gg_h1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 10, 0, 2, gg_h4) != 2 ||
+      CopyBuffer(g_handles.gg_global, 12, 0, 2, gg_d1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 14, 0, 2, gg_w1) != 2 ||
+      CopyBuffer(g_handles.gg_global, 16, 0, 2, gg_mn1) != 2)
    {
-      gg_m1[i] = g_bufferCache.gg_m1[i];
-      gg_m5[i] = g_bufferCache.gg_m5[i];
-      gg_m15[i] = g_bufferCache.gg_m15[i];
-      gg_m30[i] = g_bufferCache.gg_m30[i];
-      gg_h1[i] = g_bufferCache.gg_h1[i];
-      gg_h4[i] = g_bufferCache.gg_h4[i];
-      gg_d1[i] = g_bufferCache.gg_d1[i];
-      gg_w1[i] = g_bufferCache.gg_w1[i];
-      gg_mn1[i] = g_bufferCache.gg_mn1[i];
+      PrintFormat("❌ Erro ao copiar buffers GG TrendBar");
+      return result;
    }
    
    // 🔥 v4.26 CORREÇÃO CRÍTICA FINAL: LER CANDLE FECHADO [1]!

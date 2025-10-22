@@ -243,6 +243,15 @@ void OnTick()
                TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
    PrintFormat("════════════════════════════════════════════════════════════════");
    
+   // 🔥 v2.0 OTIMIZAÇÃO CRÍTICA: ATUALIZAR BUFFER CACHE DE UMA VEZ
+   // Chamada ÚNICA no início do frame - todos indicadores são atualizados aqui
+   // GetXXXSignal() vão ler do cache (zero CopyBuffer redundantes!)
+   if(!UpdateBufferCache())
+   {
+      PrintFormat("❌ ERRO CRÍTICO: Falha ao atualizar Buffer Cache - abortando análise");
+      return;
+   }
+   
    // 🔥 v4.24: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO + FORÇAR DESBLOQUEIO
    if(g_pauseUntilTime > TimeCurrent())
    {

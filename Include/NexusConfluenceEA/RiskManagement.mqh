@@ -843,61 +843,101 @@ bool ExecutePartialClose(ulong ticket, double percentToClose, string symbol)
 //+------------------------------------------------------------------+
 //| Atualizar trailing stop - 🔥 v4.27: IMPLEMENTADO uso de ATR    |
 //+------------------------------------------------------------------+
-//+------------------------------------------------------------------+
-//| Atualiza trailing stop com controle de log redundante           |
-//+------------------------------------------------------------------+
-void UpdateTrailingStop(ulong ticket, double trailingATR, double trailingDistance, double trailingStep)
+void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, bool isLong, string symbol)
 {
-   static double lastTrailingATR = -1.0;
-   static double lastTrailingDistance = -1.0;
-   static double lastTrailingStep = -1.0;
+   double trailingDist;
+   double stepDist;
 
-   // Verificar se houve mudança significativa nos valores
-   bool atrChanged = MathAbs(trailingATR - lastTrailingATR) > 0.00001;
-   bool distChanged = MathAbs(trailingDistance - lastTrailingDistance) > 0.00001;
-   bool stepChanged = MathAbs(trailingStep - lastTrailingStep) > 0.00001;
-
-   if (atrChanged || distChanged || stepChanged)
+   // 🔥 v4.27: IMPLEMENTAR uso de ATR para trailing dinâmico
+   if(TrailingUseATR)
    {
-      PrintFormat("📊 Trailing ATR: %.5f | Distância: %.5f (%.1f pts) | Step: %.5f (%.1f pts)",
-                  trailingATR,
-                  trailingDistance, trailingDistance / _Point,
-                  trailingStep, trailingStep / _Point);
-
-      lastTrailingATR = trailingATR;
-      lastTrailingDistance = trailingDistance;
-      lastTrailingStep = trailingStep;
-   }
-
-   // Aqui segue a lógica de trailing stop real (exemplo genérico)
-   double newSL = 0.0;
-   if (PositionSelectByTicket(ticket))
-   {
-      bool isBuy = (PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY);
-      double openPrice = PositionGetDouble(POSITION_PRICE_OPEN);
-      double currentPrice = PositionGetDouble(POSITION_PRICE_CURRENT);
-      double currentSL = PositionGetDouble(POSITION_SL);
-
-      if (isBuy)
+      // Calcular ATR no M15 (timeframe operacional)
+      int atrHandle = iATR(symbol, PERIOD_M15, 14);
+      if(atrHandle == INVALID_HANDLE)
       {
-         newSL = currentPrice - trailingDistance;
-         if (newSL > currentSL + trailingStep)
-         {
-            g_trade.SellLimit(PositionGetDouble(POSITION_VOLUME), newSL, _Symbol);
-            PrintFormat("🔄 SL atualizado (BUY): %.5f → %.5f", currentSL, newSL);
-         }
+         PrintFormat("⚠️ Erro ao criar handle ATR para trailing, usando pontos fixos");
+         trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+         stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
       }
       else
       {
-         newSL = currentPrice + trailingDistance;
-         if (newSL < currentSL - trailingStep)
+         double atr[];
+         ArraySetAsSeries(atr, true);
+
+         if(CopyBuffer(atrHandle, 0, 0, 1, atr) == 1)
          {
-            g_trade.BuyLimit(PositionGetDouble(POSITION_VOLUME), newSL, _Symbol);
-            PrintFormat("🔄 SL atualizado (SELL): %.5f → %.5f", currentSL, newSL);
+            // ✅ Usar ATR multiplicado pelo parâmetro configurável
+            trailingDist = atr[0] * TrailingATRMultiplier;
+            stepDist = atr[0] * 0.3; // Step = 30% do ATR
+
+            // Garantir valores mínimos razoáveis
+            double minDist = 100.0 * SymbolInfoDouble(symbol, SYMBOL_POINT); // Mínimo 10 pontos
+            if(trailingDist < minDist)
+               trailingDist = minDist;
+
+            PrintFormat("   📊 Trailing ATR: %.5f | Distância: %.5f (%.1f pts) | Step: %.5f (%.1f pts)",
+                        atr[0], trailingDist, trailingDist/SymbolInfoDouble(symbol, SYMBOL_POINT),
+                        stepDist, stepDist/SymbolInfoDouble(symbol, SYMBOL_POINT));
          }
+         else
+         {
+            PrintFormat("⚠️ Erro ao ler ATR, usando pontos fixos");
+            trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+            stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+         }
+
+         IndicatorRelease(atrHandle);
+      }
+   }
+   else
+   {
+      // ✅ Usar pontos fixos configurados
+      trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+      stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   }
+
+   double newSL;
+
+   if(isLong)
+   {
+      newSL = currentPrice - trailingDist;
+
+      // Só mover SL para cima (proteção) e respeitar step mínimo
+      if(newSL <= currentSL || (newSL - currentSL) < stepDist)
+         return;
+   }
+   else
+   {
+      newSL = currentPrice + trailingDist;
+
+      // Só mover SL para baixo (proteção) e respeitar step mínimo
+      if(newSL >= currentSL || (currentSL - newSL) < stepDist)
+         return;
+   }
+
+   MqlTradeRequest request;
+   MqlTradeResult result;
+
+   ZeroMemory(request);
+   request.action = TRADE_ACTION_SLTP;
+   request.position = ticket;
+   request.symbol = symbol;
+   request.sl = newSL;
+   request.tp = PositionGetDouble(POSITION_TP);
+   request.magic = EA_MAGIC_NUMBER;
+
+   if(OrderSend(request, result))
+   {
+      if(result.retcode == TRADE_RETCODE_DONE)
+      {
+         PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts) [%s]",
+                     currentSL, newSL,
+                     MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT),
+                     TrailingUseATR ? "ATR" : "fixo");
       }
    }
 }
+
 //+------------------------------------------------------------------+
 //| 🔥 v4.24: Calcular tempo de pausa LIMITADO (MÁXIMO 12H!)        |
 //+------------------------------------------------------------------+

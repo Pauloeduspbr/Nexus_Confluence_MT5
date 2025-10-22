@@ -845,8 +845,11 @@ bool ExecutePartialClose(ulong ticket, double percentToClose, string symbol)
 //+------------------------------------------------------------------+
 void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, bool isLong, string symbol)
 {
-   double trailingDist;
-   double stepDist;
+   double trailingDist = 0.0;
+   double stepDist = 0.0;
+   double lastTrailingATR = 0.0;
+   double lastTrailingDist = 0.0;
+   double lastStepDist = 0.0;
 
    // 🔥 v4.27: IMPLEMENTAR uso de ATR para trailing dinâmico
    if(TrailingUseATR)
@@ -858,6 +861,9 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
          PrintFormat("⚠️ Erro ao criar handle ATR para trailing, usando pontos fixos");
          trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
          stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+         lastTrailingATR = 0.0;
+         lastTrailingDist = trailingDist;
+         lastStepDist = stepDist;
       }
       else
       {
@@ -875,17 +881,18 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
             if(trailingDist < minDist)
                trailingDist = minDist;
 
-            // Print do trailing ATR apenas se SL for realmente movido (evita poluição de log)
-            // Guardar valores para uso posterior
-            double lastTrailingATR = atr[0];
-            double lastTrailingDist = trailingDist;
-            double lastStepDist = stepDist;
+            lastTrailingATR = atr[0];
+            lastTrailingDist = trailingDist;
+            lastStepDist = stepDist;
          }
          else
          {
             PrintFormat("⚠️ Erro ao ler ATR, usando pontos fixos");
             trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
             stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+            lastTrailingATR = 0.0;
+            lastTrailingDist = trailingDist;
+            lastStepDist = stepDist;
          }
 
          IndicatorRelease(atrHandle);
@@ -894,8 +901,11 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
    else
    {
       // ✅ Usar pontos fixos configurados
-      trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
-      stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   trailingDist = TrailingDistancePoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   stepDist = TrailingStepPoints * SymbolInfoDouble(symbol, SYMBOL_POINT);
+   lastTrailingATR = 0.0;
+   lastTrailingDist = trailingDist;
+   lastStepDist = stepDist;
    }
 
    double newSL;

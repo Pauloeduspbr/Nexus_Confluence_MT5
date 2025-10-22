@@ -875,9 +875,11 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
             if(trailingDist < minDist)
                trailingDist = minDist;
 
-            PrintFormat("   📊 Trailing ATR: %.5f | Distância: %.5f (%.1f pts) | Step: %.5f (%.1f pts)",
-                        atr[0], trailingDist, trailingDist/SymbolInfoDouble(symbol, SYMBOL_POINT),
-                        stepDist, stepDist/SymbolInfoDouble(symbol, SYMBOL_POINT));
+            // Print do trailing ATR apenas se SL for realmente movido (evita poluição de log)
+            // Guardar valores para uso posterior
+            double lastTrailingATR = atr[0];
+            double lastTrailingDist = trailingDist;
+            double lastStepDist = stepDist;
          }
          else
          {
@@ -930,6 +932,9 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
    {
       if(result.retcode == TRADE_RETCODE_DONE)
       {
+         PrintFormat("   📊 Trailing ATR: %.5f | Distância: %.5f (%.1f pts) | Step: %.5f (%.1f pts)",
+                     lastTrailingATR, lastTrailingDist, lastTrailingDist/SymbolInfoDouble(symbol, SYMBOL_POINT),
+                     lastStepDist, lastStepDist/SymbolInfoDouble(symbol, SYMBOL_POINT));
          PrintFormat("   📈 Trailing SL: %.5f → %.5f (distância: %.1f pts) [%s]",
                      currentSL, newSL,
                      MathAbs(currentPrice - newSL) / SymbolInfoDouble(symbol, SYMBOL_POINT),

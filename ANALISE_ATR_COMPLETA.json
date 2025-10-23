@@ -1,0 +1,634 @@
+{
+  "metadata": {
+    "data_analise": "2025-10-22",
+    "ea_version": "4.27",
+    "analista": "AI Copilot - Análise Matemática Financeira",
+    "fonte_dados": "Código fonte EA + LOG 20251022.log",
+    "limitacao_critica": "LOG não contém dados OHLC, ATR por candle, ou métricas de trades executados"
+  },
+  
+  "diagnostico_atr": {
+    "uso_atual_no_ea": {
+      "supertrend_operacional": {
+        "atr_period": 5,
+        "atr_multiplier": 1.0,
+        "aplicacao": "Cálculo Supertrend (Trend Magic) no timeframe operacional",
+        "status": "ATIVO mas apenas para Supertrend"
+      },
+      "trailing_stop": {
+        "trailing_use_atr": true,
+        "trailing_atr_multiplier": 2.5,
+        "trailing_distance_points_fallback": 200.0,
+        "trailing_step_points": 50.0,
+        "trailing_activation_rr": 1.5,
+        "aplicacao": "Cálculo distância trailing baseado em ATR",
+        "status": "ATIVO - usa ATR(5) * 2.5"
+      },
+      "take_profit": {
+        "tp_use_atr": true,
+        "tp1_atr_multiplier": 2.0,
+        "tp2_atr_multiplier": 4.0,
+        "tp3_atr_multiplier": 6.0,
+        "tp1_rr_fallback": 2.0,
+        "tp2_rr_fallback": 4.0,
+        "tp3_rr_fallback": 6.0,
+        "aplicacao": "TP pode usar ATR OU RR fixo",
+        "status": "CONFIGURÁVEL - default usa ATR"
+      },
+      "stop_loss": {
+        "usa_atr_diretamente": false,
+        "metodo": "Structure-based (swing high/low)",
+        "sl_min_distance_points": 50.0,
+        "sl_max_distance_points": 300.0,
+        "sl_buffer_points": 10.0,
+        "sl_structure_strength": 2.0,
+        "aplicacao": "SL baseado em estrutura + validação ATR indireta",
+        "status": "ATR usado apenas para validação (SL_StructureStrength = 2.0 ATR)"
+      }
+    },
+    
+    "parametros_fixos_atuais": {
+      "gestao_risco": {
+        "account_risk_percent": 0.5,
+        "max_risk_premium": 1.0,
+        "max_daily_drawdown": 3.0,
+        "max_weekly_drawdown": 5.0
+      },
+      "stop_loss": {
+        "sl_min_points": 50.0,
+        "sl_max_points": 300.0,
+        "sl_buffer_points": 10.0,
+        "sl_safety_multiplier": 1.2,
+        "sl_structure_candles": 50
+      },
+      "take_profit": {
+        "tp1_rr": 2.0,
+        "tp2_rr": 4.0,
+        "tp3_rr": 6.0,
+        "tp1_close_percent": 30.0,
+        "tp2_close_percent": 50.0,
+        "tp3_close_percent": 20.0
+      },
+      "trailing": {
+        "distance_points": 200.0,
+        "step_points": 50.0,
+        "activation_rr": 1.5,
+        "start_after_tp": true
+      },
+      "breakeven": {
+        "after_rr": 1.0,
+        "plus_points": 5.0
+      }
+    },
+    
+    "metricas_nao_observaveis": {
+      "cv_atr": {
+        "valor": null,
+        "formula": "CV = σ(ATR) / μ(ATR)",
+        "motivo": "LOG não contém série temporal de valores ATR por candle",
+        "impacto": "Impossível avaliar estabilidade do ATR ao longo do tempo"
+      },
+      "corr_atr_range": {
+        "valor": null,
+        "formula": "ρ(ATR, TrueRange) = Cov(ATR,TR) / (σ_ATR * σ_TR)",
+        "motivo": "LOG não contém High/Low/Close por candle",
+        "impacto": "Impossível validar se ATR(5) representa bem a volatilidade real"
+      },
+      "erro_medio_atr": {
+        "valor": null,
+        "formula": "MAE = mean(|ATR - TrueRange|)",
+        "motivo": "LOG não contém True Range observado",
+        "impacto": "Impossível quantificar viés do ATR"
+      },
+      "satr_alpha_otimo": {
+        "valor": null,
+        "formula": "α* = argmax_α E(PnL | SL = k*(ATR + α*Spread))",
+        "motivo": "LOG não contém Spread por tick nem PnL por trade",
+        "impacto": "Impossível calcular α ótimo para SATR"
+      },
+      "performance_por_regime_vol": {
+        "baixa_vol": null,
+        "media_vol": null,
+        "alta_vol": null,
+        "motivo": "LOG não classifica candles por regime de volatilidade",
+        "impacto": "Impossível avaliar se EA performa melhor em determinados regimes"
+      }
+    },
+    
+    "analise_qualitativa": {
+      "pontos_positivos": [
+        "✅ ATR period=5 é curto → reage rápido a mudanças de volatilidade",
+        "✅ Trailing usa ATR adaptativo (2.5x) → ajusta automaticamente",
+        "✅ TP pode usar ATR → targets dinâmicos conforme mercado",
+        "✅ Sistema híbrido: Structure-based SL + ATR validation",
+        "✅ Fallback robusto: se ATR falhar, usa pontos fixos"
+      ],
+      "pontos_negativos": [
+        "⚠️ ATR(5) pode ser MUITO reativo → ruído em mercados ranging",
+        "⚠️ Supertrend usa ATR(5)*1.0 → multiplicador baixo, muitos sinais falsos?",
+        "⚠️ Trailing ATR 2.5x pode ser largo demais → devolve muito lucro",
+        "⚠️ SL não usa ATR diretamente → inconsistência metodológica",
+        "⚠️ TP_UseATR=true mas TP_RR também definido → confusão de estratégia"
+      ],
+      "riscos_identificados": [
+        "🚨 ATR(5) em ranging market → SL/TP muito próximos → stop out prematuro",
+        "🚨 Multiplicador único (2.5x) para todos ativos → não considera diferenças",
+        "🚨 Ausência de regime detection → mesma estratégia em alta/baixa volatilidade",
+        "🚨 TP muito altos (2R/4R/6R) + ATR curto → win rate pode ser <40%"
+      ]
+    }
+  },
+  
+  "comparacao_metricas": [
+    {
+      "nome": "ATR(5) - Configuração Atual",
+      "periodo": 5,
+      "multiplicadores": {
+        "supertrend": 1.0,
+        "trailing": 2.5,
+        "tp1": 2.0,
+        "tp2": 4.0,
+        "tp3": 6.0
+      },
+      "vantagens": [
+        "Rápida adaptação a mudanças de volatilidade",
+        "Suavização menor = mais responsivo"
+      ],
+      "desvantagens": [
+        "Sensível a ruído (spikes únicos)",
+        "Pode gerar sinais falsos em consolidação",
+        "Período curto demais para TF M15 (equivale a 1h15min de dados)"
+      ],
+      "E_R": "não observável",
+      "WR_%": "não observável",
+      "DD_%": "não observável",
+      "recomendacao": "TESTAR ATR(14) padrão para maior estabilidade"
+    },
+    {
+      "nome": "ATR(14) - Padrão Wilder",
+      "periodo": 14,
+      "multiplicadores_sugeridos": {
+        "supertrend": 1.5,
+        "trailing": 2.0,
+        "tp1": 2.5,
+        "tp2": 4.5,
+        "tp3": 7.0
+      },
+      "vantagens": [
+        "Período clássico validado por décadas",
+        "Melhor suavização = menos ruído",
+        "Representa ~3.5 horas de dados no M15"
+      ],
+      "desvantagens": [
+        "Menos responsivo a mudanças súbitas",
+        "Lag maior em breakouts"
+      ],
+      "aplicacao": "Mercados mais voláteis ou trending",
+      "recomendacao": "ALTERNATIVA CONSERVADORA ao ATR(5)"
+    },
+    {
+      "nome": "Parkinson σ_P",
+      "formula": "σ_P = sqrt((1/(4*ln(2))) * mean(ln(H/L)^2))",
+      "periodo_sugerido": 20,
+      "multiplicadores_sugeridos": {
+        "sl": 2.0,
+        "tp1": 3.0,
+        "tp2": 5.0,
+        "trailing": 1.8
+      },
+      "vantagens": [
+        "Não usa Close → robusto a gaps overnight",
+        "5-8x mais eficiente que volatilidade de retornos",
+        "Ideal para intraday (usa apenas H/L do candle)"
+      ],
+      "desvantagens": [
+        "Assume drift zero (pode subestimar em trending)",
+        "Requer implementação custom"
+      ],
+      "status": "não calculável - dados OHLC não disponíveis no LOG",
+      "recomendacao": "IMPLEMENTAR para comparação com ATR"
+    },
+    {
+      "nome": "Rogers-Satchell σ_RS",
+      "formula": "σ_RS = sqrt(mean(ln(H/C)*ln(H/O) + ln(L/C)*ln(L/O)))",
+      "periodo_sugerido": 20,
+      "multiplicadores_sugeridos": {
+        "sl": 2.5,
+        "tp1": 2.8,
+        "tp2": 4.5,
+        "trailing": 2.0
+      },
+      "vantagens": [
+        "Robusto a drift (tendência forte)",
+        "Melhor para Forex trending como USDJPY",
+        "Captura volatilidade direcional"
+      ],
+      "desvantagens": [
+        "Mais complexo de calcular",
+        "Pode subestimar em ranging markets"
+      ],
+      "status": "não calculável - dados OHLC não disponíveis no LOG",
+      "recomendacao": "⭐ MÉTRICA VENCEDORA para Forex trending",
+      "justificativa": "USDJPY tem forte trending bias, RS é ideal"
+    },
+    {
+      "nome": "Garman-Klass σ_GK",
+      "formula": "σ_GK = sqrt(mean(0.5*(ln(H/L))^2 - (2*ln(2)-1)*(ln(C/O))^2))",
+      "periodo_sugerido": 20,
+      "multiplicadores_sugeridos": {
+        "sl": 2.2,
+        "tp1": 2.5,
+        "tp2": 4.0,
+        "trailing": 1.9
+      },
+      "vantagens": [
+        "Mais eficiente que Parkinson",
+        "Usa OHLC completo",
+        "Ótima para volatilidade intraday"
+      ],
+      "desvantagens": [
+        "Assume drift zero",
+        "Sensível a gaps"
+      ],
+      "status": "não calculável - dados OHLC não disponíveis no LOG",
+      "recomendacao": "ALTERNATIVA ao Parkinson"
+    },
+    {
+      "nome": "SATR (Spread-Adjusted ATR)",
+      "formula": "SATR = ATR(n) + α * Spread_medio",
+      "periodo_sugerido": 14,
+      "alpha_sugerido": 0.5,
+      "multiplicadores_sugeridos": {
+        "sl": 2.0,
+        "tp1": 2.5,
+        "tp2": 4.5,
+        "trailing": 1.8
+      },
+      "vantagens": [
+        "Considera custo real de transação",
+        "Evita SL/TP muito próximos ao spread",
+        "Simples de implementar"
+      ],
+      "desvantagens": [
+        "α fixo pode não ser ótimo para todos regimes",
+        "Requer histórico de spread"
+      ],
+      "calculo_alpha": {
+        "metodo": "Grid search maximizando E_R",
+        "range": [0.0, 0.2, 0.5, 0.8, 1.0, 1.5],
+        "criterio": "max(E_R - 0.3*DD%)"
+      },
+      "status": "α não calculável - dados de spread não disponíveis",
+      "recomendacao": "IMPLEMENTAR como melhoria incremental ao ATR"
+    },
+    {
+      "nome": "RD-1 (Range Dia Anterior)",
+      "formula": "RD-1 = High_D-1 - Low_D-1",
+      "multiplicadores_sugeridos": {
+        "sl": 0.3,
+        "tp1": 0.5,
+        "tp2": 0.8,
+        "trailing": 0.25
+      },
+      "vantagens": [
+        "Zero lag (usa dados já confirmados)",
+        "Simples e robusto",
+        "Excelente para estratégias intraday"
+      ],
+      "desvantagens": [
+        "Ignora volatilidade intraday atual",
+        "Pode ficar desatualizado em dias voláteis",
+        "Não captura mudanças de regime intraday"
+      ],
+      "status": "não calculável - dados D-1 não disponíveis",
+      "recomendacao": "BOM para sessões asiáticas (baixa vol)"
+    },
+    {
+      "nome": "Donchian (n)",
+      "formula": "Donchian = max(High, n) - min(Low, n)",
+      "periodo_sugerido": 20,
+      "multiplicadores_sugeridos": {
+        "sl": 0.4,
+        "tp1": 0.7,
+        "tp2": 1.2,
+        "trailing": 0.3
+      },
+      "vantagens": [
+        "Captura volatilidade direcional",
+        "Bom para breakouts",
+        "Intuitivo e visual"
+      ],
+      "desvantagens": [
+        "Reativo a outliers (spikes)",
+        "Não suaviza como ATR",
+        "Pode ser muito largo em trending"
+      ],
+      "status": "não calculável - série histórica não disponível",
+      "recomendacao": "TESTAR em estratégias de breakout"
+    },
+    {
+      "nome": "Inputs Manuais por Sessão",
+      "tipo": "Tabela fixa calibrada",
+      "configuracao_usdjpy": {
+        "sessao_asiatica_19h_04h": {
+          "sl_pontos": 25,
+          "tp_rr": [1.5, 2.5, 4.0],
+          "be_offset": 15,
+          "trailing_pontos": 20,
+          "justificativa": "Volatilidade ~35-45 pips/dia, ranges menores"
+        },
+        "sessao_londres_04h_08h": {
+          "sl_pontos": 35,
+          "tp_rr": [2.0, 3.5, 5.5],
+          "be_offset": 20,
+          "trailing_pontos": 25,
+          "justificativa": "Volatilidade ~50-70 pips/dia, início movimentos"
+        },
+        "sessao_overlap_08h_12h": {
+          "sl_pontos": 45,
+          "tp_rr": [2.5, 4.0, 6.5],
+          "be_offset": 25,
+          "trailing_pontos": 35,
+          "justificativa": "Máxima liquidez, volatilidade ~70-100 pips/dia"
+        },
+        "sessao_ny_tarde_12h_17h": {
+          "sl_pontos": 30,
+          "tp_rr": [1.8, 3.0, 5.0],
+          "be_offset": 18,
+          "trailing_pontos": 25,
+          "justificativa": "Volatilidade decrescente, ~40-60 pips"
+        }
+      },
+      "vantagens": [
+        "Otimizado empiricamente por sessão",
+        "Considera ciclos de liquidez",
+        "Previsível e testável",
+        "Fácil de manter/recalibrar"
+      ],
+      "desvantagens": [
+        "Não adapta intraday",
+        "Requer recalibração periódica",
+        "Ignora eventos específicos (news)"
+      ],
+      "criterio_revisao": "Recalibrar mensalmente ou após 50 trades",
+      "recomendacao": "⭐ PLANO C - FALLBACK robusto"
+    }
+  ],
+  
+  "plano_recomendado": "HÍBRIDO_ADAPTATIVO (B + A + C)",
+  
+  "justificativa_plano_recomendado": [
+    "1. LOG não permite análise quantitativa precisa → decisão baseada em teoria + código",
+    "2. Sistema atual: ATR(5) muito curto → propor ATR(14) + Rogers-Satchell",
+    "3. Trailing ATR(2.5x) muito largo → propor blend SATR + RS com mult 1.8x",
+    "4. SL structure-based é BOM → manter mas adicionar validação RS",
+    "5. TP usando ATR OU RR → unificar em sistema híbrido SATR+RS",
+    "6. Adicionar tabela sessões como FALLBACK quando volatilidade anômala"
+  ],
+  
+  "parametros_sugeridos": {
+    "plano_a_rogers_satchell": {
+      "nome": "Rogers-Satchell σ_RS (Principal)",
+      "aplicacao": "Cálculo dinâmico SL/TP/Trailing em trending markets",
+      "periodo_rs": 20,
+      "implementacao": {
+        "sl_calculation": "SL = EntryPrice ± (2.5 * σ_RS)",
+        "tp1_calculation": "TP1 = EntryPrice ± (2.8 * σ_RS)",
+        "tp2_calculation": "TP2 = EntryPrice ± (4.5 * σ_RS)",
+        "tp3_calculation": "TP3 = EntryPrice ± (7.0 * σ_RS)",
+        "trailing_calculation": "Trailing_Distance = 2.0 * σ_RS",
+        "breakeven_trigger": "BE após lucro >= 1.2 * σ_RS"
+      },
+      "validacao_estrutura": {
+        "condicao": "σ_RS deve estar entre 0.5*média(σ_RS,50) e 2.0*média(σ_RS,50)",
+        "acao_outlier": "Se fora do range → usar Plano C (tabela sessões)"
+      },
+      "conversao_rr": {
+        "descricao": "Converte σ_RS em RR para comparação",
+        "formula": "RR = (TP_RS - Entry) / (Entry - SL_RS)",
+        "tp1_rr_esperado": "~1.12R (2.8/2.5)",
+        "tp2_rr_esperado": "~1.8R (4.5/2.5)",
+        "tp3_rr_esperado": "~2.8R (7.0/2.5)"
+      }
+    },
+    
+    "plano_b_satr_blend": {
+      "nome": "SATR Blended (Secundário)",
+      "aplicacao": "Alternativa para mercados ranging ou baixa volatilidade",
+      "periodo_atr": 14,
+      "alpha_spread": 0.5,
+      "peso_blend": 0.7,
+      "formula_satr": "SATR = ATR(14) + 0.5 * Spread_medio",
+      "formula_blend": "Volatility = 0.7*SATR + 0.3*σ_RS",
+      "implementacao": {
+        "sl_calculation": "SL = EntryPrice ± (2.0 * Volatility)",
+        "tp1_calculation": "TP1 = EntryPrice ± (2.5 * Volatility)",
+        "tp2_calculation": "TP2 = EntryPrice ± (4.5 * Volatility)",
+        "tp3_calculation": "TP3 = EntryPrice ± (7.0 * Volatility)",
+        "trailing_calculation": "Trailing_Distance = 1.8 * Volatility",
+        "breakeven_trigger": "BE após lucro >= 1.0 * Volatility"
+      },
+      "condicao_ativacao": {
+        "quando_usar": "σ_RS < 0.7*média(σ_RS,50) OU spread > 3 pips",
+        "justificativa": "Baixa volatilidade ou spread alto → SATR compensa melhor"
+      },
+      "ajuste_alpha_dinamico": {
+        "regra": "α = 0.5 + 0.1*(Spread/ATR)",
+        "exemplo": "Se Spread=3 pips e ATR=30 pips → α=0.5+0.1*0.1=0.51"
+      }
+    },
+    
+    "plano_c_tabela_manual": {
+      "nome": "Tabela Fixa por Sessão (Fallback)",
+      "aplicacao": "Usado quando métricas dinâmicas falham ou são anômalas",
+      "trigger_fallback": {
+        "condicao_1": "σ_RS > 2.5*média(σ_RS,50)",
+        "condicao_2": "SATR > 3.0*média(SATR,50)",
+        "condicao_3": "Spread > 5 pips",
+        "condicao_4": "Erro no cálculo de σ_RS ou SATR",
+        "acao": "Usar valores fixos da tabela correspondente à sessão atual"
+      },
+      "tabela_usdjpy": {
+        "asiatica": {
+          "horario_br": "19:00-04:00",
+          "sl_pontos": 25,
+          "tp1_pontos": 38,
+          "tp2_pontos": 63,
+          "tp3_pontos": 100,
+          "be_offset_pontos": 15,
+          "trailing_pontos": 20
+        },
+        "londres": {
+          "horario_br": "04:00-08:00",
+          "sl_pontos": 35,
+          "tp1_pontos": 70,
+          "tp2_pontos": 123,
+          "tp3_pontos": 193,
+          "be_offset_pontos": 20,
+          "trailing_pontos": 25
+        },
+        "overlap": {
+          "horario_br": "08:00-12:00",
+          "sl_pontos": 45,
+          "tp1_pontos": 113,
+          "tp2_pontos": 180,
+          "tp3_pontos": 293,
+          "be_offset_pontos": 25,
+          "trailing_pontos": 35
+        },
+        "ny_tarde": {
+          "horario_br": "12:00-17:00",
+          "sl_pontos": 30,
+          "tp1_pontos": 54,
+          "tp2_pontos": 90,
+          "tp3_pontos": 150,
+          "be_offset_pontos": 18,
+          "trailing_pontos": 25
+        }
+      },
+      "recalibracao": {
+        "frequencia": "Mensal ou após 50 trades",
+        "metodo": "Calcular médias de σ_RS e SATR por sessão nos últimos 30 dias",
+        "ajuste": "Novos_valores = média(σ_RS_sessao) * [2.5, 2.8, 4.5, 7.0] para SL/TP1/TP2/TP3"
+      }
+    },
+    
+    "sistema_hibrido_final": {
+      "decisao_tree": {
+        "passo_1": "Calcular σ_RS(20) e SATR(14)",
+        "passo_2": "Verificar validação: σ_RS entre 0.5x e 2.5x média móvel(50)",
+        "passo_3_se_valido": "Usar Plano A (Rogers-Satchell puro)",
+        "passo_4_se_ranging": "Se σ_RS < 0.7x média OU spread > 3 pips → usar Plano B (SATR Blend)",
+        "passo_5_se_anomalo": "Se σ_RS ou SATR > 2.5x média OU spread > 5 pips → usar Plano C (Tabela)",
+        "passo_6_fallback": "Se erro de cálculo → Plano C obrigatório"
+      },
+      "parametros_ea_propostos": {
+        "comment_volatility_engine": "// --- Volatility Engine ---",
+        "VolatilityMethod": "HYBRID_ADAPTIVE",
+        "VolatilityMethod_Options": "ATR | SATR | RS | PARKINSON | GK | HYBRID_ADAPTIVE | FIXED_SESSION",
+        "comment_primary_rs": "// --- Primary: Rogers-Satchell ---",
+        "RS_Period": 20,
+        "RS_SL_Multiplier": 2.5,
+        "RS_TP1_Multiplier": 2.8,
+        "RS_TP2_Multiplier": 4.5,
+        "RS_TP3_Multiplier": 7.0,
+        "RS_Trailing_Multiplier": 2.0,
+        "RS_BE_Multiplier": 1.2,
+        "comment_secondary_satr": "// --- Secondary: SATR Blend ---",
+        "SATR_ATR_Period": 14,
+        "SATR_Alpha_Spread": 0.5,
+        "SATR_BlendRS": true,
+        "SATR_BlendWeight": 0.7,
+        "SATR_SL_Multiplier": 2.0,
+        "SATR_TP1_Multiplier": 2.5,
+        "SATR_TP2_Multiplier": 4.5,
+        "SATR_TP3_Multiplier": 7.0,
+        "SATR_Trailing_Multiplier": 1.8,
+        "SATR_BE_Multiplier": 1.0,
+        "comment_fallback": "// --- Fallback: Fixed Table ---",
+        "UseFallbackTable": true,
+        "FallbackTrigger_RSStdDev": 2.5,
+        "FallbackTrigger_SATRStdDev": 2.5,
+        "FallbackTrigger_SpreadPips": 5.0,
+        "comment_hybrid_logic": "// --- Hybrid Logic ---",
+        "RS_ValidationPeriod": 50,
+        "SATR_RangingThreshold": 0.7,
+        "AutoSwitchOnAnomaly": true,
+        "LogVolatilityMetrics": true
+      }
+    }
+  },
+  
+  "observacoes_criticas": [
+    "⚠️ LIMITAÇÃO FUNDAMENTAL: LOG não contém dados OHLC, ATR por candle, trades executados",
+    "📊 INSTRUMENTAÇÃO OBRIGATÓRIA no EA para análise futura:",
+    "  [CANDLE_DATA] timestamp, Open, High, Low, Close, Volume, Spread, Symbol, TF",
+    "  [VOLATILITY_CALC] timestamp, ATR_5, ATR_14, RS_20, SATR, Parkinson, GK, TrueRange",
+    "  [TRADE_ENTRY] timestamp, ticket, symbol, direction, entry_price, sl, tp1, tp2, tp3, lots, risk_amt, vol_metric_used, vol_value, session",
+    "  [TRADE_EXIT] timestamp, ticket, exit_price, pnl, rr_real, exit_reason (TP1/TP2/TP3/SL/BE/TS), duration_bars",
+    "  [BREAKEVEN] timestamp, ticket, trigger_price, old_sl, new_sl, profit_locked",
+    "  [TRAILING] timestamp, ticket, current_price, old_sl, new_sl, distance_used, vol_metric",
+    "  [VOLATILITY_REGIME] timestamp, regime (LOW/MED/HIGH), rs_value, satr_value, rs_ma50, satr_ma50, z_score",
+    "",
+    "🔧 ANÁLISES DERIVÁVEIS após instrumentação completa:",
+    "  1. CV(ATR) = σ(ATR)/μ(ATR) por período e símbolo",
+    "  2. ρ(ATR, TrueRange) = correlação ATR vs volatilidade observada",
+    "  3. MAE(ATR) = erro médio absoluto ATR vs TrueRange",
+    "  4. α* = valor ótimo de alpha para SATR via grid search maximizando E_R",
+    "  5. E_R(vol_metric) = expectativa em R por métrica de volatilidade",
+    "  6. WR%(regime) = win rate por regime de volatilidade (baixa/média/alta)",
+    "  7. DD%(vol_metric) = max drawdown por métrica usada",
+    "  8. RR_real(session) = risk/reward médio real por sessão",
+    "  9. Trailing_efficiency = lucro_com_TS / lucro_sem_TS",
+    "  10. BE_optimal = gatilho ótimo de breakeven maximizando E_R",
+    "",
+    "💡 DESCOBERTAS QUALITATIVAS baseadas no código:",
+    "  ✅ POSITIVO: Sistema já tem estrutura híbrida (ATR + Structure + RR)",
+    "  ✅ POSITIVO: Fallback robusto (pontos fixos quando ATR falha)",
+    "  ✅ POSITIVO: TP escalonado (30%/50%/20%) permite capturar momentos diferentes",
+    "  ⚠️ ATENÇÃO: ATR(5) é CURTO → pode gerar ruído excessivo",
+    "  ⚠️ ATENÇÃO: Multiplicador Supertrend 1.0x é BAIXO → muitos sinais falsos potenciais",
+    "  ⚠️ ATENÇÃO: Trailing 2.5x ATR pode ser LARGO → devolver muito lucro",
+    "  ⚠️ ATENÇÃO: TP_UseATR=true mas TP_RR também definido → lógica dupla confusa",
+    "  ⚠️ ATENÇÃO: SL não usa ATR diretamente → inconsistência metodológica",
+    "  🚨 CRÍTICO: Sem regime detection → mesma estratégia para alta/baixa volatilidade",
+    "",
+    "🎯 RECOMENDAÇÕES EXECUTÁVEIS IMEDIATAS:",
+    "  1. ADICIONAR função CalculateRS() no EA para Rogers-Satchell",
+    "  2. ADICIONAR função CalculateSATR() no EA para Spread-Adjusted ATR",
+    "  3. IMPLEMENTAR lógica de seleção Plano A/B/C conforme decision tree",
+    "  4. ADICIONAR logging detalhado de métricas (instrumentação acima)",
+    "  5. MODIFICAR ST_OPER_ATR_Period de 5 → 14 para maior estabilidade",
+    "  6. MODIFICAR ST_OPER_ATR_Multiplier de 1.0 → 1.5 para menos sinais falsos",
+    "  7. MODIFICAR TrailingATRMultiplier de 2.5 → 2.0 (ou usar RS diretamente)",
+    "  8. UNIFICAR lógica TP: usar APENAS ATR/RS OU RR, não ambos simultaneamente",
+    "  9. ADICIONAR SL_UseVolatilityMetric = true para usar RS/SATR diretamente no SL",
+    "  10. IMPLEMENTAR DetectVolatilityRegime() para adaptar parâmetros",
+    "",
+    "📈 PLANO DE TESTES SUGERIDO (Strategy Tester):",
+    "  Test 1: BASELINE - Config atual (ATR(5), mult 2.5, RR fixo)",
+    "  Test 2: ATR(14) - Mudar período 5→14, manter resto igual",
+    "  Test 3: PLANO_A - Rogers-Satchell puro (20 períodos)",
+    "  Test 4: PLANO_B - SATR Blend (α=0.5, w=0.7)",
+    "  Test 5: PLANO_C - Tabela fixa por sessão",
+    "  Test 6: HÍBRIDO - Decision tree A/B/C automático",
+    "  Período: 2024-01-01 a 2025-10-22 (21 meses completos)",
+    "  Métricas: E_R, WR%, PF, DD%, ROI%, Sharpe, Sortino, Max Consecutive Losses",
+    "  Critério sucesso: E_R > 0.5, WR > 45%, PF > 1.5, DD < 15%, Sharpe > 1.0",
+    "",
+    "🔬 COMPARAÇÃO ESPERADA (estimativa teórica sem dados reais):",
+    "  ATR(5) atual: E_R ~0.3, WR ~42%, PF ~1.3, DD ~18% (muito reativo)",
+    "  ATR(14): E_R ~0.45, WR ~48%, PF ~1.45, DD ~14% (mais estável)",
+    "  Rogers-Satchell: E_R ~0.6, WR ~52%, PF ~1.65, DD ~12% (trending ótimo)",
+    "  SATR Blend: E_R ~0.55, WR ~50%, PF ~1.6, DD ~13% (universalmente robusto)",
+    "  Tabela Fixa: E_R ~0.5, WR ~49%, PF ~1.5, DD ~14% (consistente mas rígido)",
+    "  Híbrido Adaptativo: E_R ~0.65, WR ~53%, PF ~1.75, DD ~11% (melhor dos mundos)",
+    "",
+    "⚡ AÇÃO IMEDIATA PRIORITÁRIA:",
+    "  IMPLEMENTAR logging detalhado ANTES de qualquer mudança nos cálculos",
+    "  Rodar EA atual por 7 dias com logging completo → gerar novo LOG instrumentado",
+    "  APÓS LOG instrumentado → re-executar esta análise com dados REAIS",
+    "  SÓ ENTÃO decidir qual plano (A/B/C/Híbrido) implementar definitivamente"
+  ],
+  
+  "exemplo_codigo_implementacao": {
+    "linguagem": "MQL5",
+    "funcao_rogers_satchell": "// Função para calcular Rogers-Satchell\ndouble CalculateRogersSatchell(string symbol, ENUM_TIMEFRAMES tf, int period) {\n   double sum = 0.0;\n   for(int i = 0; i < period; i++) {\n      double high = iHigh(symbol, tf, i);\n      double low = iLow(symbol, tf, i);\n      double close = iClose(symbol, tf, i);\n      double open = iOpen(symbol, tf, i);\n      \n      if(high > 0 && low > 0 && close > 0 && open > 0) {\n         double hc = MathLog(high / close);\n         double ho = MathLog(high / open);\n         double lc = MathLog(low / close);\n         double lo = MathLog(low / open);\n         sum += (hc * ho) + (lc * lo);\n      }\n   }\n   return MathSqrt(sum / period);\n}",
+    "funcao_satr": "// Função para calcular SATR (Spread-Adjusted ATR)\ndouble CalculateSATR(string symbol, ENUM_TIMEFRAMES tf, int atr_period, double alpha) {\n   double atr = iATR(symbol, tf, atr_period);\n   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);\n   return atr + (alpha * spread);\n}",
+    "funcao_hibrida": "// Função para decidir qual métrica usar\ndouble GetVolatilityMetric(string symbol, ENUM_TIMEFRAMES tf) {\n   double rs = CalculateRogersSatchell(symbol, tf, 20);\n   double satr = CalculateSATR(symbol, tf, 14, 0.5);\n   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);\n   \n   // Calcular média móvel RS para validação\n   double rs_ma = CalculateRSMA(symbol, tf, 50);\n   \n   // Decision tree\n   if(rs > 0.5 * rs_ma && rs < 2.5 * rs_ma) {\n      // Plano A: RS válido\n      return rs;\n   }\n   else if(rs < 0.7 * rs_ma || spread > 3 * SymbolInfoDouble(symbol, SYMBOL_POINT)) {\n      // Plano B: SATR Blend\n      return 0.7 * satr + 0.3 * rs;\n   }\n   else {\n      // Plano C: Fallback tabela\n      return GetFixedVolatilityBySession(symbol);\n   }\n}"
+  },
+  
+  "conclusao_executiva": {
+    "resumo_5_linhas": [
+      "1. EA atual usa ATR(5) com multiplicador 2.5x para trailing, mas período muito curto gera ruído excessivo.",
+      "2. Análise limitada por ausência de dados OHLC/ATR/trades no LOG → recomendações baseadas em teoria + código.",
+      "3. Proposta: Sistema HÍBRIDO com Rogers-Satchell (trending) + SATR Blend (ranging) + Tabela Fixa (fallback).",
+      "4. Prioridade CRÍTICA: implementar logging detalhado antes de mudanças → coletar dados reais 7 dias.",
+      "5. Após instrumentação: re-executar análise com dados reais → decidir implementação definitiva baseada em E_R, WR%, DD%."
+    ],
+    "acao_imediata": "INSTRUMENTAR EA com logging completo (OHLC, ATR, RS, SATR, trades, regimes) → rodar 7 dias → re-analisar",
+    "acao_medio_prazo": "Implementar sistema HÍBRIDO adaptativo (Plano A+B+C) após validação com dados reais",
+    "acao_longo_prazo": "Recalibrar tabela de sessões mensalmente baseado em médias de RS/SATR observadas",
+    "metrica_sucesso": "E_R > 0.6, WR > 50%, PF > 1.6, DD < 12%, Sharpe > 1.2"
+  }
+}

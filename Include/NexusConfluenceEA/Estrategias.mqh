@@ -901,7 +901,6 @@ GGTrendBarSignal GetGGTrendBarSignal()
    {
       PrintFormat("🔴 CRÍTICO: Cache inválido ao ler GG TrendBar - ANÁLISE REJEITADA!");
       result.isValid = false;
-      result.allValid = false;
       return result;
    }
    
@@ -940,7 +939,6 @@ GGTrendBarSignal GetGGTrendBarSignal()
       PrintFormat("🔴 CRÍTICO: GG TrendBar sem dados válidos (todos zeros) - ANÁLISE REJEITADA!");
       PrintFormat("   Possível causa: Indicador não inicializou ou CopyBuffer falhou");
       result.isValid = false;
-      result.allValid = false;
       return result;
    }
    

@@ -495,12 +495,13 @@ void OnTick()
    PrintFormat("💰 GESTÃO DE RISCO:");
    PrintFormat("   Direção: %s", (mtf.direction == TRADE_DIRECTION_BUY) ? "📈 COMPRA" : "📉 VENDA");
    PrintFormat("   Risco: %.2f%% da conta (R$ %.2f)", 
-               risk.riskPercent, risk.riskAmount);
-   PrintFormat("   Lote: %.2f", risk.lotSize);
-   PrintFormat("   SL: %.5f (distância: %.1f pontos)", risk.slPrice, risk.slDistance / _Point);
-   PrintFormat("   TP1: %.5f (RR: %.1f:1)", risk.tp1Price, risk.tp1RR);
-   PrintFormat("   TP2: %.5f (RR: %.1f:1)", risk.tp2Price, risk.tp2RR);
-   PrintFormat("   TP3: %.5f (RR: %.1f:1)", risk.tp3Price, risk.tp3RR);
+               (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent,
+               risk.riskAmount);
+   PrintFormat("   Lote: %.2f", risk.positionSize);
+   PrintFormat("   SL: %.5f (distância: %.1f pontos)", risk.stopLoss, risk.slDistance / _Point);
+   PrintFormat("   TP1: %.5f (Potencial: R$ %.2f)", risk.takeProfit1, risk.potentialProfit1);
+   PrintFormat("   TP2: %.5f (Potencial: R$ %.2f)", risk.takeProfit2, risk.potentialProfit2);
+   PrintFormat("   TP3: %.5f (Potencial: R$ %.2f)", risk.takeProfit3, risk.potentialProfit3);
    PrintFormat("");
    PrintFormat("╔══════════════════════════════════════════════════════════════╗");
    PrintFormat("║              🚀 EXECUTANDO ORDEM DE %s                    ║", 

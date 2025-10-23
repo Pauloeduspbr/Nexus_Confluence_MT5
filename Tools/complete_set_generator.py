@@ -412,8 +412,8 @@ def main():
     with open(analysis_file, 'r') as f:
         analysis_data = json.load(f)
     
-    # Gerar .set files
-    generator = CompleteSetGenerator(Path("../Presets"))
+    # Gerar .set files no diretório correto do workspace
+    generator = CompleteSetGenerator(Path("Presets"))  # Relativo ao workspace atual
     
     # Extrair símbolo correto do metadata
     symbol = analysis_data.get('metadata', {}).get('symbol', analysis_data.get('symbol', 'UNKNOWN'))

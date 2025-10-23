@@ -90,20 +90,6 @@ TrailingATRMultiplier={TrailingATRMultiplier}||2.5||0.5||10.0||Y
 TrailingStartAfterTP={TrailingStartAfterTP}||false||0||true||N
 TrailingMinProfit={TrailingMinProfit}||0.5||0.0||5.0||Y
 TrailingMaxRisk={TrailingMaxRisk}||0.2||0.0||2.0||Y
-TP_UseATR={TP_UseATR}||false||0||true||N
-TP1_ATRMultiplier={TP1_ATRMultiplier}||2.0||0.5||10.0||Y
-TP2_ATRMultiplier={TP2_ATRMultiplier}||4.0||1.0||20.0||Y
-TP3_ATRMultiplier={TP3_ATRMultiplier}||6.0||2.0||30.0||Y
-TP_MinRRRatio={TP_MinRRRatio}||1.2||0.5||5.0||Y
-EnableTrailing={EnableTrailing}||false||0||true||N
-TrailingDistancePoints={TrailingDistancePoints}||200.0||10.0||1000.0||Y
-TrailingStepPoints={TrailingStepPoints}||50.0||5.0||500.0||Y
-TrailingActivationRR={TrailingActivationRR}||1.5||0.5||5.0||Y
-TrailingUseATR={TrailingUseATR}||false||0||true||N
-TrailingATRMultiplier={TrailingATRMultiplier}||2.5||0.5||10.0||Y
-TrailingStartAfterTP={TrailingStartAfterTP}||false||0||true||N
-TrailingMinProfit={TrailingMinProfit}||0.5||0.0||5.0||Y
-TrailingMaxRisk={TrailingMaxRisk}||0.2||0.0||2.0||Y
 MaxSlippagePoints={MaxSlippagePoints}||30||1||100||N
 LookbackStructureBars={LookbackStructureBars}||80||20||200||Y
 BrokerGMTOffset={BrokerGMTOffset}||2||(-12)||12||N
@@ -362,13 +348,58 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         params = self.DEFAULT_PARAMS.copy()
         params.update(self.PROFILE_PARAMS.get(profile, {}))
         
-        # Aplicar otimizações da análise
+        # 🔥 APLICAR OTIMIZAÇÕES DA ANÁLISE (CRÍTICO!)
         if 'recommendations' in analysis_data:
             recs = analysis_data['recommendations']
+            
+            # 1. Aplicar ajustes de Risk Management
             if 'optimizations' in recs:
                 opts = recs['optimizations']
                 if 'risk_management' in opts and 'parameters' in opts['risk_management']:
-                    params.update(opts['risk_management']['parameters'])
+                    risk_params = opts['risk_management']['parameters']
+                    # Aplicar apenas para perfil CONSERVATIVE (mais seguro)
+                    if profile == 'CONSERVATIVE':
+                        params.update(risk_params)
+                    # Perfis mais altos mantêm valores originais
+                
+                # 2. Aplicar ajustes de Trailing Stop
+                if 'trailing_stop' in opts and 'parameters' in opts['trailing_stop']:
+                    ts_params = opts['trailing_stop']['parameters']
+                    # Aplicar para TODOS os perfis se recomendado
+                    if 'TrailingDistanceMultiplier' in ts_params:
+                        # CONSERVATIVE: usa recomendação + 0.5
+                        # MODERATE: usa recomendação
+                        # AGGRESSIVE: usa recomendação - 0.5
+                        base_mult = ts_params.get('TrailingDistanceMultiplier', 2.5)
+                        if profile == 'CONSERVATIVE':
+                            params['TrailingATRMultiplier'] = min(base_mult + 0.5, 5.0)
+                        elif profile == 'MODERATE':
+                            params['TrailingATRMultiplier'] = base_mult
+                        else:  # AGGRESSIVE
+                            params['TrailingATRMultiplier'] = max(base_mult - 0.5, 1.5)
+            
+            # 3. 🔥 AJUSTAR HORÁRIOS BASEADO EM worst_hours (CRÍTICO!)
+            if 'avoid_conditions' in recs and 'worst_hours' in recs['avoid_conditions']:
+                worst_hours = recs['avoid_conditions']['worst_hours']
+                if worst_hours and len(worst_hours) > 0:
+                    # Encontrar melhor janela de horários (evitando piores)
+                    all_hours = list(range(0, 24))
+                    good_hours = [h for h in all_hours if h not in worst_hours]
+                    
+                    if good_hours:
+                        # Encontrar maior sequência contínua de boas horas
+                        best_start = good_hours[0]
+                        best_end = good_hours[0]
+                        
+                        for h in good_hours:
+                            if h >= 8 and h <= 18:  # Preferir horário comercial
+                                if best_start == good_hours[0]:  # Primeiro bom
+                                    best_start = h
+                                best_end = h
+                        
+                        # Aplicar
+                        params['CustomStartHour'] = best_start
+                        params['CustomEndHour'] = min(best_end, best_start + 8)  # Máx 8h
         
         # Gerar conteúdo do .set
         content = self.COMPLETE_TEMPLATE.format(

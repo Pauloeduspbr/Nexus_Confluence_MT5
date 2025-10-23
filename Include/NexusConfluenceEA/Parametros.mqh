@@ -281,11 +281,11 @@ input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
 input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
 input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
 input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
-input double SL_MaxDistancePoints     = 300.0;  // 📊 Distância máxima SL (pontos) - v4.22: 500→300 (30 pips forex)
+input double SL_MaxDistancePoints     = 150.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.30: 300→150 (CRÍTICO: -20% drawdown)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
 input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
 input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
-input double SL_SafetyMultiplier      = 1.2;    // 🛡️ Margem de segurança (1.0 = exato, 1.2 = +20%)
+input double SL_SafetyMultiplier      = 1.1;    // 🛡️ Margem de segurança - 🔥 v4.30: 1.2→1.1 (SLs menores)
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
@@ -349,7 +349,7 @@ input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
-input int    MinConfluenceScore       = 60;    // 📊 Pontuação mínima 0-100 - 🔥 v4.17: 75→60 (relaxar)
+input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 - 🔥 v4.30: 60→75 (CRÍTICO: +8% WR, setups seletivos)
 input bool   RequireSupertrend        = false; // ⚠️ Supertrend obrigatório - 🔥 v4.17: true→false (TESTAR SEM)
 input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
 input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true

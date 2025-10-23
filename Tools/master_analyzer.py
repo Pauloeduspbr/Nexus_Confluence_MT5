@@ -570,7 +570,7 @@ class MasterAnalyzer:
         try:
             # FASE 1: Validação de Dados
             self.log("\n[FASE 1/10] Validação de Dados", "INFO")
-            trades = self._phase1_validate_data(log_file, symbol)
+            trades, symbol = self._phase1_validate_data(log_file, symbol)  # CORREÇÃO: Receber símbolo detectado
             
             # FASE 2: Production Analysis
             self.log("\n[FASE 2/10] Production Analysis", "INFO")
@@ -662,7 +662,7 @@ class MasterAnalyzer:
         }
         
         self.log(f"  ✓ Validação concluída")
-        return trades
+        return trades, symbol  # CORREÇÃO: Retornar símbolo também
     
     def _phase2_production_analysis(self, trades: List[Trade]) -> Dict:
         """Fase 2: Análise production (métricas principais)"""

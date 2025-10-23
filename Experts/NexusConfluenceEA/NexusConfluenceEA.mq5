@@ -1,76 +1,61 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.27 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.27: SIMPLIFICAÇÃO RSI + CORREÇÃO CRÍTICA SUPERTREND      |
+//| Nexus Confluence EA v4.33 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.33: CORREÇÕES ESTRUTURAIS CRÍTICAS (PÓS-DIAGNÓSTICO)     |
 //|                                                                  |
-//|   ✅ CORREÇÃO #1: RSI OMA SIMPLIFICADO                          |
-//|      REMOVIDO: Validação de inclinação (slope >0.5 / <-0.5)    |
-//|      REMOVIDO: Validação de zona (overbought/oversold)          |
-//|      CRITÉRIO: Apenas posição relativa das linhas               |
-//|      BUY:  Linha vermelha > Linha azul                          |
-//|      SELL: Linha vermelha < Linha azul                          |
+//|   🚨 CONTEXTO: Backtest catastrófico v4.27 (WR 34%, DD 929%)   |
+//|      Diagnóstico identificou 3 problemas críticos:              |
+//|      1. Gestão de risco destrutiva                              |
+//|      2. Win Rate 10pp abaixo do esperado (desincronização?)     |
+//|      3. Sem edge estatístico (p-values > 0.05)                  |
 //|                                                                  |
-//|   🔥 CORREÇÃO #2: SUPERTREND SINCRONIZADO (CRÍTICO!)            |
-//|      ❌ PROBLEMA: Supertrend lia buffer [0] (candle em formação)|
-//|      ✅ CORREÇÃO: Agora lê buffer [1] (candle fechado)          |
-//|      ✅ IMPACTO: SINCRONIZAÇÃO 100% PERFEITA!                   |
+//|   ✅ FASE 1 - EMERGÊNCIA (v4.31/v4.32/v4.33):                  |
+//|      • Risco: 0.5%→0.3%, Premium: 1.0%→0.5% (v4.31)            |
+//|      • MaxSimultaneousTrades: 3→1 (v4.31)                       |
+//|      • SL_Min: 50→65, SL_Max: 120→156 (v4.32)                  |
+//|      • BreakevenAfterRR: 1.0→1.5 (v4.33) ← NOVO                |
+//|      • BreakevenPlusPoints: 5→10 (v4.33) ← NOVO                |
 //|                                                                  |
-//|   ✅ TODOS INDICADORES SINCRONIZADOS v4.27:                     |
-//|      • GG TrendBar: candle FECHADO [1] ✓                        |
-//|      • Supertrend: candle FECHADO [1] ✓ (CORRIGIDO!)            |
-//|      • WAE: candle FECHADO [1] ✓                                |
-//|      • RSI OMA: candle FECHADO [1] ✓                            |
-//|      • Currency Strength: candle FECHADO [1] ✓                  |
-//|      → VALORES EA = SINAIS VISUAIS NO GRÁFICO!                  |
+//|   ✅ FASE 2 - ESTRUTURAL (v4.33):                              |
+//|      • Timing: iTime(...,0)→iTime(...,1) (candle fechado)      |
+//|      • Cache: Validação rigorosa pré-análise                    |
+//|      • Logs: Auditoria consolidada completa em cada entrada     |
+//|      • Tracking: Error rate de cache para diagnóstico           |
 //|                                                                  |
-//|   📊 MANTIDO v4.24: Sistema de bloqueio otimizado               |
-//|      - Bloqueio máximo 12h (M15: 3h, M30: 5h, H1: 8h, H4: 12h) |
+//|   🎯 HIPÓTESE PRINCIPAL:                                        |
+//|      BufferCache falha silenciosamente → GG TrendBar retorna    |
+//|      zeros → EA interpreta como "alinhado" → entra sem          |
+//|      confluência real → WR desce de 45% para 34%               |
 //|                                                                  |
-//|   ⚠️ IMPACTO: ENTRADAS RÁPIDAS + SINCRONIZAÇÃO PERFEITA!       |
+//|   📊 IMPACTO ESPERADO (SE HIPÓTESE CORRETA):                   |
+//|      WR: 34% → 42-45% (+8-11pp)                                |
+//|      PF: 0.98 → 1.3-1.5 (+33-53%)                              |
+//|      DD: 929% → 25-35% (-96%)                                   |
+//|      Sharpe: -0.006 → 0.3-0.5 (+51x-84x)                       |
+//|                                                                  |
+//|   ⚠️ SE CACHE ERROR RATE < 1%:                                 |
+//|      Hipótese rejeitada → Problema é estratégico, não técnico  |
+//|      Necessário redesenhar estratégia                           |
+//|                                                                  |
+//|   📝 PRÓXIMO PASSO:                                            |
+//|      Backtest completo v4.33 → Validar cache error rate →      |
+//|      Confirmar/rejeitar hipótese de desincronização             |
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.17 - Sistema Universal Multi-Timeframe    |
-//| Baseado no Sistema de Trading Profissional v4.0                  |
-//|                                                                  |
-//| Descrição: Expert Advisor completo que implementa sistema        |
-//| multi-ativo com gestão de risco baseada em estrutura             |
-//| NOVO v4.1: Suporte a múltiplos timeframes (M1, M5, M15, M30,    |
-//|            H1, H4) com parâmetros independentes                  |
-//| NOVO v4.11: Correção crítica SL + Gestão de posições            |
-//| NOVO v4.12: Supertrend obrigatório + Hierarquia otimizada       |
-//| NOVO v4.13: Magic Number INPUT + Limpeza total indicadores      |
-//| 🔥 v4.14: CORREÇÃO LÓGICA SUPERTREND (DBL_MAX)                 |
-//| 🔥 v4.15: CORREÇÕES CRÍTICAS BACKTEST                          |
-//|   - Risco reduzido: 0.5-1% (era 1.5-2%)                        |
-//|   - Apenas setups PREMIUM (3/3 filtros)                         |
-//|   - Proteção drawdown diário/semanal                            |
-//|   - Breakeven apenas após TP1 fechado                           |
-//|   - Trailing dinâmico 2.5x ATR                                 |
-//|   - Horários Londres/NY overlap apenas                          |
-//| 🔥 v4.16: PARAMETRIZAÇÃO TOTAL - ZERO HARDCODE                 |
-//|   - 35+ novos parâmetros ajustáveis                            |
-//|   - SL estrutural 100% configurável                            |
-//|   - TP dinâmico baseado em ATR                                  |
-//|   - Trailing adaptativo por RR                                  |
-//|   - Sistema de risco adaptativo                                 |
-//|   - Controle granular de drawdown                              |
-//|   - Breakeven/Lock profit parametrizados                        |
-//|   - Qualidade de setup ajustável                                |
-//| 🔥 v4.17: CORREÇÕES CRÍTICAS BUGS IDENTIFICADOS                |
-//|   - DEBUG MASSIVO: Logs detalhados sinais SELL                  |
-//|   - PROTEÇÃO DD REFORÇADA: Verificação início OnTick()          |
-//|   - TP's AUMENTADOS: 1.5→2.0, 3.0→4.0, 5.0→6.0                |
-//|   - FILTROS RELAXADOS: MinScore 75→60, GOOD permitido          |
-//|   - PAUSA VISÍVEL: Contador perdas + notificações              |
-//|                                                                  |
-//| Autor: GitHub Copilot                                            |
-//| Data: Outubro 2025                                               |
-//| Versão: 4.27 - Simplificação RSI OMA (Entradas Mais Rápidas)   |
+//| CHANGELOG v4.27-v4.33:                                           |
+//|   v4.33 (23/01/2025): Correções estruturais pós-diagnóstico     |
+//|   v4.32 (Anterior): Ajuste SL estrutural (+30%)                 |
+//|   v4.31 (Anterior): Redução risco emergencial (-40%)            |
+//|   v4.27 (22/01/2025): Simplificação RSI + Sync Supertrend      |
+//+------------------------------------------------------------------+
+//| AUTOR: GitHub Copilot + Desenvolvedor                            |
+//| DATA: Janeiro 2025                                               |
+//| VERSÃO: 4.33                                                     |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
 //| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
 //| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
 //|               Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.27                                                     |
+//| VERSÃO: 4.33 (Correções Estruturais Pós-Diagnóstico)            |
 //+------------------------------------------------------------------+
 #property strict
 

@@ -926,9 +926,14 @@ GGTrendBarSignal GetGGTrendBarSignal()
    // Problema identificado: Cache pode ter valores 0 (indicador não carregado)
    // Resultado: EA opera sem macro alinhado de verdade (WR 34% → 40%+ esperado)
    bool hasValidData = false;
-   hasValidData |= (MathAbs(gg_m1[1]) > 0.01 || MathAbs(gg_m5[1]) > 0.01);
-   hasValidData |= (MathAbs(gg_m15[1]) > 0.01 || MathAbs(gg_m30[1]) > 0.01);
-   hasValidData |= (MathAbs(gg_h1[1]) > 0.01 || MathAbs(gg_h4[1]) > 0.01);
+   
+   // Verificar se pelo menos um timeframe tem dados válidos (não-zero)
+   if(MathAbs(gg_m1[1]) > 0.01 || MathAbs(gg_m5[1]) > 0.01)
+      hasValidData = true;
+   if(MathAbs(gg_m15[1]) > 0.01 || MathAbs(gg_m30[1]) > 0.01)
+      hasValidData = true;
+   if(MathAbs(gg_h1[1]) > 0.01 || MathAbs(gg_h4[1]) > 0.01)
+      hasValidData = true;
    
    if(!hasValidData)
    {

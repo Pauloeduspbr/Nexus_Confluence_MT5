@@ -408,57 +408,68 @@ class TradeReconstructor:
             del self.open_positions[ticket]
     
     def _handle_deal_backtest(self, match):
-        """Trata deal de backtest MT5 (abertura de posição)"""
+        """Trata deal de backtest MT5 (abertura/fechamento de posição)"""
         # Grupos: 1=timestamp, 2=ticket, 3=type, 4=volume, 5=symbol, 6=price
         timestamp_str = match.group(1)
         ticket = int(match.group(2))
         trade_type = match.group(3).upper()
         volume = float(match.group(4))
         symbol = match.group(5)
-        entry_price = float(match.group(6))
+        price = float(match.group(6))
         
-        # Se já existe, é um fechamento (deal de saída)
-        if ticket in self.open_positions:
-            trade = self.open_positions[ticket]
-            trade.close_time = datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S')
-            trade.close_price = entry_price
+        # Verificar se há posição aberta OPOSTA
+        open_tickets = list(self.open_positions.keys())
+        for open_ticket in open_tickets:
+            open_trade = self.open_positions[open_ticket]
             
-            # Calcular profit
-            if trade.trade_type == 'BUY':
-                trade.profit = (entry_price - trade.entry_price) * volume * 100  # pips
-            else:
-                trade.profit = (trade.entry_price - entry_price) * volume * 100  # pips
-            
-            trade.is_closed = True
-            
-            # Calcular duração
-            if trade.open_time and trade.close_time:
-                duration = (trade.close_time - trade.open_time).total_seconds() / 60
-                trade.duration_minutes = duration
-            
-            # Calcular R-multiple
-            risk = abs(trade.entry_price - trade.initial_sl) if trade.initial_sl else 0
-            if risk > 0:
-                if trade.trade_type == 'BUY':
-                    trade.r_multiple = (entry_price - trade.entry_price) / risk
+            # Se o tipo do deal é OPOSTO ao da posição aberta, é um fechamento
+            if (open_trade.trade_type == 'BUY' and trade_type == 'SELL') or \
+               (open_trade.trade_type == 'SELL' and trade_type == 'BUY'):
+                # Fechar a posição aberta
+                open_trade.close_time = datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S')
+                open_trade.close_price = price
+                
+                # Calcular profit em pips
+                if open_trade.trade_type == 'BUY':
+                    open_trade.profit = (price - open_trade.entry_price) * 10000  # pips USDJPY
                 else:
-                    trade.r_multiple = (trade.entry_price - entry_price) / risk
-            
-            # Remover de posições abertas
-            del self.open_positions[ticket]
-        else:
-            # Nova posição
-            trade = Trade(
-                ticket=ticket,
-                symbol=symbol,
-                trade_type=trade_type,
-                open_time=datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S'),
-                entry_price=entry_price,
-                volume=volume
-            )
-            
-            self.open_positions[ticket] = trade
-            self.trades[ticket] = trade
+                    open_trade.profit = (open_trade.entry_price - price) * 10000  # pips
+                
+                open_trade.is_closed = True
+                
+                # Calcular duração
+                if open_trade.open_time and open_trade.close_time:
+                    duration = (open_trade.close_time - open_trade.open_time).total_seconds() / 60
+                    open_trade.duration_minutes = duration
+                
+                # Calcular R-multiple (usar 30 pips como SL padrão se não tiver)
+                risk = abs(open_trade.entry_price - open_trade.initial_sl) * 10000 if open_trade.initial_sl else 30
+                if risk > 0:
+                    open_trade.r_multiple = open_trade.profit / risk
+                
+                # Determinar motivo
+                if open_trade.profit > 0:
+                    open_trade.close_reason = 'TP'
+                else:
+                    open_trade.close_reason = 'SL'
+                
+                # Remover de posições abertas
+                del self.open_positions[open_ticket]
+                break
+        
+        # Sempre criar nova posição com este deal
+        new_trade = Trade(
+            ticket=ticket,
+            symbol=symbol,
+            trade_type=trade_type,
+            open_time=datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S'),
+            entry_price=price,
+            volume=volume,
+            initial_sl=0.0  # Backtest não mostra SL nos deals
+        )
+        
+        self.open_positions[ticket] = new_trade
+        self.trades[ticket] = new_trade
     
     def _handle_position_closed(self, match):
         """Trata fechamento de posição no backtest"""

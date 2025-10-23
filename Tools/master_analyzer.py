@@ -667,12 +667,20 @@ class MasterAnalyzer:
     def _phase2_production_analysis(self, trades: List[Trade]) -> Dict:
         """Fase 2: Análise production (métricas principais)"""
         
-        analyzer = ProductionAnalyzer(
-            bootstrap_iterations=self.config.bootstrap_iterations,
-            seed=self.config.seed
-        )
+        # Calcular métricas básicas
+        from production_analyzer import MetricsCalculator
+        metrics = MetricsCalculator.calculate_all_metrics(trades)
         
-        results = analyzer.analyze(trades)
+        # Bootstrap analysis
+        from production_analyzer import BootstrapAnalyzer
+        bootstrap_analyzer = BootstrapAnalyzer(seed=self.config.seed)
+        bootstrap_results = bootstrap_analyzer.bootstrap_all_metrics(trades)
+        
+        results = {
+            'metrics': metrics.__dict__ if hasattr(metrics, '__dict__') else metrics,
+            'bootstrap': {k: v.__dict__ if hasattr(v, '__dict__') else v 
+                         for k, v in bootstrap_results.items()}
+        }
         
         self.results['production'] = results
         
@@ -690,27 +698,29 @@ class MasterAnalyzer:
     def _phase3_advanced_analysis(self, trades: List[Trade]) -> Dict:
         """Fase 3: Análise avançada (outliers, overfitting, regimes)"""
         
-        analyzer = AdvancedAnalyzer(
-            train_pct=self.config.train_pct,
-            bootstrap_iterations=self.config.bootstrap_iterations,
-            monte_carlo_iterations=self.config.monte_carlo_iterations,
-            seed=self.config.seed
-        )
+        from advanced_analyzer import AdvancedAnalyzer
+        analyzer = AdvancedAnalyzer(seed=self.config.seed)
         
-        results = analyzer.analyze(trades)
+        results = analyzer.analyze_complete(trades)
         
         self.results['advanced'] = results
         
-        # Log principais descobertas
-        if 'outliers' in results:
-            self.log(f"  Outliers detectados: {results['outliers'].get('n_outlier_trades', 0)}")
-        
-        if 'walk_forward' in results and 'degradation' in results['walk_forward']:
-            deg = results['walk_forward']['degradation']
-            self.log(f"  Degradação WR: {deg.get('win_rate', 0):+.1f}%")
-        
-        if 'regimes' in results:
-            self.log(f"  Regimes analisados: {len(results['regimes'])}")
+        # Log principais descobertas (com proteção de erros)
+        try:
+            if 'outliers' in results:
+                n_outliers = results['outliers'].get('n_outlier_trades', 0)
+                self.log(f"  Outliers detectados: {n_outliers}")
+            
+            if 'walk_forward' in results and isinstance(results['walk_forward'], dict):
+                if 'degradation' in results['walk_forward']:
+                    deg = results['walk_forward']['degradation']
+                    wr_deg = deg.get('win_rate', 0) if isinstance(deg, dict) else 0
+                    self.log(f"  Degradação WR: {wr_deg:+.1f}%")
+            
+            if 'regimes' in results:
+                self.log(f"  Regimes analisados: {len(results['regimes'])}")
+        except Exception as e:
+            self.log(f"  ⚠ Erro ao logar resultados avançados: {e}", "WARNING")
         
         self.log(f"  ✓ Advanced analysis concluída")
         return results
@@ -723,23 +733,40 @@ class MasterAnalyzer:
             'cross_validation': {}
         }
         
-        # Verificar consistência de métricas básicas
-        prod_wr = prod_results.get('metrics', {}).get('win_rate', 0)
-        
-        if 'walk_forward' in adv_results:
-            train_wr = adv_results['walk_forward'].get('train_metrics', {}).get('win_rate', 0)
-            
-            consistency = abs(prod_wr - train_wr) < 1.0  # Diferença < 1%
-            correlations['consistency_check']['win_rate'] = {
-                'production': prod_wr,
-                'walk_forward_train': train_wr,
-                'is_consistent': consistency
-            }
-            
-            if consistency:
-                self.log(f"  ✓ Win Rate consistente entre análises")
+        try:
+            # Acessar métricas corretamente (pode ser dict ou objeto)
+            metrics = prod_results.get('metrics', {})
+            if hasattr(metrics, 'win_rate'):
+                prod_wr = metrics.win_rate
+            elif isinstance(metrics, dict):
+                prod_wr = metrics.get('win_rate', 0)
             else:
-                self.log(f"  ⚠ Divergência em Win Rate detectada", "WARNING")
+                prod_wr = 0
+            
+            if 'walk_forward' in adv_results:
+                wf_data = adv_results['walk_forward']
+                if isinstance(wf_data, dict):
+                    train_metrics = wf_data.get('train_metrics', {})
+                    if hasattr(train_metrics, 'win_rate'):
+                        train_wr = train_metrics.win_rate
+                    elif isinstance(train_metrics, dict):
+                        train_wr = train_metrics.get('win_rate', 0)
+                    else:
+                        train_wr = 0
+                    
+                    consistency = abs(prod_wr - train_wr) < 1.0
+                    correlations['consistency_check']['win_rate'] = {
+                        'production': prod_wr,
+                        'walk_forward_train': train_wr,
+                        'is_consistent': consistency
+                    }
+                    
+                    if consistency:
+                        self.log(f"  ✓ Win Rate consistente")
+                    else:
+                        self.log(f"  ⚠ Divergência detectada", "WARNING")
+        except Exception as e:
+            self.log(f"  ⚠ Erro na correlação: {e}", "WARNING")
         
         self.log(f"  ✓ Correlação concluída")
         return correlations
@@ -753,64 +780,72 @@ class MasterAnalyzer:
             'info': []
         }
         
-        # 1. Verificar Sharpe muito baixo
-        sharpe = prod_results.get('metrics', {}).get('sharpe_ratio', 0)
-        if sharpe < self.config.min_sharpe_ratio:
-            anomalies['critical'].append({
-                'type': 'LOW_SHARPE',
-                'value': sharpe,
-                'threshold': self.config.min_sharpe_ratio,
-                'message': f'Sharpe {sharpe:.2f} abaixo do mínimo {self.config.min_sharpe_ratio}'
-            })
-            self.log(f"  ⚠ CRITICAL: Sharpe muito baixo ({sharpe:.2f})", "ERROR")
-        
-        # 2. Verificar Win Rate muito baixo
-        wr = prod_results.get('metrics', {}).get('win_rate', 0)
-        if wr < self.config.min_win_rate:
-            anomalies['critical'].append({
-                'type': 'LOW_WIN_RATE',
-                'value': wr,
-                'threshold': self.config.min_win_rate,
-                'message': f'Win Rate {wr:.1f}% abaixo do mínimo {self.config.min_win_rate}%'
-            })
-            self.log(f"  ⚠ CRITICAL: Win Rate muito baixo ({wr:.1f}%)", "ERROR")
-        
-        # 3. Verificar Drawdown alto
-        dd = prod_results.get('metrics', {}).get('max_drawdown_pct', 0)
-        if dd > self.config.max_drawdown_pct:
-            anomalies['warnings'].append({
-                'type': 'HIGH_DRAWDOWN',
-                'value': dd,
-                'threshold': self.config.max_drawdown_pct,
-                'message': f'Drawdown {dd:.1f}% acima do máximo {self.config.max_drawdown_pct}%'
-            })
-            self.log(f"  ⚠ WARNING: Drawdown alto ({dd:.1f}%)", "WARNING")
-        
-        # 4. Verificar degradação walk-forward
-        if 'walk_forward' in adv_results and 'degradation' in adv_results['walk_forward']:
-            deg = adv_results['walk_forward']['degradation']
-            if abs(deg.get('win_rate', 0)) > self.config.max_allowed_degradation * 100:
+        try:
+            # Extrair métricas de forma segura
+            metrics = prod_results.get('metrics', {})
+            if hasattr(metrics, 'sharpe_ratio'):
+                sharpe = metrics.sharpe_ratio
+                wr = metrics.win_rate
+                dd = metrics.max_drawdown_pct
+            elif isinstance(metrics, dict):
+                sharpe = metrics.get('sharpe_ratio', 0)
+                wr = metrics.get('win_rate', 0)
+                dd = metrics.get('max_drawdown_pct', 0)
+            else:
+                sharpe = wr = dd = 0
+            
+            # 1. Verificar Sharpe muito baixo
+            if sharpe < self.config.min_sharpe_ratio:
                 anomalies['critical'].append({
-                    'type': 'OVERFITTING',
-                    'value': deg.get('win_rate', 0),
-                    'threshold': self.config.max_allowed_degradation * 100,
-                    'message': 'Overfitting detectado em walk-forward'
+                    'type': 'LOW_SHARPE',
+                    'value': sharpe,
+                    'threshold': self.config.min_sharpe_ratio,
+                    'message': f'Sharpe {sharpe:.2f} abaixo do mínimo'
                 })
-                self.log(f"  ⚠ CRITICAL: Overfitting detectado", "ERROR")
-        
-        # 5. Verificar p-values Monte Carlo
-        if 'monte_carlo' in adv_results and 'p_values' in adv_results['monte_carlo']:
-            p_sharpe = adv_results['monte_carlo']['p_values'].get('sharpe', 1.0)
-            if p_sharpe > 0.05:
+                self.log(f"  ⚠ CRITICAL: Sharpe baixo ({sharpe:.2f})", "ERROR")
+            
+            # 2. Verificar Win Rate muito baixo
+            if wr < self.config.min_win_rate:
+                anomalies['critical'].append({
+                    'type': 'LOW_WIN_RATE',
+                    'value': wr,
+                    'threshold': self.config.min_win_rate,
+                    'message': f'Win Rate {wr:.1f}% abaixo do mínimo'
+                })
+                self.log(f"  ⚠ CRITICAL: Win Rate baixo ({wr:.1f}%)", "ERROR")
+            
+            # 3. Verificar Drawdown alto
+            if dd > self.config.max_drawdown_pct:
                 anomalies['warnings'].append({
-                    'type': 'NO_EDGE',
-                    'value': p_sharpe,
-                    'threshold': 0.05,
-                    'message': f'Edge não comprovado estatisticamente (p={p_sharpe:.4f})'
+                    'type': 'HIGH_DRAWDOWN',
+                    'value': dd,
+                    'threshold': self.config.max_drawdown_pct,
+                    'message': f'Drawdown {dd:.1f}% acima do máximo'
                 })
-                self.log(f"  ⚠ WARNING: Edge não comprovado (p={p_sharpe:.4f})", "WARNING")
+                self.log(f"  ⚠ WARNING: Drawdown alto ({dd:.1f}%)", "WARNING")
+            
+            # 4. Verificar degradação walk-forward
+            if 'walk_forward' in adv_results and isinstance(adv_results['walk_forward'], dict):
+                wf = adv_results['walk_forward']
+                if 'degradation' in wf and isinstance(wf['degradation'], dict):
+                    deg_wr = wf['degradation'].get('win_rate', 0)
+                    if abs(deg_wr) > self.config.max_allowed_degradation * 100:
+                        anomalies['critical'].append({
+                            'type': 'OVERFITTING',
+                            'value': deg_wr,
+                            'threshold': self.config.max_allowed_degradation * 100,
+                            'message': 'Overfitting detectado'
+                        })
+                        self.log(f"  ⚠ CRITICAL: Overfitting", "ERROR")
+        except Exception as e:
+            self.log(f"  ⚠ Erro na detecção de anomalias: {e}", "WARNING")
         
         # Log summary
+        self.log(f"  Críticos: {len(anomalies['critical'])}, Avisos: {len(anomalies['warnings'])}")
+        self.log(f"  ✓ Detecção de anomalias concluída")
+        
+        self.results['anomalies'] = anomalies
+        return anomalies
         n_critical = len(anomalies['critical'])
         n_warnings = len(anomalies['warnings'])
         

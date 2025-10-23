@@ -440,13 +440,15 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         """Gera arquivo .set COMPLETO com todos os 90+ parâmetros"""
         
         # Extrair dados da análise
-        symbol = analysis_data.get('symbol', 'UNKNOWN')
-        total_trades = analysis_data.get('total_trades', 0)
+        # 🔥 CORREÇÃO: Symbol está em metadata.symbol
+        metadata = analysis_data.get('metadata', {})
+        symbol = metadata.get('symbol', analysis_data.get('symbol', 'UNKNOWN'))
+        total_trades = metadata.get('n_trades', analysis_data.get('total_trades', 0))
         
         metrics = analysis_data.get('production', {}).get('metrics', {})
         win_rate = metrics.get('win_rate', 0.0)
         sharpe = metrics.get('sharpe_ratio', 0.0)
-        dd = metrics.get('max_drawdown_percent', 0.0)
+        dd = metrics.get('max_drawdown_pct', metrics.get('max_drawdown_percent', 0.0))
         pf = metrics.get('profit_factor', 0.0)
         quality = analysis_data.get('quality_score', 0)
         

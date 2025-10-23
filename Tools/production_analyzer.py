@@ -1054,19 +1054,38 @@ class ProductionAnalyzer:
 def main():
     """Função principal"""
     import sys
+    import argparse
     
-    if len(sys.argv) < 2:
-        print("Usage: python production_analyzer.py <log_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description='🚀 Nexus Confluence - Production Analyzer v1.0',
+        epilog="""
+Exemplos de uso:
+  python production_analyzer.py log/20251023.log
+  python production_analyzer.py log/20251023.log --seed 123
+  python production_analyzer.py log/20251023.log --output analysis_output/custom/
+
+NOTA: Para análise completa com geração de .set, use master_analyzer.py
+        """
+    )
     
-    log_file = sys.argv[1]
+    parser.add_argument('log_file', help='Caminho para arquivo de log MT5')
+    parser.add_argument('--seed', type=int, default=42, help='Seed para reprodutibilidade (default: 42)')
+    parser.add_argument('--output', help='Arquivo de saída JSON (default: analysis_output/production_analysis_complete.json)')
     
-    analyzer = ProductionAnalyzer(log_file, seed=42)
+    args = parser.parse_args()
+    
+    log_file = args.log_file
+    
+    analyzer = ProductionAnalyzer(log_file, seed=args.seed)
     results = analyzer.run_full_analysis()
     
     # Salvar resultados
-    output_file = Path('analysis_output') / 'production_analysis_complete.json'
-    output_file.parent.mkdir(exist_ok=True)
+    if args.output:
+        output_file = Path(args.output)
+    else:
+        output_file = Path('analysis_output') / 'production_analysis_complete.json'
+    
+    output_file.parent.mkdir(exist_ok=True, parents=True)
     
     with open(output_file, 'w') as f:
         json.dump(results, f, indent=2, default=str)

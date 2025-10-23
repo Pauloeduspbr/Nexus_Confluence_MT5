@@ -1,0 +1,10 @@
+{
+  "candles": 0,
+  "mtf_approved": 0,
+  "mtf_rejected": 0,
+  "setups_good": 0,
+  "setups_premium": 0,
+  "risk_calc": 0,
+  "rejections": {},
+  "atr_values": []
+}

@@ -22,6 +22,7 @@ class LogWatcher:
         self.log_dir = Path(log_dir)
         self.check_interval = check_interval
         self.processed_logs: Set[str] = set()
+        self.currently_processing: Optional[str] = None  # Track current log being processed
         self.state_file = Path(".log_watcher_state.json")
         
         # Carregar estado anterior
@@ -85,77 +86,104 @@ class LogWatcher:
             if not self._is_valid_log(log_file):
                 continue
             
-            # Calcular hash
-            log_hash = self._get_log_hash(log_file)
-            log_id = f"{log_file.name}:{log_hash}"
+            # Skip if currently processing this file
+            if self.currently_processing and log_file.name == self.currently_processing:
+                continue
             
-            # Se não processado ou mudou
-            if log_id not in self.processed_logs:
-                new_logs.append({
-                    'path': log_file,
-                    'id': log_id,
-                    'size': log_file.stat().st_size,
-                    'modified': datetime.fromtimestamp(log_file.stat().st_mtime)
-                })
+            # Calcular hash
+            try:
+                log_hash = self._get_log_hash(log_file)
+                log_id = f"{log_file.name}:{log_hash}"
+                
+                # Se não processado ou mudou
+                if log_id not in self.processed_logs:
+                    new_logs.append({
+                        'path': log_file,
+                        'id': log_id,
+                        'size': log_file.stat().st_size,
+                        'modified': datetime.fromtimestamp(log_file.stat().st_mtime)
+                    })
+            except Exception as e:
+                print(f"⚠ Erro ao processar {log_file.name}: {e}")
+                continue
         
         return new_logs
     
     def process_log(self, log_info: dict) -> bool:
         """Processa um log detectado"""
         log_path = log_info['path']
+        log_size_mb = log_info['size'] / (1024 * 1024)
         
-        print(f"\n{'='*80}")
-        print(f"🔍 NOVO LOG DETECTADO: {log_path.name}")
-        print(f"{'='*80}")
-        print(f"  Tamanho: {log_info['size'] / 1024:.1f} KB")
-        print(f"  Modificado: {log_info['modified']}")
-        print()
+        # Mark as currently processing
+        self.currently_processing = log_path.name
         
-        # Executar análise completa
         try:
-            print("📊 Executando análise completa...")
+            print(f"\n{'='*80}")
+            print(f"🔍 NOVO LOG DETECTADO: {log_path.name}")
+            print(f"{'='*80}")
+            print(f"  Tamanho: {log_size_mb:.1f} MB")
+            print(f"  Modificado: {log_info['modified']}")
             
-            # Chamar master_analyzer.py
-            import subprocess
+            # Estimar tempo baseado no tamanho
+            # Aproximação: ~2MB/min para processamento
+            estimated_minutes = max(5, int(log_size_mb / 2))
+            estimated_timeout = estimated_minutes * 60 + 300  # + 5min buffer
             
-            cmd = [
-                sys.executable,
-                "Tools/master_analyzer.py",
-                str(log_path)
-            ]
+            print(f"  Tempo estimado: ~{estimated_minutes} minutos")
+            print(f"  Timeout configurado: {estimated_timeout // 60} minutos")
+            print()
             
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300  # 5 minutos timeout
-            )
-            
-            if result.returncode == 0:
-                print("✓ Análise completa executada com sucesso")
-                print(result.stdout)
+            # Executar análise completa
+            try:
+                print("📊 Executando análise completa...")
+                print("⏳ Processamento pode demorar vários minutos para logs grandes...")
+                print("⚠️  NÃO INTERROMPA o processo - aguarde a conclusão!")
+                print()
                 
-                # Marcar como processado
-                self.processed_logs.add(log_info['id'])
-                self._save_state()
+                # Chamar master_analyzer.py
+                import subprocess
                 
-                # Acionar próxima fase (diagnóstico e correção)
-                self._trigger_diagnosis_and_fix(log_path)
+                cmd = [
+                    sys.executable,
+                    "Tools/master_analyzer.py",
+                    str(log_path)
+                ]
                 
-                return True
-            else:
-                print(f"✗ Erro na análise: {result.stderr}")
+                # Executar SEM capture_output para ver progresso em tempo real
+                result = subprocess.run(
+                    cmd,
+                    timeout=estimated_timeout  # Timeout dinâmico baseado no tamanho
+                )
+                
+                if result.returncode == 0:
+                    print("\n✓ Análise completa executada com sucesso")
+                    
+                    # Marcar como processado
+                    self.processed_logs.add(log_info['id'])
+                    self._save_state()
+                    
+                    # Acionar próxima fase (diagnóstico e correção)
+                    self._trigger_diagnosis_and_fix(log_path)
+                    
+                    return True
+                else:
+                    print(f"\n✗ Erro na análise: returncode={result.returncode}")
+                    return False
+            
+            except subprocess.TimeoutExpired:
+                print(f"\n✗ Timeout: análise demorou mais de {estimated_timeout // 60} minutos")
+                print("⚠️  Considere aumentar o timeout ou reduzir o tamanho do log")
+                return False
+            
+            except Exception as e:
+                print(f"✗ Erro ao processar log: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
         
-        except subprocess.TimeoutExpired:
-            print("✗ Timeout: análise demorou mais de 5 minutos")
-            return False
-        
-        except Exception as e:
-            print(f"✗ Erro ao processar log: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
+        finally:
+            # Clear currently processing flag
+            self.currently_processing = None
     
     def _trigger_diagnosis_and_fix(self, log_path: Path):
         """Aciona diagnóstico e correções automaticamente"""

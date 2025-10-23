@@ -39,6 +39,7 @@ from advanced_analyzer import (
     MarketRegimeAnalyzer, TemporalPatternAnalyzer, 
     TradeCharacteristicsAnalyzer
 )
+from complete_set_generator import CompleteSetGenerator
 
 
 # ============================================================================
@@ -883,30 +884,81 @@ class MasterAnalyzer:
         return recommendations
     
     def _phase7_generate_sets(self, symbol: str, recommendations: Dict) -> Dict:
-        """Fase 7: Gera arquivos .set otimizados"""
+        """Fase 7: Gera arquivos .set COMPLETOS otimizados (TODOS OS 157 PARÂMETROS)"""
+        
+        self.log("[FASE 7/10] Geração de Arquivos .set COMPLETOS")
+        self.log("=" * 80)
         
         set_files = {}
         
+        # Obter métricas para quality score
+        prod_metrics = self.results.get('production', {}).get('metrics', {})
+        quality_score = int(self._calculate_quality_score(
+            self.results.get('production', {}),
+            self.results.get('advanced', {})
+        ))
+        n_trades = prod_metrics.get('total_trades', 0)
+        
         profiles = ['CONSERVATIVE', 'MODERATE', 'AGGRESSIVE']
         
+        self.log(f"  Gerando {len(profiles)} perfis COMPLETOS...")
+        self.log(f"  Symbol: {symbol}")
+        self.log(f"  Quality Score: {quality_score}/100")
+        self.log(f"  Trades: {n_trades}")
+        
+        # Preparar dados completos para o gerador
+        analysis_data = {
+            'metadata': {
+                'symbol': symbol,
+                'n_trades': n_trades
+            },
+            'production': self.results.get('production', {}),
+            'quality_score': quality_score,
+            'recommendations': recommendations
+        }
+        
+        # Criar instância do gerador completo
+        generator = CompleteSetGenerator(output_dir=self.config.presets_dir)
+        
         for profile in profiles:
-            content = self.set_generator.generate_optimized_set(
-                symbol, recommendations, profile
+            self.log(f"\n  → Gerando perfil {profile}...")
+            
+            # USAR GERADOR COMPLETO - 157 parâmetros!
+            content = generator.generate_complete_set(
+                analysis_data=analysis_data,
+                profile=profile
             )
             
-            filepath = self.set_generator.save_set_file(symbol, content, profile)
+            # Salvar arquivo
+            timestamp = datetime.now().strftime('%Y%m%d')
+            filename = f"NexusConfluence_{symbol}_{profile}_{timestamp}.set"
+            filepath = self.config.presets_dir / filename
+            
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            # Contar linhas (deve ser ~160)
+            num_lines = len(content.strip().split('\n'))
+            num_params = len([l for l in content.split('\n') if '=' in l and not l.startswith(';')])
             
             set_files[profile] = {
                 'path': str(filepath),
                 'size_bytes': len(content),
-                'parameters': self.set_generator.extract_set_parameters(content)
+                'num_lines': num_lines,
+                'num_parameters': num_params,
+                'parameters': {}  # Não extrair todos para JSON (muito grande)
             }
             
-            self.log(f"  ✓ {profile}: {filepath.name}")
+            self.log(f"    ✓ {profile}: {filepath.name}")
+            self.log(f"      - Linhas: {num_lines}")
+            self.log(f"      - Parâmetros: {num_params}")
+            self.log(f"      - Tamanho: {len(content):,} bytes")
         
         self.results['optimized_sets'] = set_files
         
-        self.log(f"  ✓ {len(set_files)} arquivos .set gerados")
+        self.log(f"\n  ✓ {len(set_files)} arquivos .set COMPLETOS gerados")
+        self.log("=" * 80)
+        
         return set_files
     
     def _phase8_export_json(self) -> Path:

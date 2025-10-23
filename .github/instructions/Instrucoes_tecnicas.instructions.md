@@ -1190,7 +1190,52 @@ void OnTimer() {
 
 ## 📝 DOCUMENTAÇÃO E COMENTÁRIOS
 
-### **Padrão de Comentários Obrigatório**
+### **FORMATO DE ARQUIVOS .SET (PRESETS MT5)**
+
+**CRÍTICO:** Arquivos `.set` devem seguir EXATAMENTE o formato MT5. Cada linha segue o padrão:
+```
+ParameterName=Value||Default||Min||Max||Optimize
+```
+
+**Estrutura:**
+- `Value`: Valor atual do parâmetro
+- `Default`: Valor padrão
+- `Min`: Valor mínimo para otimização
+- `Max`: Valor máximo para otimização  
+- `Optimize`: Y (sim) ou N (não) para otimização genética
+
+**Exemplo correto:**
+```ini
+; Nexus Confluence EA v4.30 - Production Grade
+; saved on 2025.01.24
+;
+AccountRiskPercent=0.5||0.5||0.1||5.0||N
+MaxRiskPremium=1.0||1.0||0.1||5.0||N
+EnableTrailing=true||false||0||true||N
+TrailingUseATR=true||false||0||true||Y
+CustomStartHour=10||10||1||100||N
+MinFreeMarginPercent=20.0||20.0||10.0||50.0||N
+```
+
+**Tipos de valores:**
+- `double`: Use formato `X.X||X.X||Min||Max||N`
+- `int`: Use formato `X||X||Min||Max||N`
+- `bool`: Use formato `true||false||0||true||N`
+- `string`: Sem pipes, apenas `ParameterName=Value`
+- `color`: Sem pipes, apenas `ParameterName=ColorCode`
+
+**NUNCA use:**
+- ❌ Seções decorativas com `═══════`
+- ❌ Comentários multilinha dentro do formato
+- ❌ Valores sem pipes `||`
+- ❌ Linhas vazias excessivas
+
+**SEMPRE use:**
+- ✅ Header simples com `;` no início
+- ✅ Formato `Value||Default||Min||Max||Y/N`
+- ✅ Comentários simples com `;` apenas no header
+
+### **Padrão de Comentários Obrigatório em Código MQL5**
 
 ```cpp
 //+------------------------------------------------------------------+

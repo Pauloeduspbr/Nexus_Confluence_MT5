@@ -350,7 +350,7 @@ input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
-input int    MinConfluenceScore       = 85;    // 📊 Pontuação mínima 0-100 - 🔥 v4.31: 75→85 (CRÍTICO: WR 34.5%→50%+ estimado)
+input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 - 🔥 v4.31: 75→85 (CRÍTICO: WR 34.5%→50%+ estimado)
 input bool   RequireSupertrend        = true;  // ⚠️ Supertrend obrigatório - 🔥 v4.31: REATIVADO (filtro adicional crítico)
 input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
 input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true

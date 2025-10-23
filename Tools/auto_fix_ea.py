@@ -717,9 +717,6 @@ def main():
     print("="*80)
     print("✅ PROCESSO 100% AUTOMÁTICO CONCLUÍDO!")
     print("="*80)
-        print("\nExemplo:")
-        print("  python auto_fix_ea.py analysis_output/master_analysis_20251023_120000.json")
-        sys.exit(1)
     
     analysis_file = sys.argv[1]
     

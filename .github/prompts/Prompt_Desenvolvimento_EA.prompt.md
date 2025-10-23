@@ -42,7 +42,7 @@ Desenvolver/manter o **Nexus Confluence EA v4.27+** para MetaTrader 5, um sistem
 - ✅ Usa **confluência inteligente** de indicadores
 - ✅ Gestão de risco **baseada em estrutura** de preços
 - ✅ **Sistema multi-timeframe dinâmico** (se adapta ao TF operacional)
-- ✅ **Código modular limpo** (3 arquivos .mqh principais)
+- ✅ **Código modular limpo** (4 arquivos .mqh principais)
 - ✅ **Zero redundância** - um arquivo por funcionalidade
 
 ### Princípios Fundamentais
@@ -56,13 +56,13 @@ Desenvolver/manter o **Nexus Confluence EA v4.27+** para MetaTrader 5, um sistem
 
 ## 🏗️ ESTRUTURA MODULAR ATUAL (v4.27)
 
-### **ARQUITETURA DE 3 MÓDULOS**
+### **ARQUITETURA DE 4 MÓDULOS .MQH**
 
 ```
 NexusConfluenceEA.mq5 (MAIN)
 ├── Parametros.mqh       → TODOS inputs, enums, structs
-├── RogersSatchell.mqh   → Cálculo de volatilidade
-├── Estrategias.mqh      → TODA lógica de estratégia
+├── RogersSatchell.mqh   → Cálculo de volatilidade alternativa
+├── Estrategias.mqh      → TODA lógica de estratégia/indicadores
 └── RiskManagement.mqh   → TODA gestão de risco/posições
 ```
 

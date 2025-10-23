@@ -44,9 +44,9 @@ Nexus_Confluence_MT5/
 │
 ├── Include/NexusConfluenceEA/
 │   ├── Parametros.mqh                 📋 TODOS os inputs, enums, structs
+│   ├── RogersSatchell.mqh             📊 Cálculo volatilidade alternativa
 │   ├── Estrategias.mqh                🎯 TODA lógica de estratégia/indicadores
-│   ├── RiskManagement.mqh             💰 TODA gestão de risco/posições
-│   └── RogersSatchell.mqh             📊 Cálculo volatilidade alternativa
+│   └── RiskManagement.mqh             💰 TODA gestão de risco/posições
 │
 ├── Indicators/NexusConfluenceEA/
 │   ├── GG_TrendBar_Indicator.mq5      🎨 Indicador macro principal
@@ -78,7 +78,7 @@ Nexus_Confluence_MT5/
 
 ---
 
-## 🏗️ ARQUITETURA MODULAR v4.27
+## 🏗️ ARQUITETURA MODULAR v4.27 (4 MÓDULOS .MQH)
 
 ### **1. ARQUIVO PRINCIPAL: NexusConfluenceEA.mq5**
 
@@ -887,7 +887,7 @@ bool CalculatePositionSize(
 
 ✅ Implementa fielmente o Sistema Universal v4.0
 ✅ Adapta-se automaticamente a qualquer ativo
-✅ Usa estrutura modular clara (3 arquivos .mqh principais)
+✅ Usa estrutura modular clara (4 arquivos .mqh principais)
 ✅ Respeita rigorosamente gestão de risco com proteções
 ✅ Opera apenas setups de qualidade (PREMIUM/GOOD)
 ✅ Mantém código consolidado (zero redundância)

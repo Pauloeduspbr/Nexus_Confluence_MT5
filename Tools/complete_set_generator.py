@@ -185,7 +185,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
             'TrailingATRMultiplier': 3.0,
             'EnableBreakeven': 'true',
             'BreakevenAfterRR': 0.8,
-            'MinConfluenceScore': 70,
+            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
             'MaxDailyDrawdown': 2.0,
             'MaxWeeklyDrawdown': 4.0,
         },
@@ -195,7 +195,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
             'TrailingATRMultiplier': 2.5,
             'EnableBreakeven': 'true',
             'BreakevenAfterRR': 1.0,
-            'MinConfluenceScore': 60,
+            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
             'MaxDailyDrawdown': 3.0,
             'MaxWeeklyDrawdown': 5.0,
         },
@@ -205,7 +205,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
             'TrailingATRMultiplier': 2.0,
             'EnableBreakeven': 'true',
             'BreakevenAfterRR': 1.2,
-            'MinConfluenceScore': 50,
+            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
             'MaxDailyDrawdown': 5.0,
             'MaxWeeklyDrawdown': 8.0,
         }
@@ -250,11 +250,11 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         'SL_BufferPoints': 10.0,
         'SL_FallbackPercent': 0.3,
         'SL_MinDistancePoints': 50.0,
-        'SL_MaxDistancePoints': 300.0,
+        'SL_MaxDistancePoints': 150.0,  # 🔥 v4.30: 300→150 (CRÍTICO: -20% drawdown)
         'SL_UseStructure': 'true',
         'SL_StructureCandles': 50,
         'SL_StructureStrength': 2.0,
-        'SL_SafetyMultiplier': 1.2,
+        'SL_SafetyMultiplier': 1.1,  # 🔥 v4.30: 1.2→1.1 (SLs menores)
         'EnablePartialTP': 'true',
         'TP1_RR': 2.0,
         'TP2_RR': 4.0,
@@ -302,7 +302,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         'UseADXFilter': 'false',
         'ADX_Period': 14,
         'ADX_MinTrend': 25.0,
-        'MinConfluenceScore': 60,
+        'MinConfluenceScore': 75,  # 🔥 v4.30: 60→75 (CRÍTICO: +8% WR, setups seletivos)
         'RequireSupertrend': 'false',
         'RequireADXConfirmation': 'false',
         'MinADXStrength': 20.0,

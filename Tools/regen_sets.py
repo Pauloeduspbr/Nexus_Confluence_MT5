@@ -30,6 +30,9 @@ def main():
     print(f"📈 Trades: {n_trades}")
     print()
     
+    # Detectar versão atual (padrão v4.32)
+    version = "v4.32"
+    
     # Gerar .set files
     presets_dir = base_dir / 'Presets'
     generator = CompleteSetGenerator(presets_dir)
@@ -37,14 +40,14 @@ def main():
     for profile in ['CONSERVATIVE', 'MODERATE', 'AGGRESSIVE']:
         print(f"⚙️  Gerando perfil {profile}...")
         content = generator.generate_complete_set(analysis_data, profile)
-        filepath = generator.save_set_file(content, symbol, profile)
+        filepath = generator.save_set_file(content, symbol, profile, version)
         
         print(f"   ✅ Arquivo: {filepath.name}")
         print(f"   📦 Tamanho: {filepath.stat().st_size:,} bytes")
         print(f"   📊 Linhas: {len(content.splitlines())}")
         print()
     
-    print("✅ ARQUIVOS .SET REGENERADOS COM SUCESSO!")
+    print(f"✅ ARQUIVOS .SET {version} REGENERADOS COM SUCESSO!")
 
 if __name__ == '__main__':
     main()

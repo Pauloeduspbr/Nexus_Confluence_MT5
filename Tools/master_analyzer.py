@@ -929,9 +929,10 @@ class MasterAnalyzer:
                 profile=profile
             )
             
-            # Salvar arquivo
+            # Salvar arquivo com VERSÃO no nome
+            version = "v4.32"  # Versão atual
             timestamp = datetime.now().strftime('%Y%m%d')
-            filename = f"NexusConfluence_{symbol}_{profile}_{timestamp}.set"
+            filename = f"NexusConfluence_{symbol}_{profile}_{version}_{timestamp}.set"
             filepath = self.config.presets_dir / filename
             
             with open(filepath, 'w', encoding='utf-8') as f:

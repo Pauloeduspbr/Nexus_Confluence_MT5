@@ -413,10 +413,10 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         
         return content
     
-    def save_set_file(self, content: str, symbol: str, profile: str) -> Path:
-        """Salva arquivo .set"""
+    def save_set_file(self, content: str, symbol: str, profile: str, version: str = "v4.32") -> Path:
+        """Salva arquivo .set com versão no nome"""
         timestamp = datetime.now().strftime('%Y%m%d')
-        filename = f"NexusConfluence_{symbol}_{profile}_{timestamp}.set"
+        filename = f"NexusConfluence_{symbol}_{profile}_{version}_{timestamp}.set"
         filepath = self.output_dir / filename
         
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -449,12 +449,16 @@ def main():
     # Extrair símbolo correto do metadata
     symbol = analysis_data.get('metadata', {}).get('symbol', analysis_data.get('symbol', 'UNKNOWN'))
     
+    # Detectar versão atual do EA (baseado nas correções aplicadas)
+    version = "v4.32"  # Versão atual após correções
+    
     for profile in ['CONSERVATIVE', 'MODERATE', 'AGGRESSIVE']:
         content = generator.generate_complete_set(analysis_data, profile)
         filepath = generator.save_set_file(
             content,
-            symbol,  # CORREÇÃO: Usar símbolo extraído do metadata
-            profile
+            symbol,
+            profile,
+            version  # Incluir versão
         )
         print(f"✅ Generated: {filepath}")
         print(f"   Size: {filepath.stat().st_size:,} bytes")

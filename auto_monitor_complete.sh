@@ -1,141 +1,203 @@
 #!/bin/bash
-PID=$(cat .analysis_pid 2>/dev/null || echo "0")
+
+# Script de Monitoramento Completo Unificado v4.32
+# Integra análise + monitoramento em tempo real + correções automáticas
+
+set -euo pipefail
+
 START_TIME=$(date +%s)
+VERSION="v4.32"
 
-echo "════════════════════════════════════════════════════════════════"
-echo "🤖 SISTEMA AUTOMÁTICO COMPLETO v4.31"
-echo "════════════════════════════════════════════════════════════════"
-echo "📊 PID Análise: $PID"
-echo "⏳ Iniciado em: $(date '+%H:%M:%S')"
-echo "🔴 ZERO INTERVENÇÃO HUMANA!"
-echo ""
-echo "ETAPAS:"
-echo "  [1/4] Análise do Log       (Processando...)"
-echo "  [2/4] Análise do Código EA (Aguardando...)"
-echo "  [3/4] Correções Automáticas (Aguardando...)"
-echo "  [4/4] Relatório Final      (Aguardando...)"
-echo ""
+# Detectar PID da análise se já está rodando
+PID=$(cat .analysis_pid 2>/dev/null || echo "")
 
-while true; do
-    if ! ps -p $PID > /dev/null 2>&1; then
-        END_TIME=$(date +%s)
-        DURATION=$((END_TIME - START_TIME))
-        MINUTES=$((DURATION / 60))
+# Cores
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+print_banner() {
+    clear
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}${BOLD}      🚀 SISTEMA AUTOMÁTICO COMPLETO ${VERSION} 🚀${NC}"
+    echo -e "${CYAN}       Nexus Confluence EA - Monitoramento em Tempo Real${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    if [ -n "$PID" ]; then
+        echo -e "${GREEN}📊 PID Análise: $PID${NC}"
+    fi
+    echo -e "${YELLOW}⏳ Iniciado em: $(date '+%Y-%m-%d %H:%M:%S')${NC}"
+    echo -e "${RED}${BOLD}🔴 ZERO INTERVENÇÃO HUMANA - PROCESSO AUTOMÁTICO COMPLETO!${NC}"
+    echo ""
+    echo -e "${BLUE}ETAPAS DO PROCESSO:${NC}"
+    echo "  [1/5] Análise do Log MT5      (Processando...)"
+    echo "  [2/5] Análise do Código EA    (Aguardando...)"
+    echo "  [3/5] Correções Automáticas   (Aguardando...)"
+    echo "  [4/5] Geração de Presets .set (Aguardando...)"
+    echo "  [5/5] Relatório Final         (Aguardando...)"
+    echo ""
+}
+
+monitor_realtime() {
+    # Monitorar progresso via arquivo de status JSON
+    local status_file=".realtime_status.json"
+    local last_progress=0
+    local last_phase=""
+    
+    while [ -z "$PID" ] || ps -p $PID > /dev/null 2>&1 || [ -f "$status_file" ]; do
+        CURRENT_TIME=$(date +%s)
+        ELAPSED=$(((CURRENT_TIME - START_TIME) / 60))
         
-        echo ""
-        echo "════════════════════════════════════════════════════════════════"
-        echo "✅ [1/4] ANÁLISE DO LOG COMPLETA EM ${MINUTES} MINUTOS!"
-        echo "════════════════════════════════════════════════════════════════"
-        echo ""
-        
-        LATEST_JSON=$(ls -t analysis_output/master_analysis_*.json 2>/dev/null | head -1)
-        
-        if [ -n "$LATEST_JSON" ]; then
-            echo "📁 $LATEST_JSON"
-            
-            QUALITY=$(grep -o '"quality_score":[0-9.]*' "$LATEST_JSON" | head -1 | cut -d':' -f2)
-            WIN_RATE=$(grep -o '"win_rate":[0-9.]*' "$LATEST_JSON" | head -1 | cut -d':' -f2)
-            N_TRADES=$(grep -o '"n_trades":[0-9]*' "$LATEST_JSON" | head -1 | cut -d':' -f2)
-            
-            echo "🎯 Quality Score: ${QUALITY}/100"
-            echo "📈 Win Rate: ${WIN_RATE}%"
-            echo "🔢 Trades: ${N_TRADES}"
-            echo ""
-            
-            echo "════════════════════════════════════════════════════════════════"
-            echo "🔍 [2/4] INICIANDO ANÁLISE DO CÓDIGO EA..."
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            
-            # EXECUTAR AUTO FIX EA
-            cd /mnt/d/EA_Projetos/Nexus_Confluence_MT5/Nexus_Confluence_MT5
-            source venv/bin/activate
-            python Tools/auto_fix_ea.py "$LATEST_JSON"
-            
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-            echo "✅ [3/4] ANÁLISE COMPLETA!"
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            
-            # Verificar relatório de correções
-            FIX_REPORT=$(ls -t analysis_output/auto_fix_report_*.md 2>/dev/null | head -1)
-            
-            if [ -n "$FIX_REPORT" ]; then
-                echo "📁 RELATÓRIO DE CORREÇÕES:"
-                echo "   $FIX_REPORT"
-                echo ""
+        if [ -f "$status_file" ]; then
+            # Ler progresso do JSON (requer jq)
+            if command -v jq &> /dev/null; then
+                current_progress=$(jq -r '.progress // 0' "$status_file" 2>/dev/null || echo "0")
+                current_phase=$(jq -r '.current_phase // "PROCESSING"' "$status_file" 2>/dev/null || echo "PROCESSING")
+                errors=$(jq -r '.errors | length' "$status_file" 2>/dev/null || echo "0")
                 
-                # Contar problemas críticos
-                CRITICAL=$(grep -c "🔴" "$FIX_REPORT" 2>/dev/null || echo "0")
-                IMPORTANT=$(grep -c "🟡" "$FIX_REPORT" 2>/dev/null || echo "0")
+                # Mostrar barra de progresso
+                if [ "$current_progress" -ne "$last_progress" ] || [ "$current_phase" != "$last_phase" ]; then
+                    filled=$((current_progress / 2))
+                    empty=$((50 - filled))
+                    bar=$(printf '█%.0s' $(seq 1 $filled))
+                    spaces=$(printf ' %.0s' $(seq 1 $empty))
+                    
+                    echo -ne "\r${GREEN}[${bar}${spaces}]${NC} ${current_progress}% - ${current_phase}  "
+                    
+                    last_progress=$current_progress
+                    last_phase=$current_phase
+                fi
                 
-                echo "🔴 Problemas Críticos: $CRITICAL"
-                echo "🟡 Problemas Importantes: $IMPORTANT"
-                echo ""
-                
-                if [ "$CRITICAL" -gt "0" ] || [ "$IMPORTANT" -gt "0" ]; then
-                    echo "⚠️  CORREÇÕES NECESSÁRIAS NO CÓDIGO EA!"
+                if [ "$errors" -gt "0" ]; then
                     echo ""
-                    echo "📋 TOP 3 CORREÇÕES:"
-                    grep -A 2 "###" "$FIX_REPORT" | head -15
+                    echo -e "${RED}❌ Erros detectados: $errors${NC}"
                 fi
             fi
-            
-            echo ""
-            echo "════════════════════════════════════════════════════════════════"
-            echo "📊 [4/4] RELATÓRIO FINAL"
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            
-            # Listar todos arquivos gerados
-            echo "📁 ARQUIVOS GERADOS:"
-            echo "   ✓ $LATEST_JSON"
-            echo "   ✓ $(ls -1 analysis_output/master_log_*.txt 2>/dev/null | tail -1)"
-            if [ -n "$FIX_REPORT" ]; then
-                echo "   ✓ $FIX_REPORT"
+        else
+            # Fallback para monitoramento clássico
+            if [ -n "$PID" ]; then
+                CPU=$(ps -p $PID -o %cpu --no-headers 2>/dev/null | tr -d ' ' || echo "0")
+                PHASE=$(tail -20 analysis_progress.log 2>/dev/null | grep -oE '\[FASE [0-9]+/10\]' | tail -1 || echo "")
+                
+                echo -e "\r[$(date '+%H:%M:%S')] ${ELAPSED}min | CPU:${CPU}% | ${PHASE:-Processando...}  "
             fi
+        fi
+        
+        # Verificar se concluiu
+        if [ -f ".analysis_complete" ]; then
             echo ""
+            echo -e "${GREEN}✅ Processo concluído!${NC}"
+            break
+        fi
+        
+        sleep 2
+    done
+}
+
+show_results() {
+    local END_TIME=$(date +%s)
+    local DURATION=$((END_TIME - START_TIME))
+    local MINUTES=$((DURATION / 60))
+    local SECONDS=$((DURATION % 60))
+    
+    echo ""
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}${BOLD}        ✅ PROCESSO AUTOMÁTICO 100% CONCLUÍDO!${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo -e "${GREEN}⏱️  Tempo Total: ${MINUTES}min ${SECONDS}s${NC}"
+    echo ""
+    
+    # Verificar arquivos gerados
+    LATEST_JSON=$(ls -t analysis_output/master_analysis_*.json 2>/dev/null | head -1)
+    
+    if [ -n "$LATEST_JSON" ]; then
+        echo -e "${YELLOW}📁 ARQUIVOS GERADOS:${NC}"
+        echo "   ✅ $(basename $LATEST_JSON)"
+        echo "   ✅ $(basename $(ls -1 analysis_output/master_log_*.txt 2>/dev/null | tail -1))"
+        
+        FIX_REPORT=$(ls -t analysis_output/auto_fix_report_*.md 2>/dev/null | head -1)
+        if [ -n "$FIX_REPORT" ]; then
+            echo "   ✅ $(basename $FIX_REPORT)"
+        fi
+        
+        FINAL_REPORT=$(ls -t RELATORIO_COMPLETO_${VERSION}_*.md 2>/dev/null | head -1)
+        if [ -n "$FINAL_REPORT" ]; then
+            echo "   ✅ $(basename $FINAL_REPORT)"
+        fi
+        
+        echo ""
+        echo -e "${YELLOW}� PRESETS .SET GERADOS (${VERSION}):${NC}"
+        ls -1 Presets/*_${VERSION}_*.set 2>/dev/null | while read file; do
+            echo "   ✅ $(basename $file)"
+        done
+        
+        echo ""
+        
+        # Estatísticas do JSON
+        if command -v jq &> /dev/null; then
+            WIN_RATE=$(jq -r '.quality_metrics.win_rate // "N/A"' "$LATEST_JSON" 2>/dev/null)
+            PROFIT_FACTOR=$(jq -r '.quality_metrics.profit_factor // "N/A"' "$LATEST_JSON" 2>/dev/null)
+            N_TRADES=$(jq -r '.basic_stats.n_trades // "N/A"' "$LATEST_JSON" 2>/dev/null)
             
-            echo "📁 ARQUIVOS .SET:"
-            ls -1 Presets/*_$(date +%Y%m%d).set 2>/dev/null | while read file; do
-                echo "   ✓ $file"
-            done
+            echo -e "${YELLOW}📊 MÉTRICAS DA ANÁLISE:${NC}"
+            echo "   📈 Win Rate: ${WIN_RATE}%"
+            echo "   💰 Profit Factor: ${PROFIT_FACTOR}"
+            echo "   🔢 Total Trades: ${N_TRADES}"
             echo ""
+        fi
+        
+        # Contar problemas do fix report
+        if [ -n "$FIX_REPORT" ]; then
+            CRITICAL=$(grep -c "🔴" "$FIX_REPORT" 2>/dev/null || echo "0")
+            IMPORTANT=$(grep -c "🟡" "$FIX_REPORT" 2>/dev/null || echo "0")
             
-            echo "════════════════════════════════════════════════════════════════"
-            echo "🎉 PROCESSO AUTOMÁTICO 100% CONCLUÍDO!"
-            echo "════════════════════════════════════════════════════════════════"
-            echo ""
-            echo "⏱️  Tempo total: ${MINUTES} minutos"
-            echo "✅ Análise do Log: Completa"
-            echo "✅ Análise do Código EA: Completa"
-            echo "✅ Detecção de Problemas: Completa"
-            echo "✅ Relatórios: Gerados"
+            echo -e "${YELLOW}🔧 CORREÇÕES DETECTADAS:${NC}"
+            echo "   🔴 Críticas: $CRITICAL"
+            echo "   🟡 Importantes: $IMPORTANT"
             echo ""
             
             if [ "$CRITICAL" -gt "0" ]; then
-                echo "🔴 AÇÃO NECESSÁRIA: Revisar correções críticas no EA"
+                echo -e "${RED}⚠️  AÇÃO NECESSÁRIA: Revisar correções críticas aplicadas${NC}"
             elif [ "$IMPORTANT" -gt "0" ]; then
-                echo "🟡 RECOMENDADO: Revisar melhorias sugeridas"
+                echo -e "${YELLOW}� RECOMENDADO: Revisar melhorias sugeridas${NC}"
             else
-                echo "✅ EA OTIMIZADO: Nenhuma correção necessária"
+                echo -e "${GREEN}✅ EA OTIMIZADO: Configurações adequadas${NC}"
             fi
-            
-        else
-            echo "⚠️  Nenhum arquivo JSON encontrado - análise falhou"
+            echo ""
         fi
-        
-        touch .analysis_complete
-        break
     fi
     
-    CURRENT_TIME=$(date +%s)
-    ELAPSED=$(((CURRENT_TIME - START_TIME) / 60))
-    CPU=$(ps -p $PID -o %cpu --no-headers 2>/dev/null | tr -d ' ')
-    PHASE=$(tail -20 analysis_progress.log 2>/dev/null | grep -oE '\[FASE [0-9]+/10\]' | tail -1)
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo -e "${CYAN}${BOLD}              🎯 PRÓXIMOS PASSOS${NC}"
+    echo -e "${CYAN}════════════════════════════════════════════════════════════════${NC}"
+    echo ""
+    echo "  1. ✅ Revisar relatório completo gerado"
+    echo "  2. ✅ Verificar presets ${VERSION} em Presets/"
+    echo "  3. ✅ Carregar preset adequado no MT5"
+    echo "  4. ✅ Testar em conta DEMO por 48-72 horas"
+    echo "  5. ✅ Validar métricas antes de considerar REAL"
+    echo ""
     
-    echo "[$(date '+%H:%M:%S')] ${ELAPSED}min | CPU:${CPU}% | ${PHASE:-[1/4] Processando log...}"
-    
-    sleep 120
-done
+    if [ -n "$FINAL_REPORT" ]; then
+        echo -e "${GREEN}📊 Relatório Completo: $FINAL_REPORT${NC}"
+        echo ""
+    fi
+}
+
+# EXECUÇÃO PRINCIPAL
+print_banner
+
+echo -e "${BLUE}🔍 Monitorando processo em tempo real...${NC}"
+echo ""
+
+monitor_realtime
+
+show_results
+
+echo -e "${GREEN}${BOLD}Sistema executado com sucesso!${NC}"
+echo ""

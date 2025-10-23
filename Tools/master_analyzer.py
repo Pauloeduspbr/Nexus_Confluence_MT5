@@ -634,8 +634,8 @@ class MasterAnalyzer:
         self.log(f"  Arquivo: {log_file}")
         
         # Carregar trades
-        reconstructor = TradeReconstructor()
-        trades = reconstructor.process_log_file(log_file)
+        reconstructor = TradeReconstructor(log_file)
+        trades = reconstructor.parse_log_streaming()
         
         self.log(f"  ✓ {len(trades)} trades carregados")
         

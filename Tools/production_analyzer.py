@@ -152,6 +152,23 @@ class TradeReconstructor:
         
         # Regex patterns
         self.patterns = {
+            # Pattern para log de backtest MT5 (deal #X buy/sell)
+            'deal_backtest': re.compile(
+                r'(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}:\d{2}).*'
+                r'deal\s+#(\d+)\s+'
+                r'(buy|sell)\s+'
+                r'([\d.]+)\s+'
+                r'(\w+)\s+'
+                r'at\s+([\d.]+)',
+                re.IGNORECASE
+            ),
+            # Pattern para posição fechada (backtest)
+            'position_closed': re.compile(
+                r'(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}:\d{2}).*'
+                r'position\s+closed.*?at\s+([\d.]+).*?'
+                r'\[#(\d+)\s+(buy|sell)\s+([\d.]+)\s+(\w+)\s+([\d.]+)\s+sl:\s*([\d.]+)',
+                re.IGNORECASE
+            ),
             'order_open': re.compile(
                 r'(\d{4}\.\d{2}\.\d{2}\s\d{2}:\d{2}:\d{2}).*'
                 r'order\s+#(\d+).*'
@@ -215,7 +232,7 @@ class TradeReconstructor:
         lines_processed = 0
         trades_found = 0
         
-        with open(self.log_file, 'r', encoding='utf-8', errors='ignore') as f:
+        with open(self.log_file, 'r', encoding='utf-16-le', errors='ignore') as f:
             buffer = ""
             
             while True:
@@ -248,6 +265,18 @@ class TradeReconstructor:
     
     def _process_line(self, line: str):
         """Processa uma linha do log"""
+        # Deal backtest (MT5 backtest format)
+        match = self.patterns['deal_backtest'].search(line)
+        if match:
+            self._handle_deal_backtest(match)
+            return
+        
+        # Position closed (backtest)
+        match = self.patterns['position_closed'].search(line)
+        if match:
+            self._handle_position_closed(match)
+            return
+        
         # Order open
         match = self.patterns['order_open'].search(line)
         if match:

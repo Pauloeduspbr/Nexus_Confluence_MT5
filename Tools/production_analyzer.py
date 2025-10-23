@@ -234,6 +234,7 @@ class TradeReconstructor:
         
         with open(self.log_file, 'r', encoding='utf-16-le', errors='ignore') as f:
             buffer = ""
+            start_time = datetime.now()
             
             while True:
                 chunk = f.read(chunk_size)
@@ -249,8 +250,15 @@ class TradeReconstructor:
                     lines_processed += 1
                     self._process_line(line)
                 
-                if lines_processed % 100000 == 0:
-                    print(f"  Processed: {lines_processed:,} lines, {len(self.trades):,} trades found")
+                # ⭐ PROGRESSO MELHORADO: Mostrar a cada 50k linhas
+                if lines_processed % 50000 == 0:
+                    elapsed = (datetime.now() - start_time).total_seconds()
+                    rate = lines_processed / elapsed if elapsed > 0 else 0
+                    eta_seconds = (file_size / (1024*1024) / (chunk_size / (1024*1024)) * elapsed / (lines_processed / 100000)) if lines_processed > 0 else 0
+                    
+                    print(f"  ⏳ Processado: {lines_processed:,} linhas | {len(self.trades):,} trades | "
+                          f"Taxa: {rate:,.0f} linhas/seg | "
+                          f"Tempo: {elapsed:.0f}s | ETA: ~{eta_seconds:.0f}s")
         
         # Processar última linha
         if buffer:

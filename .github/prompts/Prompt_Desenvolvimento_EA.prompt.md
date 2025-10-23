@@ -1,149 +1,423 @@
 ---
 mode: agent
 ---
-# 🎯 PROMPT PARA DESENVOLVIMENTO - EA NEXUS CONFLUENCE MT5 V4.0
+# 🎯 PROMPT DESENVOLVIMENTO - NEXUS CONFLUENCE EA v4.27+
+
+## ⚠️ REGRAS CRÍTICAS - LEIA PRIMEIRO
+
+### 🚫 **PROIBIÇÕES ABSOLUTAS**
+
+**ANTES DE QUALQUER AÇÃO, VERIFICAR:**
+
+```
+❌ PROIBIDO CRIAR novos arquivos sem remover antigos
+❌ PROIBIDO CRIAR documentos redundantes  
+❌ PROIBIDO CRIAR versões "_new", "_v2", "_backup"
+❌ PROIBIDO MANTER código duplicado
+❌ PROIBIDO CRIAR relatórios desnecessários
+
+✅ OBRIGATÓRIO corrigir código EXISTENTE primeiro
+✅ OBRIGATÓRIO remover arquivo antigo ao criar substituto
+✅ OBRIGATÓRIO consolidar em arquivos existentes
+✅ OBRIGATÓRIO documentar motivo se criar novo arquivo
+```
+
+### 📋 **HIERARQUIA DE DECISÃO**
+
+```
+1️⃣ TENTAR CORRIGIR código existente (95% dos casos)
+2️⃣ SE IMPOSSÍVEL: Planejar substituição completa
+3️⃣ CRIAR novo arquivo E REMOVER antigo imediatamente
+4️⃣ NUNCA deixar versões duplicadas coexistindo
+```
+
+---
 
 ## 📋 OBJETIVO PRINCIPAL
-Desenvolver um Expert Advisor (EA) completo para MetaTrader 5 que implemente fielmente o **Sistema de Trading Profissional v4.0 - Versão Universal**, capaz de operar automaticamente em múltiplas classes de ativos (Forex, Índices, Metais, B3) com gestão de risco profissional e adaptação inteligente por tipo de ativo.
 
----
+Desenvolver/manter o **Nexus Confluence EA v4.27+** para MetaTrader 5, um sistema profissional multi-timeframe que:
 
-## 🌍 VISÃO GERAL DO SISTEMA
-
-### Filosofia Universal
-O EA deve implementar um sistema que:
-- ✅ **Funciona em qualquer ativo** (Forex, Índices, Metais, B3)
-- ✅ **Adapta-se automaticamente** às características de cada classe
-- ✅ **Usa confluência inteligente** de indicadores
-- ✅ **Gestão de risco baseada em estrutura** de preços
-- ✅ **Respeita horários de liquidez** globais sincronizados
-- ✅ **Prioriza qualidade sobre quantidade** de trades
+- ✅ Opera em **qualquer ativo** (Forex, Índices, Metais, B3)
+- ✅ Adapta-se **automaticamente** às características de cada classe
+- ✅ Usa **confluência inteligente** de indicadores
+- ✅ Gestão de risco **baseada em estrutura** de preços
+- ✅ **Sistema multi-timeframe dinâmico** (se adapta ao TF operacional)
+- ✅ **Código modular limpo** (3 arquivos .mqh principais)
+- ✅ **Zero redundância** - um arquivo por funcionalidade
 
 ### Princípios Fundamentais
-1. **Alinhamento Multi-Timeframe Obrigatório** (H4/H1 alinhados)
-2. **Confluência de Indicadores Adaptável** (2/3 ou 2/2 conforme ativo)
-3. **Gestão de Risco Baseada em Estrutura** (SL no último topo/fundo)
-4. **Horários de Liquidez Inteligentes** (adaptados por ativo)
-5. **Qualidade Suprema** (aguardar setups perfeitos)
+1. **Código Limpo > Código Novo** - corrigir antes de criar
+2. **Alinhamento Multi-Timeframe Dinâmico** (MACRO-1+2 alinhados obrigatório)
+3. **Confluência Adaptável** (2/3 ou 2/2 conforme ativo)
+4. **Gestão de Risco Estrutural** (SL no último topo/fundo)
+5. **Qualidade > Quantidade** (setups PREMIUM/GOOD apenas)
 
 ---
 
-## 🔧 ESPECIFICAÇÕES TÉCNICAS DETALHADAS
+## 🏗️ ESTRUTURA MODULAR ATUAL (v4.27)
 
-### **1. ESTRUTURA BASE DO EA**
+### **ARQUITETURA DE 3 MÓDULOS**
+
+```
+NexusConfluenceEA.mq5 (MAIN)
+├── Parametros.mqh       → TODOS inputs, enums, structs
+├── RogersSatchell.mqh   → Cálculo de volatilidade
+├── Estrategias.mqh      → TODA lógica de estratégia
+└── RiskManagement.mqh   → TODA gestão de risco/posições
+```
+
+**REGRA DE OURO:** Não há "classes" como em POO. Tudo são funções e structs globais organizados em módulos .mqh.
+
+### **1. ARQUIVO PRINCIPAL: NexusConfluenceEA.mq5**
 
 ```cpp
-// Estrutura básica do EA
-class CNexusConfluenceEA {
-private:
-    // Enumerações para tipos de ativos
-    enum ASSET_CLASS {
-        FOREX_MAJOR,    // EUR/USD, GBP/USD, USD/JPY, AUD/USD
-        FOREX_MINOR,    // EUR/GBP, EUR/JPY, GBP/JPY, etc
-        FOREX_EXOTIC,   // USD/BRL, USD/MXN, USD/ZAR, etc
-        INDEX_US,       // S&P500, Nasdaq, Dow Jones
-        INDEX_EU,       // DAX, FTSE, CAC40
-        INDEX_B3,       // WIN (Mini Índice Bovespa)
-        CURRENCY_B3,    // WDO (Mini Dólar)
-        METALS,         // XAU/USD, XAG/USD
-        CRYPTO          // BTC/USD, ETH/USD (futuro)
-    };
+// RESPONSABILIDADES EXCLUSIVAS:
+// - OnInit(): Inicializar indicadores e variáveis globais
+// - OnTick(): Fluxo de execução principal (delegar para funções)
+// - OnDeinit(): Limpar recursos (release de indicadores)
+// - OnTimer(): Resets diários/semanais
+
+// INCLUDES (ordem IMPORTANTE):
+#include <Trade\Trade.mqh>
+#include "..\..\Include\NexusConfluenceEA\Parametros.mqh"
+#include "..\..\Include\NexusConfluenceEA\RogersSatchell.mqh"
+#include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
+#include "..\..\Include\NexusConfluenceEA\RiskManagement.mqh"
+
+// VARIÁVEIS GLOBAIS (mínimo necessário):
+CTrade g_trade;
+datetime g_lastCandleTime = 0;
+double g_dailyStartBalance = 0.0;
+int g_consecutiveLosses = 0;
+datetime g_pauseUntilTime = 0;
+// ... etc
+```
+
+### **2. MÓDULO: Parametros.mqh**
+
+```cpp
+// APENAS DEFINIÇÕES - ZERO LÓGICA!
+
+// ENUMS:
+enum TRADE_DIRECTION { NONE=-1, BUY=0, SELL=1 };
+enum SETUP_CLASS { REJECT=0, GOOD=1, PREMIUM=2 };
+enum ASSET_CLASS { 
+    UNKNOWN=0, FOREX_MAJOR=1, FOREX_MINOR=2, 
+    FOREX_EXOTIC=3, CURRENCY_B3=4, INDEX_B3=5,
+    INDEX_US=6, INDEX_EU=7, METALS=8, CRYPTO=9
+};
+
+// STRUCTS:
+struct TMSignal { ... };
+struct CSSignal { ... };
+struct RSISignal { ... };
+struct WAESignal { ... };
+struct RiskCalculation { ... };
+struct IndicatorHandles { ... };
+struct BufferCache { ... };
+
+// INPUTS (100+ parâmetros):
+input group "=== CONFIGURAÇÕES GERAIS ==="
+input double AccountRiskPercent = 0.5;
+input double MaxRiskPremium = 1.0;
+// ... todos os inputs do EA
+```
+
+### **3. MÓDULO: Estrategias.mqh**
+
+```cpp
+// TODA LÓGICA DE ESTRATÉGIA E INDICADORES
+
+// VARIÁVEIS GLOBAIS DO MÓDULO:
+ENUM_TIMEFRAMES g_tfMacro1, g_tfMacro2, g_tfMacro3;
+int g_numNiveisMacro; // 2 ou 3 níveis
+IndicatorHandles g_handles; // Handles de todos indicadores
+BufferCache g_cache; // Cache de buffers (otimização)
+
+// FUNÇÕES PRINCIPAIS:
+void DefineMultiTimeframes(ENUM_TIMEFRAMES tfOper, ...);
+bool AnalyzeMultiTimeframeAlignment(...);
+void AnalyzeMicroFilters(...);
+TMSignal GetGGTrendBarSignal(...);
+TMSignal GetSupertrendSignal(...);
+WAESignal GetWAESignal(...);
+RSISignal GetRSIOMASignal(...);
+CSSignal GetCurrencyStrengthSignal(...);
+void CalculateSetupScore(...);
+void ReleaseIndicators();
+```
+
+### **4. MÓDULO: RiskManagement.mqh**
+
+```cpp
+// TODA GESTÃO DE RISCO E POSIÇÕES
+
+// FUNÇÕES PRINCIPAIS:
+double GetMaxRiskForDay(); // v4.30: Redução progressiva
+bool CalculatePositionSize(...);
+double FindStructureSL(...);
+void CalculateTakeProfits(...);
+bool ValidateRiskCalculation(...);
+void ManageExistingTrades(); // BE/TS/TP parcial
+void MoveToBreakeven(ulong ticket);
+void ExecutePartialClose(ulong ticket, double percent);
+void UpdateTrailingStop(ulong ticket);
+datetime CalculatePauseTime(int losses); // Máx 12h
+```
+
+---
+
+## 📊 SISTEMA MULTI-TIMEFRAME DINÂMICO
+
+### **LÓGICA DE DEFINIÇÃO AUTOMÁTICA (v4.27)**
+
+```cpp
+// O sistema SE ADAPTA ao timeframe operacional:
+
+TF OPERACIONAL → MACRO-1 → MACRO-2 → MACRO-3
+───────────────────────────────────────────────
+M1  ou M5      →   H1    →   M30   →  M15
+M15            →   H4    →   H1    →  M30
+M30            →   H4    →   H1    →  (não usa MACRO-3)
+H1  ou H4      →   D1    →   H4    →  (apenas 2 níveis)
+
+REGRAS:
+1. MACRO-1 + MACRO-2 devem estar ALINHADOS (obrigatório)
+2. MACRO-3 alinhado = PREMIUM setup
+3. MACRO-3 divergente = GOOD setup
+4. Sistema de 2 ou 3 níveis (automático)
+```
+
+### **Função DefineMultiTimeframes()**
+
+```cpp
+void DefineMultiTimeframes(
+    ENUM_TIMEFRAMES tfOper,
+    ENUM_TIMEFRAMES &outMacro1,
+    ENUM_TIMEFRAMES &outMacro2,
+    ENUM_TIMEFRAMES &outMacro3,
+    int &outNumNiveis
+) {
+    // Implementa a lógica de adaptação automática
+    switch(tfOper) {
+        case PERIOD_M1:
+        case PERIOD_M5:
+            outMacro1 = PERIOD_H1;
+            outMacro2 = PERIOD_M30;
+            outMacro3 = PERIOD_M15;
+            outNumNiveis = 3;
+            break;
+        
+        case PERIOD_M15:
+            outMacro1 = PERIOD_H4;
+            outMacro2 = PERIOD_H1;
+            outMacro3 = PERIOD_M30;
+            outNumNiveis = 3;
+            break;
+        
+        case PERIOD_M30:
+            outMacro1 = PERIOD_H4;
+            outMacro2 = PERIOD_H1;
+            outMacro3 = PERIOD_CURRENT; // Não usa
+            outNumNiveis = 2;
+            break;
+        
+        case PERIOD_H1:
+        case PERIOD_H4:
+            outMacro1 = PERIOD_D1;
+            outMacro2 = PERIOD_H4;
+            outMacro3 = PERIOD_CURRENT; // Não usa
+            outNumNiveis = 2;
+            break;
+    }
+}
+```
+
+---
+
+## 🎯 INDICADORES E FILTROS
+
+### **A) GG TrendBar - INDICADOR MACRO PRINCIPAL**
+
+```cpp
+// SUBSTITUIU Trend Magic original
+// É o PRINCIPAL indicador para análise macro
+// Lê buffer [1] (candle FECHADO)
+
+TMSignal GetGGTrendBarSignal(string symbol, ENUM_TIMEFRAMES tf) {
+    TMSignal signal;
+    signal.isValid = false;
+    signal.direction = TRADE_DIRECTION_NONE;
     
-    // Configurações por classe de ativo
-    struct AssetConfig {
-        ASSET_CLASS type;
-        bool useCurrencyStrength;
-        int requiredFilters;        // 2 ou 3
-        int minFiltersForTrade;     // 2 ou 2
-        double idealSLMin;          // Distância mínima SL
-        double idealSLMax;          // Distância máxima SL
-        double slBuffer;            // Buffer adicional
-        int primeHourStart;         // Horário prime início (BR)
-        int primeHourEnd;           // Horário prime fim (BR)
-        double maxRiskPercent;      // Risco máximo para premium setups
-    };
-};
-```
-
-### **2. INDICADORES OBRIGATÓRIOS**
-
-#### A) **Trader Magic (Indicador Principal)**
-```cpp
-// Função para detectar mudança do Trader Magic
-bool CheckTraderMagicSignal(string symbol, ENUM_TIMEFRAMES timeframe) {
-    // Verificar mudança de cor por 2+ candles
-    // Para COMPRA: Mudou de VERMELHO → VERDE/AZUL
-    // Para VENDA: Mudou de VERDE/AZUL → VERMELHO
-    // Deve manter cor por pelo menos 2 candles fechados
-}
-```
-
-#### B) **Currency Strength Meter**
-```cpp
-// Aplicável apenas para: Forex (todos), WDO, Metais
-bool CheckCurrencyStrength(string symbol, ENUM_TIMEFRAMES timeframe, bool isBuy) {
-    // Para pares forex: Moeda base forte vs moeda cotação fraca
-    // Para WDO: USD vs BRL
-    // Para Metais: Interpretar INVERSO (USD fraco = ouro forte)
-}
-```
-
-#### C) **RSI OMA (RSI com inclinação)**
-```cpp
-bool CheckRSIOMA(string symbol, ENUM_TIMEFRAMES timeframe, bool isBuy) {
-    // Verificar:
-    // 1. RSI na cor correta (vermelho acima azul para compra)
-    // 2. Linha com inclinação na direção correta
-    // 3. Não oscilando (estável por 2+ candles)
-}
-```
-
-#### D) **WAE (Waddah Attar Explosion)**
-```cpp
-bool CheckWAE(string symbol, ENUM_TIMEFRAMES timeframe, bool isBuy) {
-    // Verificar:
-    // 1. Histograma na cor correta
-    // 2. Barras EXPANDINDO (não diminuindo)
-    // 3. Força suficiente (acima de threshold mínimo)
-}
-```
-
-### **3. SISTEMA MULTI-TIMEFRAME**
-
-```cpp
-struct MultiTimeframeAnalysis {
-    bool H4_aligned;        // H4 na cor correta
-    bool H1_aligned;        // H1 alinhado com H4
-    bool M30_aligned;       // M30 alinhado (desejável)
-    bool structure_valid;   // Estrutura H4 favorável
-    int quality_score;      // 0-3 pontos
-};
-
-MultiTimeframeAnalysis AnalyzeTimeframes(string symbol, bool isBuy) {
-    // REGRA OURO: H4 e H1 DEVEM estar alinhados
-    // M30 alinhado = bonus (setup premium)
-    // Estrutura: topos/fundos sequenciais corretos
-}
-```
-
-### **4. SISTEMA DE PONTUAÇÃO ADAPTÁVEL**
-
-```cpp
-struct SetupScore {
-    int traderMagicPoints;      // 1 ponto (obrigatório)
-    int currencyStrengthPoints; // 0 ou 1 (se aplicável)
-    int rsiomaPoints;          // 0 ou 1
-    int waePoints;             // 0 ou 1
-    int totalPoints;           // Soma total
-    int requiredPoints;        // 2 ou 3 conforme ativo
-    string classification;     // "PREMIUM", "BOM", "REJECT"
-};
-
-SetupScore CalculateSetupScore(string symbol, ENUM_TIMEFRAMES tf, bool isBuy) {
-    ASSET_CLASS assetType = ClassifyAsset(symbol);
+    double ggValue[];
+    int handle = g_handles.gg_trendbar[tf];
     
-    // Forex/Metais/WDO: Precisa 2 de 3 (CS, RSI, WAE)
-    // Índices/WIN: Precisa 2 de 2 (RSI, WAE) - CS não aplicável
+    if(CopyBuffer(handle, 0, 1, 1, ggValue) <= 0) {
+        return signal;
+    }
+    
+    // Interpretar valor:
+    // +1.0 = VERDE (BUY)
+    // -1.0 = VERMELHO (SELL)
+    //  0.0 = AMARELO (INDECISO)
+    
+    if(ggValue[0] > 0.5) {
+        signal.direction = TRADE_DIRECTION_BUY;
+        signal.isValid = true;
+    }
+    else if(ggValue[0] < -0.5) {
+        signal.direction = TRADE_DIRECTION_SELL;
+        signal.isValid = true;
+    }
+    
+    return signal;
+}
+```
+
+### **B) Supertrend - OPCIONAL (Reforço)**
+
+```cpp
+// OPCIONAL - apenas se RequireSupertrend = true
+// v4.27 CRÍTICO: Agora lê buffer [1] (antes era [0])
+
+TMSignal GetSupertrendSignal(string symbol, ENUM_TIMEFRAMES tf, bool isBuy) {
+    TMSignal signal;
+    signal.isValid = false;
+    
+    double stValue[];
+    int handle = g_handles.supertrend[tf];
+    
+    // CORREÇÃO v4.27: buffer [1] para sincronização
+    if(CopyBuffer(handle, 0, 1, 1, stValue) <= 0) {
+        return signal;
+    }
+    
+    // Supertrend > 0 = tendência alta
+    // Supertrend < 0 = tendência baixa
+    
+    bool aligned = (isBuy && stValue[0] > 0) || 
+                   (!isBuy && stValue[0] < 0);
+    
+    signal.isValid = aligned;
+    signal.direction = (stValue[0] > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+    
+    return signal;
+}
+```
+
+### **C) WAE - Waddah Attar Explosion**
+
+```cpp
+// Verifica explosão de momentum
+// Lê 3 candles para verificar expansão
+// Lê buffer [1] (candle FECHADO)
+
+WAESignal GetWAESignal(string symbol, ENUM_TIMEFRAMES tf, bool isBuy) {
+    WAESignal signal;
+    signal.isValid = false;
+    signal.isAligned = false;
+    
+    double trendUp[3], trendDown[3], explosion[3];
+    int handle = g_handles.wae[tf];
+    
+    if(CopyBuffer(handle, 0, 1, 3, trendUp) <= 0) return signal;
+    if(CopyBuffer(handle, 1, 1, 3, trendDown) <= 0) return signal;
+    if(CopyBuffer(handle, 2, 1, 3, explosion) <= 0) return signal;
+    
+    signal.isValid = true;
+    
+    if(isBuy) {
+        // BUY: Barra verde + expandindo
+        bool correctColor = (trendUp[0] > 0);
+        bool expanding = (trendUp[0] > trendUp[1]);
+        signal.isAligned = correctColor && expanding;
+    }
+    else {
+        // SELL: Barra vermelha + expandindo
+        bool correctColor = (trendDown[0] > 0);
+        bool expanding = (trendDown[0] > trendDown[1]);
+        signal.isAligned = correctColor && expanding;
+    }
+    
+    return signal;
+}
+```
+
+### **D) RSI OMA - v4.27 SIMPLIFICADO**
+
+```cpp
+// SIMPLIFICAÇÃO v4.27: Apenas posição relativa!
+// ❌ REMOVIDO: Verificação de slope (inclinação)
+// ❌ REMOVIDO: Verificação de zona (overbought/oversold)
+// ✅ CRITÉRIO: redLine > blueLine (BUY) ou < (SELL)
+
+RSISignal GetRSIOMASignal(string symbol, ENUM_TIMEFRAMES tf, bool isBuy) {
+    RSISignal signal;
+    signal.isValid = false;
+    signal.isAligned = false;
+    
+    double redLine[1], blueLine[1];
+    int handle = g_handles.rsioma[tf];
+    
+    if(CopyBuffer(handle, 0, 1, 1, redLine) <= 0) return signal;
+    if(CopyBuffer(handle, 1, 1, 1, blueLine) <= 0) return signal;
+    
+    signal.isValid = true;
+    
+    // SIMPLIFICADO: Apenas posição das linhas
+    if(isBuy) {
+        signal.isAligned = (redLine[0] > blueLine[0]);
+    }
+    else {
+        signal.isAligned = (redLine[0] < blueLine[0]);
+    }
+    
+    return signal;
+}
+```
+
+### **E) Currency Strength Meter**
+
+```cpp
+// APLICÁVEL:  Forex (todos), WDO, Metais
+// NÃO USA: WIN, Índices (não tem pares de moedas)
+
+CSSignal GetCurrencyStrengthSignal(string symbol, bool isBuy) {
+    CSSignal signal;
+    signal.isValid = false;
+    signal.isAligned = false;
+    
+    // Verificar se é aplicável
+    ASSET_CLASS assetClass = ClassifyAsset(symbol);
+    if(assetClass == ASSET_CLASS_INDEX_B3 ||
+       assetClass == ASSET_CLASS_INDEX_US ||
+       assetClass == ASSET_CLASS_INDEX_EU) {
+        return signal; // Não aplicável para índices
+    }
+    
+    // Extrair moedas
+    string baseCurrency = StringSubstr(symbol, 0, 3);
+    string quoteCurrency = StringSubstr(symbol, 3, 3);
+    
+    // Ler força
+    double baseStrength = GetCurrencyStrength(baseCurrency);
+    double quoteStrength = GetCurrencyStrength(quoteCurrency);
+    
+    signal.isValid = true;
+    
+    // ATENÇÃO: METAIS = INTERPRETAÇÃO INVERSA!
+    if(assetClass == ASSET_CLASS_METALS) {
+        // Ouro sobe quando USD fraco
+        signal.isAligned = (isBuy && quoteStrength < baseStrength) ||
+                          (!isBuy && quoteStrength > baseStrength);
+    }
+    else {
+        // Forex normal
+        signal.isAligned = (isBuy && baseStrength > quoteStrength) ||
+                          (!isBuy && baseStrength < quoteStrength);
+    }
+    
+    return signal;
 }
 ```
 

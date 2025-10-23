@@ -19,71 +19,48 @@ rad.json
 #License-file
 *.flf
 #Test results file
-TestResults.xml
-CORRECCIONES_REALIZADAS.md
-ANALISE_INDICADORES_COMPLETA.md
-CORRECOES_GG_TRENDBAR.md
-Indicators/NexusConfluenceEA/GG_TrendBar_Indicator.mq5
-CORRECAO_BUFFER_ASSERIES.md
-mql5.pdf
-compile_indicator.bat
-Indicators/NexusConfluenceEA/GG_TrendBar_Indicator.ex5
-Indicators/NexusConfluenceEA/GG_TrendBar_Indicator.mq5
-Indicators/NexusConfluenceEA/GG_TrendBar_Indicator.log
-Indicators/NexusConfluenceEA/compile.bat
-Experts/NexusConfluenceEA/NexusConfluenceEA.ex5
-Experts/NexusConfluenceEA/NexusConfluenceEA.log
-GG_compile.log
-GG_TrendBar_Indicator.ex5
-Indicators/NexusConfluenceEA/GG_TrendBar_Indicator_BACKUP.mq5
-Experts/NexusConfluenceEA/compile_ea.bat
-.gitignore
-Experts/NexusConfluenceEA/compile.log
-VISUAL_INDICATORS_GUIDE.md
-SOLUCAO_INDICADORES_DUPLICADOS.md
-SOLUCAO_DEFINITIVA_INDICADORES.md
-CORRECAO_FINAL_SUBJANELAS.md
-CORRECAO_DEFINITIVA_DUPLICATAS.md
-CORRECAO_REMOCAO_INDICADORES.md
-CORRECAO_ERRO_4115_REMOCAO.md
-Captura de tela 2025-10-18 035646.png
-GUIA_RAPIDO.md
-NOVAS_FUNCIONALIDADES.md
-RESUMO_IMPLEMENTACAO.md
-EXPLICACAO_LOTE_UNIVERSAL.md
-ANALISE_COMPLETA_MULTITIMEFRAME.md
-ARQUITETURA_MODULAR.md
-NOVA_LOGICA_ESTRATEGIAS_MULTITF.md
-RESUMO_TRABALHO_REALIZADO.md
-Experts/NexusConfluenceEA/NexusConfluenceEA_BACKUP_OLD.mq5
-Experts/NexusConfluenceEA/clean_code.ps1
-Experts/NexusConfluenceEA/NexusConfluenceEA_backup.mq5
-CHANGELOG_PHASE12.md
-GUIA_TESTE_PHASE12.md
-CHANGELOG_v4.4.md
-.gitignore
-FIX_Incorrect_Input_Parameters.md
-FIX_v4.4.2_FINAL.md
-PROBLEMA_IDENTIFICADO_v4.4.2.md
-RESUMO_CORRECAO.md
-GUIA_DEBUG.md
-EXPLICACAO_SIMPLES.md
-.gitignore
-PROBLEMA_REAL_IDENTIFICADO.md
-CORRECAO_DESBLOQUEIO_AUTOMATICO.md
-CORRECAO_DESBLOQUEIO_TEMPO_DIA.md
-CORRECAO_DESBLOQUEIO_RECUPERACAO_v4.6.md
-log/20251019.log
-CORRECAO_HIGH_WATER_MARK_v4.7.md
-CORRECAO_RESET_DIARIO_v4.8.md
-REMOCAO_BLOQUEIO_v4.9.md
-LEIA_ISSO_URGENTE.md
+*.xml
+# Log files
 *.log
 *.md
 .gitignore
-STATUS_CORRECAO.txt
 *.txt
-log/Captura de tela 2025-10-20 102959.png
 *.png
-log/20251021.txt.bak.20251022_144455
-Indicators/NexusConfluenceEA/WaddahAttarExplosion_Professional.ex5
+.gitignore
+.gitignore
+.gitignore
+.gitignore
+### AL ###
+#Template for AL projects for Dynamics 365 Business Central
+#launch.json folder
+.vscode/
+#Cache folder
+.alcache/
+#Symbols folder
+.alpackages/
+#Snapshots folder
+.snapshots/
+#Testing Output folder
+.output/
+#Extension App-file
+*.app
+#Rapid Application Development File
+rad.json
+#Translation Base-file
+*.g.xlf
+#License-file
+*.flf
+#Test results file
+*.xml
+# Log files
+*.log
+*.md
+.gitignore
+*.txt
+*.png
+.gitignore
+.gitignore
+.gitignore
+.gitignore
+venv/
+venv/bin/activate

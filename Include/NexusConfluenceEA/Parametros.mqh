@@ -244,6 +244,23 @@ input group "=== 💰 GESTÃO DE LOTE ==="
 input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)
                                                // Forex: 0.01 | B3: 1.0 | Índices: 0.1
 
+input group "=== 📊 MÉTRICA DE VOLATILIDADE - v4.28 ==="
+enum VOLATILITY_METRIC
+{
+   VOLATILITY_ATR = 0,              // ATR Tradicional (5 períodos, rápido)
+   VOLATILITY_ROGERS_SATCHELL = 1,  // Rogers-Satchell (14 períodos, +35% estável)
+   VOLATILITY_SATR_BLEND = 2        // SATR Blend (10+5, balanceado) - FUTURO
+};
+input VOLATILITY_METRIC UseVolatilityMetric = VOLATILITY_ATR;  // 📊 Métrica de volatilidade
+input int    ATR_Period                     = 5;      // 📊 Período ATR (padrão: 5)
+input int    RS_Period                      = 14;     // 📊 Período Rogers-Satchell (recomendado: 14)
+input int    RS_EMAPeriod                   = 5;      // 📊 Suavização EMA para RS (trailing)
+input double RS_Multiplier_Supertrend       = 1.2;    // 📊 RS Multiplicador Supertrend (+20% vs ATR)
+input double RS_Multiplier_Trailing         = 3.0;    // 📊 RS Multiplicador Trailing (+20% vs ATR)
+input double RS_Multiplier_TP1              = 12.0;   // 📊 RS Multiplicador TP1 (+20% vs ATR)
+input double RS_Multiplier_TP2              = 18.0;   // 📊 RS Multiplicador TP2 (+20% vs ATR)
+input double RS_Multiplier_TP3              = 24.0;   // 📊 RS Multiplicador TP3 (+33% vs ATR)
+
 input group "=== 📅 FILTRO SEMANAL - Dias da Semana ==="
 input bool   TradeOnMonday            = true;  // 📅 Operar na Segunda-feira
 input bool   TradeOnTuesday           = true;  // 📅 Operar na Terça-feira

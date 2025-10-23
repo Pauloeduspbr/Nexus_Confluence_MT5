@@ -222,6 +222,24 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
    PrintFormat("💰 CALCULANDO TAMANHO DE POSIÇÃO");
    PrintFormat("════════════════════════════════════════════════════════════════");
    
+   // 🔥 CORREÇÃO CRÍTICA #1: VALIDAR CAPITAL MÍNIMO FLEXÍVEL
+   double accountBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   double minCapital = 100.0; // Mínimo $100 para contas pequenas
+   
+   if(accountBalance < minCapital)
+   {
+      result.errorMessage = StringFormat("Capital insuficiente: $%.2f < $%.2f mínimo", 
+                                        accountBalance, minCapital);
+      PrintFormat("❌ %s", result.errorMessage);
+      return result;
+   }
+   
+   // ⚠️ AVISO: Contas pequenas ($100-500) terão menos oportunidades por margem limitada
+   if(accountBalance < 500.0)
+   {
+      PrintFormat("⚠️ Capital baixo ($%.2f) - Operará com lotes pequenos e menos trades simultâneos", accountBalance);
+   }
+   
    // 1. SE LOTE FIXO CONFIGURADO, USAR DIRETO
    if(FixedLotSize > 0)
    {
@@ -317,6 +335,27 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
    
    // Calcular distância SL em pontos
    double slDistance = MathAbs(currentPrice - slLevel);
+   
+   // 🔥 CORREÇÃO CRÍTICA #2: FORÇAR HARD LIMIT NO SL (não apenas validar depois)
+   double maxSLDistance = SL_MaxDistancePoints * _Point;
+   if(slDistance > maxSLDistance)
+   {
+      PrintFormat("   ⚠️ SL estrutura %.1f pts > máximo %.1f pts - FORÇANDO LIMITE",
+                  slDistance/_Point, SL_MaxDistancePoints);
+      
+      // Recalcular SL para respeitar o limite máximo
+      if(direction == TRADE_DIRECTION_BUY)
+      {
+         slLevel = currentPrice - maxSLDistance;
+      }
+      else
+      {
+         slLevel = currentPrice + maxSLDistance;
+      }
+      
+      slDistance = maxSLDistance;
+      PrintFormat("   ✅ SL AJUSTADO: %.5f (distância: %.1f pts)", slLevel, slDistance/_Point);
+   }
    
    PrintFormat("   📏 Distância SL: %.5f (%.1f pontos)", slDistance, slDistance/_Point);
    

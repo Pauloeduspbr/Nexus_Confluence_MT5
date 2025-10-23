@@ -309,7 +309,7 @@ RiskCalculation CalculatePositionSize(string symbol, TRADE_DIRECTION direction, 
    // 2. MODO RISCO AUTOMÁTICO (baseado em % da conta)
    PrintFormat("   ⚙️ Modo: RISCO AUTOMÁTICO");
    
-   double accountBalance = AccountInfoDouble(ACCOUNT_BALANCE);
+   // accountBalance já declarado na linha 226 - reutilizar
    double riskPercent = (setupClass == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent;
    
    PrintFormat("   💰 Saldo da conta: $%.2f", accountBalance);

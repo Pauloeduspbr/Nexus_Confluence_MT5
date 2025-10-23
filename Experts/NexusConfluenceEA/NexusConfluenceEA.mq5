@@ -1157,7 +1157,8 @@ double GetVolatilityValue(string symbol, ENUM_TIMEFRAMES timeframe, int shift = 
          return 0.0;
       }
       
-      double atr_buffer[3]; // Buffer com 3 valores para validação
+      double atr_buffer[]; // Buffer dinâmico para compatibilidade com ArraySetAsSeries
+      ArrayResize(atr_buffer, 3);
       ArraySetAsSeries(atr_buffer, true);
       
       int copied = CopyBuffer(atrHandle, 0, shift, 3, atr_buffer);
@@ -1205,6 +1206,8 @@ double GetVolatilityValue(string symbol, ENUM_TIMEFRAMES timeframe, int shift = 
       // TENTATIVA 1: Calcular RS
       volatility = CalculateRogersSatchell(symbol, timeframe, RS_Period, shift);
       
+      bool needFallback = false; // Flag para controlar fallback
+      
       if(volatility > 0.0)
       {
          // VALIDAÇÃO: RS deve estar em range razoável
@@ -1217,20 +1220,47 @@ double GetVolatilityValue(string symbol, ENUM_TIMEFRAMES timeframe, int shift = 
          {
             PrintFormat("⚠️ AVISO: RS fora do range seguro (%.2f pips)", volatility_pips);
             PrintFormat("   → FALLBACK para ATR");
-            // FALLBACK: Usar ATR em caso de valor suspeito
-            goto USE_ATR_FALLBACK;
+            needFallback = true;
          }
-         
-         PrintFormat("   📊 Rogers-Satchell(%d): %.8f (%.2f pips) [OK]", 
-                     RS_Period, volatility, volatility_pips);
-         return volatility;
+         else
+         {
+            PrintFormat("   📊 Rogers-Satchell(%d): %.8f (%.2f pips) [OK]", 
+                        RS_Period, volatility, volatility_pips);
+            return volatility;
+         }
       }
       else
       {
          PrintFormat("⚠️ AVISO: Rogers-Satchell retornou zero");
          PrintFormat("   → FALLBACK para ATR");
-         // FALLBACK: Usar ATR se RS falhar
-         goto USE_ATR_FALLBACK;
+         needFallback = true;
+      }
+      
+      // Se chegou aqui, precisa de fallback
+      if(needFallback)
+      {
+         // Executar fallback ATR
+         PrintFormat("🔄 EXECUTANDO FALLBACK ATR...");
+         
+         int atrHandle_fallback = iATR(symbol, timeframe, 14); // ATR(14) padrão
+         
+         if(atrHandle_fallback == INVALID_HANDLE)
+         {
+            PrintFormat("❌ ERRO CRÍTICO: FALLBACK ATR também falhou!");
+            PrintFormat("❌ IMPOSSÍVEL CALCULAR VOLATILIDADE - ABORTANDO");
+            return 0.0;
+         }
+         
+         double atr_fallback[1];
+         int copied_fallback = CopyBuffer(atrHandle_fallback, 0, shift, 1, atr_fallback);
+         IndicatorRelease(atrHandle_fallback);
+         
+         if(copied_fallback == 1 && atr_fallback[0] > 0.0)
+         {
+            volatility = atr_fallback[0];
+            PrintFormat("   ✅ FALLBACK ATR(14): %.8f [RECUPERADO]", volatility);
+            return volatility;
+         }
       }
    }
    else if(UseVolatilityMetric == VOLATILITY_SATR_BLEND)
@@ -1240,43 +1270,29 @@ double GetVolatilityValue(string symbol, ENUM_TIMEFRAMES timeframe, int shift = 
       // ────────────────────────────────────────────────────────────
       PrintFormat("⚠️ AVISO: SATR Blend não implementado");
       PrintFormat("   → FALLBACK para ATR");
-      goto USE_ATR_FALLBACK;
-   }
-   else
-   {
-      // ────────────────────────────────────────────────────────────
-      // ERRO: MÉTRICA DESCONHECIDA
-      // ────────────────────────────────────────────────────────────
-      PrintFormat("❌ ERRO CRÍTICO: Métrica desconhecida (%d)", UseVolatilityMetric);
-      PrintFormat("   → FALLBACK FORÇADO para ATR");
-      goto USE_ATR_FALLBACK;
-   }
-   
-   // ═══════════════════════════════════════════════════════════════
-   // FALLBACK: ATR TRADICIONAL (SEMPRE DISPONÍVEL)
-   // ═══════════════════════════════════════════════════════════════
-   USE_ATR_FALLBACK:
-   
-   PrintFormat("🔄 EXECUTANDO FALLBACK ATR...");
-   
-   int atrHandle_fallback = iATR(symbol, timeframe, 14); // ATR(14) padrão
-   
-   if(atrHandle_fallback == INVALID_HANDLE)
-   {
-      PrintFormat("❌ ERRO CRÍTICO: FALLBACK ATR também falhou!");
-      PrintFormat("❌ IMPOSSÍVEL CALCULAR VOLATILIDADE - ABORTANDO");
-      return 0.0;
-   }
-   
-   double atr_fallback[1];
-   int copied_fallback = CopyBuffer(atrHandle_fallback, 0, shift, 1, atr_fallback);
-   IndicatorRelease(atrHandle_fallback);
-   
-   if(copied_fallback == 1 && atr_fallback[0] > 0.0)
-   {
-      volatility = atr_fallback[0];
-      PrintFormat("   ✅ FALLBACK ATR(14): %.8f [RECUPERADO]", volatility);
-      return volatility;
+      
+      // Executar fallback ATR
+      PrintFormat("🔄 EXECUTANDO FALLBACK ATR...");
+      
+      int atrHandle_fallback = iATR(symbol, timeframe, 14); // ATR(14) padrão
+      
+      if(atrHandle_fallback == INVALID_HANDLE)
+      {
+         PrintFormat("❌ ERRO CRÍTICO: FALLBACK ATR também falhou!");
+         PrintFormat("❌ IMPOSSÍVEL CALCULAR VOLATILIDADE - ABORTANDO");
+         return 0.0;
+      }
+      
+      double atr_fallback[1];
+      int copied_fallback = CopyBuffer(atrHandle_fallback, 0, shift, 1, atr_fallback);
+      IndicatorRelease(atrHandle_fallback);
+      
+      if(copied_fallback == 1 && atr_fallback[0] > 0.0)
+      {
+         volatility = atr_fallback[0];
+         PrintFormat("   ✅ FALLBACK ATR(14): %.8f [RECUPERADO]", volatility);
+         return volatility;
+      }
    }
    
    // ═══════════════════════════════════════════════════════════════

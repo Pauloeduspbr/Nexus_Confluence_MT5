@@ -223,15 +223,18 @@ input group "══════════════════════�
 input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
 input group "════════════════════════════════════════════════════════"
 
+input group "=== 🏷️ IDENTIFICAÇÃO DO BACKTEST - v4.34 ==="
+input string ConfigSetName            = "CONSERVATIVE"; // 🔥 v4.34: Nome do .set rodando (CONSERVATIVE/MODERATE/AGGRESSIVE) - CRÍTICO para análise separada!
+
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
-input double AccountRiskPercent       = 0.3;   // 📊 Risco padrão por trade (%) - 🔥 v4.31: REDUZIDO 0.5→0.3 (CRÍTICO: DD 929%→<200%)
-input double MaxRiskPremium           = 0.5;   // 🏆 Risco máximo setup PREMIUM (%) - 🔥 v4.31: REDUZIDO 1.0→0.5 (PROTEÇÃO EXTREMA)
+input double AccountRiskPercent       = 0.2;    // � % Conta em risco por trade (CONSERVADOR) - 🔥 v4.34: 0.3→0.2 (Análise: DD 112%, reduzir exposição)
+input double MaxRiskPremium           = 0.3;    // 💎 Máx % risco para setups PREMIUM - 🔥 v4.34: 0.5→0.3 (Análise: mesma proporção 0.2→0.3)
 // 🔥 REMOVIDO v4.9: input double MaxDrawdownPercent = 15.0; // Bloqueio por drawdown DESABILITADO
 // 🔥 v4.15: PROTEÇÕES DE DRAWDOWN REATIVADAS (versão melhorada)
 // 🔥 v4.31: PROTEÇÃO CRÍTICA - Análise mostrou DD 929.8% com risco 0.5-1.0%
 input double MaxDailyDrawdown         = 3.0;   // 🛡️ Drawdown máximo diário (%) - pausa trading (ATIVADO v4.31)
 input double MaxWeeklyDrawdown        = 5.0;   // 🛡️ Drawdown máximo semanal (%) - pausa trading
-input int    MaxConsecutiveLosses     = 2;     // 🛡️ Máximo perdas consecutivas - 🔥 v4.31: 3→2 (pausa mais rápida)
+input int    MaxConsecutiveLosses     = 3;     // 🛡️ Máximo perdas consecutivas - 🔥 v4.34: 2→3 (Análise: balancear proteção/oportunidades)
 input int    MaxSimultaneousTrades    = 1;     // 🔢 Máximo de trades simultâneos - 🔥 v4.31: 3→1 (CRÍTICO: reduzir exposição)
 input bool   EnableSecondaryHours     = true;  // 🕐 Habilitar horários secundários Forex
 input bool   EnableMorningB3          = false; // 🇧🇷 Habilitar sessão da manhã B3
@@ -239,7 +242,8 @@ input bool   AvoidNews                = true;  // 📰 Evitar operar próximo a 
 input bool   ValidateATRRange         = true;  // 📏 Validar ATR ideal por ativo
 input bool   SendAlerts               = true;  // 🔔 Enviar notificações push
 input bool   AllowCautiousSetups      = false; // ⚠️ Permitir setups CAUTELOSOS (2/2 + MACRO-3 oposto)
-input bool   AllowGoodSetups          = true;  // 🔥 v4.17: PERMITIR GOOD (2/3 filtros) - era false
+input bool   AllowGoodSetups          = false; // 🔥 v4.34: DESABILITADO (Análise: GOOD tem WR 35-40%, apenas PREMIUM 50-55%)
+input string HourBlacklist            = "0,3,7,9,12,16,18,19,20,21"; // ⏰ v4.34: Horas a evitar (análise: 10 piores horas, separar por vírgula)
 
 input group "=== 💰 GESTÃO DE LOTE ==="
 input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)
@@ -307,9 +311,9 @@ input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
 input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
 input double TrailingDistancePoints   = 200.0;  // 📏 Distância trailing (pontos) - usado se ATR desabilitado
 input double TrailingStepPoints       = 50.0;   // 📏 Passo mínimo trailing (pontos)
-input double TrailingActivationRR     = 1.5;    // 🎯 Ativar após RR (ex: 1.5 = após 1.5:1)
+input double TrailingActivationRR     = 3.5;    // 🎯 Ativar após RR - 🔥 v4.34: 1.5→3.5 (Análise: TS 0% WR, aguardar mais lucro)
 input bool   TrailingUseATR           = true;   // 📊 Usar ATR para calcular trailing - 🔥 v4.15: ATIVADO
-input double TrailingATRMultiplier    = 2.5;    // 📊 Multiplicador ATR (se ativo) - 🔥 v4.15: 2.0→2.5
+input double TrailingATRMultiplier    = 4.5;    // 📊 Multiplicador ATR - 🔥 v4.34: 2.5→4.5 (Análise: +80% espaço, evitar stop prematuro)
 input bool   TrailingStartAfterTP     = true;   // 🎯 Iniciar trailing apenas após TP1 fechado
 input double TrailingMinProfit        = 0.5;    // 💰 Lucro mínimo % para ativar trailing
 input double TrailingMaxRisk          = 0.2;    // 🛡️ Risco máximo % permitido no trailing
@@ -350,7 +354,7 @@ input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
-input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 - 🔥 v4.31: 75→85 (CRÍTICO: WR 34.5%→50%+ estimado)
+input int    MinConfluenceScore       = 70;    // 📊 Pontuação mínima 0-100 - 🔥 v4.34: 75→70 (Análise: apenas setups 70+ têm WR>45%)
 input bool   RequireSupertrend        = true;  // ⚠️ Supertrend obrigatório - 🔥 v4.31: REATIVADO (filtro adicional crítico)
 input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
 input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true

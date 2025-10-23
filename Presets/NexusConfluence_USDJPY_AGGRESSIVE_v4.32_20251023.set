@@ -1,9 +1,9 @@
 ; Nexus Confluence EA v4.30 - AGGRESSIVE Profile
-; saved on 2025.10.23 15:50:33
+; saved on 2025.10.23 17:32:44
 ; this file contains input parameters for testing/optimizing NexusConfluenceEA expert advisor
 ; to use it in the strategy tester, click Load in the context menu of the Inputs tab
 ;
-; Symbol: USDJPY | Quality Score: 42/100 | Trades Analyzed: 1115
+; Symbol: USDJPY | Quality Score: 44/100 | Trades Analyzed: 709
 ;
 AccountRiskPercent=1.5||1.5||0.1||5.0||N
 MaxRiskPremium=2.0||2.0||0.1||5.0||N
@@ -36,7 +36,7 @@ TradeOnFriday=true||false||0||true||N
 TradeOnSaturday=false||false||0||true||N
 TradeOnSunday=false||false||0||true||N
 UseCustomTradingHours=true||false||0||true||N
-CustomStartHour=11||10||0||23||Y
+CustomStartHour=9||10||0||23||Y
 CustomStartMinute=0||0||0||59||N
 CustomEndHour=17||18||0||23||Y
 CustomEndMinute=0||0||0||59||N

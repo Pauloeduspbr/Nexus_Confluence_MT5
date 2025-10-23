@@ -570,48 +570,60 @@ class MasterAnalyzer:
         
         try:
             # FASE 1: Validação de Dados
-            self.log("\n[FASE 1/10] Validação de Dados", "INFO")
+            self.log("\n[FASE 1/11] Validação de Dados", "INFO")
             trades, symbol = self._phase1_validate_data(log_file, symbol)  # CORREÇÃO: Receber símbolo detectado
             
-            # FASE 2: Production Analysis
-            self.log("\n[FASE 2/10] Production Analysis", "INFO")
-            prod_results = self._phase2_production_analysis(trades)
+            # 🔥 FASE 1.5: Separação por CONFIG_SET (v4.34)
+            self.log("\n[FASE 1.5/11] Separação por CONFIG_SET", "INFO")
+            trades_by_set = self._phase1_5_separate_by_config_set(trades)
+            
+            # FASE 2: Production Analysis (por CONFIG_SET)
+            self.log("\n[FASE 2/11] Production Analysis (por CONFIG_SET)", "INFO")
+            prod_results = self._phase2_production_analysis_by_set(trades, trades_by_set)
             
             # FASE 3: Advanced Analysis
-            self.log("\n[FASE 3/10] Advanced Analysis", "INFO")
+            self.log("\n[FASE 3/11] Advanced Analysis", "INFO")
             adv_results = self._phase3_advanced_analysis(trades)
             
             # FASE 4: Correlação de Resultados
-            self.log("\n[FASE 4/10] Correlação de Resultados", "INFO")
+            self.log("\n[FASE 4/11] Correlação de Resultados", "INFO")
             correlations = self._phase4_correlate_results(prod_results, adv_results)
             
             # FASE 5: Detecção de Anomalias
-            self.log("\n[FASE 5/10] Detecção de Anomalias", "INFO")
+            self.log("\n[FASE 5/11] Detecção de Anomalias", "INFO")
             anomalies = self._phase5_detect_anomalies(prod_results, adv_results)
             
             # FASE 6: Geração de Recomendações
-            self.log("\n[FASE 6/10] Geração de Recomendações", "INFO")
+            self.log("\n[FASE 6/11] Geração de Recomendações", "INFO")
             recommendations = self._phase6_generate_recommendations(prod_results, adv_results)
+            
+            # 🔥 FASE 6.5: Comparação entre CONFIG_SETs (v4.34)
+            self.log("\n[FASE 6.5/11] Comparação entre CONFIG_SETs", "INFO")
+            comparison = self._phase6_5_compare_config_sets(trades_by_set)
             
             # FASE 7: Geração de Arquivos .set
             if generate_sets:
-                self.log("\n[FASE 7/10] Geração de Arquivos .set Otimizados", "INFO")
+                self.log("\n[FASE 7/11] Geração de Arquivos .set Otimizados", "INFO")
                 set_files = self._phase7_generate_sets(symbol or "UNKNOWN", recommendations)
             else:
                 set_files = {}
-                self.log("\n[FASE 7/10] Pulada (generate_sets=False)", "INFO")
+                self.log("\n[FASE 7/11] Pulada (generate_sets=False)", "INFO")
             
             # FASE 8: Export JSON
-            self.log("\n[FASE 8/10] Export JSON Estruturado", "INFO")
+            self.log("\n[FASE 8/11] Export JSON Estruturado", "INFO")
             json_path = self._phase8_export_json()
             
             # FASE 9: Geração de Logs Detalhados
-            self.log("\n[FASE 9/10] Geração de Logs", "INFO")
+            self.log("\n[FASE 9/11] Geração de Logs", "INFO")
             log_path = self._phase9_save_logs()
             
-            # FASE 10: Finalização
-            self.log("\n[FASE 10/10] Finalização e Summary", "INFO")
-            summary = self._phase10_finalize(trades, prod_results, adv_results, recommendations)
+            # FASE 10: Relatório Markdown
+            self.log("\n[FASE 10/11] Geração de Relatório Markdown", "INFO")
+            report_path = self._phase10_generate_markdown_report(symbol, trades_by_set, comparison)
+            
+            # FASE 11: Finalização
+            self.log("\n[FASE 11/11] Finalização e Summary", "INFO")
+            summary = self._phase11_finalize(trades, prod_results, adv_results, recommendations)
             
             self.log("\n" + "="*80)
             self.log("ANÁLISE COMPLETA FINALIZADA COM SUCESSO", "SUCCESS")
@@ -664,6 +676,110 @@ class MasterAnalyzer:
         
         self.log(f"  ✓ Validação concluída")
         return trades, symbol  # CORREÇÃO: Retornar símbolo também
+    
+    def _phase1_5_separate_by_config_set(self, trades: List[Trade]) -> Dict[str, List[Trade]]:
+        """
+        🔥 v4.34: Fase 1.5 - Separar trades por CONFIG_SET
+        
+        Agrupa trades por config_set_name (CONSERVATIVE/MODERATE/AGGRESSIVE)
+        para análise separada e comparativa
+        
+        Args:
+            trades: Lista completa de trades
+        
+        Returns:
+            Dict[config_set_name, List[Trade]]
+        """
+        from collections import defaultdict
+        
+        trades_by_set = defaultdict(list)
+        unknown_count = 0
+        
+        for trade in trades:
+            config_set = trade.config_set_name or "UNKNOWN"
+            if config_set == "UNKNOWN":
+                unknown_count += 1
+            trades_by_set[config_set].append(trade)
+        
+        # Log resultados
+        self.log(f"  Total de trades: {len(trades)}")
+        for set_name, set_trades in sorted(trades_by_set.items()):
+            percentage = (len(set_trades) / len(trades)) * 100
+            self.log(f"  ├─ {set_name}: {len(set_trades)} trades ({percentage:.1f}%)")
+        
+        if unknown_count > 0:
+            self.log(f"  ⚠️  {unknown_count} trades sem CONFIG_SET (logs antigos?)", "WARN")
+        
+        self.log(f"  ✓ Separação concluída: {len(trades_by_set)} config sets encontrados")
+        
+        # Salvar em results
+        self.results['config_sets'] = {
+            set_name: len(set_trades)
+            for set_name, set_trades in trades_by_set.items()
+        }
+        
+        return dict(trades_by_set)
+    
+    def _phase2_production_analysis_by_set(
+        self, 
+        trades: List[Trade],
+        trades_by_set: Dict[str, List[Trade]]
+    ) -> Dict:
+        """
+        🔥 v4.34: Fase 2 - Production Analysis separada por CONFIG_SET
+        
+        Gera análise completa para cada .set individualmente + consolidado
+        """
+        all_results = {}
+        
+        # Análise consolidada (todos os trades)
+        self.log(f"\n  📊 Análise CONSOLIDADA (todos os trades):")
+        consolidated = self._run_production_analysis(trades, "CONSOLIDATED")
+        all_results['CONSOLIDATED'] = consolidated
+        
+        # Análise por CONFIG_SET
+        for set_name, set_trades in sorted(trades_by_set.items()):
+            if len(set_trades) < self.config.min_trades:
+                self.log(f"\n  ⏭️  {set_name}: Pulado ({len(set_trades)} < {self.config.min_trades} trades)")
+                continue
+            
+            self.log(f"\n  📊 Análise {set_name} ({len(set_trades)} trades):")
+            results = self._run_production_analysis(set_trades, set_name)
+            all_results[set_name] = results
+        
+        self.results['production'] = all_results
+        self.log(f"\n  ✓ Production analysis concluída para {len(all_results)} config sets")
+        
+        return all_results
+    
+    def _run_production_analysis(self, trades: List[Trade], set_name: str) -> Dict:
+        """Executa production analysis para um conjunto de trades"""
+        from production_analyzer import MetricsCalculator, BootstrapAnalyzer
+        
+        # Calcular métricas básicas
+        metrics = MetricsCalculator.calculate_all_metrics(trades)
+        
+        # Bootstrap analysis
+        bootstrap_analyzer = BootstrapAnalyzer(seed=self.config.seed)
+        bootstrap_results = bootstrap_analyzer.bootstrap_all_metrics(trades)
+        
+        results = {
+            'set_name': set_name,
+            'n_trades': len(trades),
+            'metrics': metrics.__dict__ if hasattr(metrics, '__dict__') else metrics,
+            'bootstrap': {k: v.__dict__ if hasattr(v, '__dict__') else v 
+                         for k, v in bootstrap_results.items()}
+        }
+        
+        # Log principais métricas
+        if 'metrics' in results:
+            m = results['metrics']
+            self.log(f"    Win Rate: {m['win_rate']:.1f}%")
+            self.log(f"    Profit Factor: {m['profit_factor']:.2f}")
+            self.log(f"    Sharpe Ratio: {m['sharpe_ratio']:.2f}")
+            self.log(f"    Max Drawdown: {m['max_drawdown_pct']:.1f}%")
+        
+        return results
     
     def _phase2_production_analysis(self, trades: List[Trade]) -> Dict:
         """Fase 2: Análise production (métricas principais)"""
@@ -883,6 +999,102 @@ class MasterAnalyzer:
         self.log(f"  ✓ Recomendações geradas")
         return recommendations
     
+    def _phase6_5_compare_config_sets(self, trades_by_set: Dict[str, List[Trade]]) -> Dict:
+        """
+        🔥 v4.34: Fase 6.5 - Comparação entre CONFIG_SETs
+        
+        Compara performance entre CONSERVATIVE/MODERATE/AGGRESSIVE
+        e identifica melhor/pior configuração
+        
+        Args:
+            trades_by_set: Dict[config_set_name, List[Trade]]
+        
+        Returns:
+            Dict com ranking e análise comparativa
+        """
+        from production_analyzer import MetricsCalculator
+        
+        comparison = {
+            'rankings': {},
+            'best_set': None,
+            'worst_set': None,
+            'detailed_comparison': {}
+        }
+        
+        # Calcular métricas para cada set
+        set_metrics = {}
+        for set_name, set_trades in trades_by_set.items():
+            if len(set_trades) < self.config.min_trades:
+                continue
+            
+            metrics = MetricsCalculator.calculate_all_metrics(set_trades)
+            set_metrics[set_name] = metrics
+        
+        if len(set_metrics) < 2:
+            self.log(f"  ⏭️  Comparação pulada (< 2 config sets válidos)")
+            return comparison
+        
+        # Criar ranking por métrica chave
+        rankings = {}
+        for metric in ['win_rate', 'profit_factor', 'sharpe_ratio']:
+            sorted_sets = sorted(
+                set_metrics.items(),
+                key=lambda x: getattr(x[1], metric, 0),
+                reverse=True
+            )
+            rankings[metric] = [s[0] for s in sorted_sets]
+        
+        # Calcular score composto (média dos rankings)
+        set_scores = {}
+        for set_name in set_metrics.keys():
+            positions = []
+            for metric_ranking in rankings.values():
+                if set_name in metric_ranking:
+                    positions.append(metric_ranking.index(set_name) + 1)
+            set_scores[set_name] = sum(positions) / len(positions) if positions else 999
+        
+        # Identificar melhor e pior
+        best_set = min(set_scores, key=set_scores.get)
+        worst_set = max(set_scores, key=set_scores.get)
+        
+        comparison['rankings'] = rankings
+        comparison['best_set'] = best_set
+        comparison['worst_set'] = worst_set
+        comparison['set_scores'] = set_scores
+        
+        # Log comparação
+        self.log(f"\n  📊 COMPARAÇÃO ENTRE CONFIG_SETS:")
+        self.log(f"  {'='*60}")
+        
+        for set_name in sorted(set_metrics.keys()):
+            metrics = set_metrics[set_name]
+            score = set_scores[set_name]
+            badge = "🏆" if set_name == best_set else ("⚠️" if set_name == worst_set else "📊")
+            
+            self.log(f"\n  {badge} {set_name} (Ranking Score: {score:.1f})")
+            self.log(f"    ├─ Win Rate: {metrics.win_rate:.1f}%")
+            self.log(f"    ├─ Profit Factor: {metrics.profit_factor:.2f}")
+            self.log(f"    ├─ Sharpe Ratio: {metrics.sharpe_ratio:.2f}")
+            self.log(f"    └─ Max DD: {metrics.max_drawdown_pct:.1f}%")
+        
+        # Comparação direta melhor vs pior
+        if best_set != worst_set:
+            best_m = set_metrics[best_set]
+            worst_m = set_metrics[worst_set]
+            
+            self.log(f"\n  🎯 MELHOR ({best_set}) vs PIOR ({worst_set}):")
+            self.log(f"    ├─ Win Rate: {best_m.win_rate:.1f}% vs {worst_m.win_rate:.1f}% "
+                     f"({best_m.win_rate - worst_m.win_rate:+.1f}pp)")
+            self.log(f"    ├─ Profit Factor: {best_m.profit_factor:.2f} vs {worst_m.profit_factor:.2f} "
+                     f"({((best_m.profit_factor/worst_m.profit_factor)-1)*100:+.1f}%)")
+            self.log(f"    └─ Sharpe: {best_m.sharpe_ratio:.2f} vs {worst_m.sharpe_ratio:.2f} "
+                     f"({best_m.sharpe_ratio - worst_m.sharpe_ratio:+.2f})")
+        
+        self.log(f"\n  ✓ Comparação concluída")
+        
+        self.results['config_set_comparison'] = comparison
+        return comparison
+    
     def _phase7_generate_sets(self, symbol: str, recommendations: Dict) -> Dict:
         """Fase 7: Gera arquivos .set COMPLETOS otimizados (TODOS OS 157 PARÂMETROS)"""
         
@@ -990,7 +1202,75 @@ class MasterAnalyzer:
         self.log(f"  ✓ Log salvo: {log_path.name}")
         return log_path
     
-    def _phase10_finalize(
+    def _phase10_generate_markdown_report(
+        self,
+        symbol: str,
+        trades_by_set: Dict[str, List[Trade]],
+        comparison: Dict
+    ) -> str:
+        """
+        🔥 v4.34: Fase 10 - Gera relatório Markdown com comparação entre .sets
+        
+        Cria arquivo .md com:
+        - Resumo executivo
+        - Comparação entre CONFIG_SETs
+        - Recomendações por .set
+        - Gráficos e tabelas
+        """
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        report_file = self.config.output_dir / f"RELATORIO_COMPARACAO_{timestamp}.md"
+        
+        with open(report_file, 'w', encoding='utf-8') as f:
+            f.write(f"# 📊 RELATÓRIO COMPARATIVO - NEXUS CONFLUENCE EA\n\n")
+            f.write(f"**Data**: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}  \n")
+            f.write(f"**Símbolo**: {symbol}  \n")
+            f.write(f"**Total de Trades**: {sum(len(t) for t in trades_by_set.values())}  \n\n")
+            
+            f.write(f"---\n\n")
+            f.write(f"## 🏆 RANKING DE CONFIG_SETs\n\n")
+            
+            if 'best_set' in comparison and comparison['best_set']:
+                f.write(f"### ✅ MELHOR CONFIGURAÇÃO: **{comparison['best_set']}**\n\n")
+                f.write(f"### ⚠️ PIOR CONFIGURAÇÃO: **{comparison['worst_set']}**\n\n")
+            
+            f.write(f"---\n\n")
+            f.write(f"## 📈 MÉTRICAS POR CONFIG_SET\n\n")
+            f.write(f"| Config Set | Trades | Win Rate | Profit Factor | Sharpe | Max DD |\n")
+            f.write(f"|------------|--------|----------|---------------|--------|--------|\n")
+            
+            for set_name, set_trades in sorted(trades_by_set.items()):
+                if len(set_trades) < self.config.min_trades:
+                    continue
+                
+                from production_analyzer import MetricsCalculator
+                metrics = MetricsCalculator.calculate_all_metrics(set_trades)
+                
+                badge = "🏆" if set_name == comparison.get('best_set') else \
+                        ("⚠️" if set_name == comparison.get('worst_set') else "📊")
+                
+                f.write(f"| {badge} **{set_name}** | {len(set_trades)} | "
+                       f"{metrics.win_rate:.1f}% | {metrics.profit_factor:.2f} | "
+                       f"{metrics.sharpe_ratio:.2f} | {metrics.max_drawdown_pct:.1f}% |\n")
+            
+            f.write(f"\n---\n\n")
+            f.write(f"## 🎯 RECOMENDAÇÕES\n\n")
+            f.write(f"### ✅ Use {comparison.get('best_set', 'N/A')} para:\n")
+            f.write(f"- Melhor performance geral\n")
+            f.write(f"- Maior consistência\n")
+            f.write(f"- Menor drawdown relativo\n\n")
+            
+            f.write(f"### ⚠️ Evite {comparison.get('worst_set', 'N/A')} devido a:\n")
+            f.write(f"- Métricas inferiores\n")
+            f.write(f"- Maior risco/drawdown\n")
+            f.write(f"- Menor consistência\n\n")
+            
+            f.write(f"---\n\n")
+            f.write(f"*Relatório gerado automaticamente pelo Master Analyzer v5.0*\n")
+        
+        self.log(f"  ✓ Relatório salvo: {report_file.name}")
+        return str(report_file)
+    
+    def _phase11_finalize(
         self, 
         trades: List[Trade],
         prod_results: Dict,

@@ -76,6 +76,7 @@ class Trade:
     
     # Classification
     setup_class: Optional[str] = None  # 'PREMIUM', 'GOOD', etc
+    config_set_name: Optional[str] = None  # 🔥 v4.34: 'CONSERVATIVE', 'MODERATE', 'AGGRESSIVE'
     
     # Status
     is_closed: bool = False
@@ -204,6 +205,11 @@ class TradeReconstructor:
                 r'Breakeven\s+ativado.*ticket\s+#?(\d+)',
                 re.IGNORECASE
             ),
+            # 🔥 v4.34: Extrai CONFIG_SET de cada trade
+            'config_set': re.compile(
+                r'CONFIG_SET:\s*(\w+)',
+                re.IGNORECASE
+            ),
             'ts_activated': re.compile(
                 r'Trailing\s+Stop\s+ativado.*ticket\s+#?(\d+)',
                 re.IGNORECASE
@@ -317,6 +323,16 @@ class TradeReconstructor:
             ticket = int(match.group(1))
             if ticket in self.open_positions:
                 self.open_positions[ticket].tp2_hit = True
+            return
+        
+        # 🔥 v4.34: CONFIG_SET extraction
+        match = self.patterns['config_set'].search(line)
+        if match:
+            config_set_name = match.group(1)
+            # Associar ao último trade aberto (heurística: CONFIG_SET vem logo após trade aberto)
+            if self.open_positions:
+                last_ticket = max(self.open_positions.keys())
+                self.open_positions[last_ticket].config_set_name = config_set_name
             return
         
         # BE activated

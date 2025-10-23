@@ -1,61 +1,65 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.33 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.33: CORREÇÕES ESTRUTURAIS CRÍTICAS (PÓS-DIAGNÓSTICO)     |
+//| Nexus Confluence EA v4.34 - Sistema Universal Multi-Timeframe    |
+//| 🔥 v4.34: AJUSTES BASEADOS EM ANÁLISE REAL DE 710 TRADES       |
 //|                                                                  |
-//|   🚨 CONTEXTO: Backtest catastrófico v4.27 (WR 34%, DD 929%)   |
-//|      Diagnóstico identificou 3 problemas críticos:              |
-//|      1. Gestão de risco destrutiva                              |
-//|      2. Win Rate 10pp abaixo do esperado (desincronização?)     |
-//|      3. Sem edge estatístico (p-values > 0.05)                  |
+//|   � CONTEXTO: Análise completa 23/10/2025 (710 trades, 9M):   |
+//|      • Win Rate: 39.6% (target: 47-52%)                         |
+//|      • Profit Factor: 1.05 (target: 1.25-1.45)                  |
+//|      • Sharpe Ratio: 0.01 (target: 0.20-0.30)                   |
+//|      • Max Drawdown: 112.0% (target: 25-35%)                    |
+//|      • Trailing Stop Win Rate: 0% (CRÍTICO!)                    |
+//|      • Quality Score: 44/100 (target: 65-75)                    |
 //|                                                                  |
-//|   ✅ FASE 1 - EMERGÊNCIA (v4.31/v4.32/v4.33):                  |
-//|      • Risco: 0.5%→0.3%, Premium: 1.0%→0.5% (v4.31)            |
-//|      • MaxSimultaneousTrades: 3→1 (v4.31)                       |
-//|      • SL_Min: 50→65, SL_Max: 120→156 (v4.32)                  |
-//|      • BreakevenAfterRR: 1.0→1.5 (v4.33) ← NOVO                |
-//|      • BreakevenPlusPoints: 5→10 (v4.33) ← NOVO                |
+//|   ✅ CORREÇÕES v4.34:                                           |
+//|      1. FILTROS DE ENTRADA (Estrategias.mqh)                    |
+//|         • MinConfluenceScore: 75→85 (+10pts mais rigoroso)     |
+//|         • AllowGoodSetups: true→false (apenas PREMIUM)         |
+//|         • HourBlacklist: 10 piores horas (0,3,7,9,12,16...)    |
 //|                                                                  |
-//|   ✅ FASE 2 - ESTRUTURAL (v4.33):                              |
-//|      • Timing: iTime(...,0)→iTime(...,1) (candle fechado)      |
-//|      • Cache: Validação rigorosa pré-análise                    |
-//|      • Logs: Auditoria consolidada completa em cada entrada     |
-//|      • Tracking: Error rate de cache para diagnóstico           |
+//|      2. TRAILING STOP (RiskManagement.mqh)                      |
+//|         • TrailingActivationRR: 1.5→3.5 (+133% aguardar lucro) |
+//|         • TrailingATRMultiplier: 2.5→4.5 (+80% espaço)         |
+//|         → Objetivo: TS Win Rate 0%→40-50%                       |
 //|                                                                  |
-//|   🎯 HIPÓTESE PRINCIPAL:                                        |
-//|      BufferCache falha silenciosamente → GG TrendBar retorna    |
-//|      zeros → EA interpreta como "alinhado" → entra sem          |
-//|      confluência real → WR desce de 45% para 34%               |
+//|      3. GESTÃO DE RISCO (Parametros.mqh)                        |
+//|         • AccountRiskPercent: 0.3%→0.2% (-33% exposição)       |
+//|         • MaxRiskPremium: 0.5%→0.3% (-40% exposição)           |
+//|         • MaxConsecutiveLosses: 2→3 (balanceado)               |
+//|         → Objetivo: DD 112%→35-50%                              |
 //|                                                                  |
-//|   📊 IMPACTO ESPERADO (SE HIPÓTESE CORRETA):                   |
-//|      WR: 34% → 42-45% (+8-11pp)                                |
-//|      PF: 0.98 → 1.3-1.5 (+33-53%)                              |
-//|      DD: 929% → 25-35% (-96%)                                   |
-//|      Sharpe: -0.006 → 0.3-0.5 (+51x-84x)                       |
+//|      4. PROTEÇÃO CONSECUTIVA (RiskManagement.mqh)               |
+//|         • Pause após 3 perdas: 1h                               |
+//|         • Pause após 4 perdas: 2h                               |
+//|         • Pause após 5+ perdas: 4h                              |
+//|         → Objetivo: evitar cascatas de perdas                   |
 //|                                                                  |
-//|   ⚠️ SE CACHE ERROR RATE < 1%:                                 |
-//|      Hipótese rejeitada → Problema é estratégico, não técnico  |
-//|      Necessário redesenhar estratégia                           |
+//|   📊 IMPACTO ESPERADO (CONSERVADOR):                            |
+//|      Win Rate: 39.6% → 47-52% (+7-12pp)                        |
+//|      Profit Factor: 1.05 → 1.25-1.45 (+19-38%)                 |
+//|      Sharpe Ratio: 0.01 → 0.20-0.30 (+20-30x)                  |
+//|      Max Drawdown: 112% → 35-50% (-56-70%)                     |
+//|      Quality Score: 44 → 65-75 (+21-31pts)                     |
 //|                                                                  |
-//|   📝 PRÓXIMO PASSO:                                            |
-//|      Backtest completo v4.33 → Validar cache error rate →      |
-//|      Confirmar/rejeitar hipótese de desincronização             |
+//|   🎯 VALIDAÇÃO:                                                 |
+//|      Backtest completo v4.34 → Comparar com v4.33 →            |
+//|      Confirmar melhorias métricas → Iterar se necessário        |
 //+------------------------------------------------------------------+
-//| CHANGELOG v4.27-v4.33:                                           |
+//| CHANGELOG v4.33-v4.34:                                           |
+//|   v4.34 (23/01/2025): Ajustes baseados em análise 710 trades   |
 //|   v4.33 (23/01/2025): Correções estruturais pós-diagnóstico     |
 //|   v4.32 (Anterior): Ajuste SL estrutural (+30%)                 |
 //|   v4.31 (Anterior): Redução risco emergencial (-40%)            |
-//|   v4.27 (22/01/2025): Simplificação RSI + Sync Supertrend      |
 //+------------------------------------------------------------------+
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Janeiro 2025                                               |
-//| VERSÃO: 4.33                                                     |
+//| VERSÃO: 4.34                                                     |
 //+------------------------------------------------------------------+
 //+------------------------------------------------------------------+
 //| ARQUIVO: NexusConfluenceEA.mq5                                   |
 //| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
 //| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
 //|               Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.33 (Correções Estruturais Pós-Diagnóstico)            |
+//| VERSÃO: 4.34 (Ajustes Baseados em Análise Real de 710 Trades)   |
 //+------------------------------------------------------------------+
 #property strict
 
@@ -314,6 +318,13 @@ void OnTick()
    if(!ValidateDrawdownLimits())
    {
       PrintFormat("🛑 DRAWDOWN LIMIT ATINGIDO - Sistema pausado");
+      return;
+   }
+   
+   // 🔥 v4.34: ETAPA 1.6: VERIFICAR HOURLY BLACKLIST (10 piores horas)
+   if(!ValidateHourlyBlacklist())
+   {
+      PrintFormat("⏰ HORA ATUAL EM BLACKLIST - Análise evitada (proteção estatística)");
       return;
    }
 
@@ -682,6 +693,37 @@ bool ValidateDrawdownLimits()
      }
    
    return true; // Tudo OK
+  }
+
+//+------------------------------------------------------------------+
+//| 🔥 v4.34: Valida se hora atual está em blacklist                |
+//| Análise identificou 10 piores horas com Performance Factor < 0  |
+//+------------------------------------------------------------------+
+bool ValidateHourlyBlacklist()
+  {
+   // Parse do input HourBlacklist (formato: "0,3,7,9,12,16,18,19,20,21")
+   if(HourBlacklist == "") return true; // Blacklist desabilitado
+   
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   int currentHour = dt.hour;
+   
+   // Verificar se hora atual está na blacklist
+   string hours[];
+   int count = StringSplit(HourBlacklist, ',', hours);
+   
+   for(int i = 0; i < count; i++)
+     {
+      int blockedHour = (int)StringToInteger(hours[i]);
+      if(currentHour == blockedHour)
+        {
+         PrintFormat("⏰ HORA ATUAL EM BLACKLIST: %02d:00 (PF < 0 em análise histórica)", currentHour);
+         PrintFormat("   Blacklist configurada: %s", HourBlacklist);
+         return false;
+        }
+     }
+   
+   return true; // Hora OK para operar
   }
 
 //+------------------------------------------------------------------+
@@ -1507,6 +1549,7 @@ void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculatio
 
    PrintFormat("════════════════════════════════════════════════════════════════");
    PrintFormat("✅ TRADE ABERTO COM SUCESSO!");
+   PrintFormat("   🏷️ CONFIG_SET: %s", ConfigSetName); // 🔥 v4.34: CRÍTICO para análise separada!
    PrintFormat("   Ticket: %I64u", result.order);
    PrintFormat("   Deal: %I64u", result.deal);
    PrintFormat("   Volume: %.2f lotes", result.volume);

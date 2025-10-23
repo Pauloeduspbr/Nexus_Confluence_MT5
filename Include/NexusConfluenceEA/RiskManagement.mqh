@@ -1109,37 +1109,67 @@ void UpdateTrailingStop(ulong ticket, double currentPrice, double currentSL, boo
 //+------------------------------------------------------------------+
 //| 🔥 v4.24: Calcular tempo de pausa LIMITADO (MÁXIMO 12H!)        |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| 🔥 v4.34: Calcula tempo de pausa baseado em perdas consecutivas |
+//| MUDANÇA: Pausa progressiva baseada em g_consecutiveLosses       |
+//| 3 perdas = 1h, 4 perdas = 2h, 5+ perdas = 4h (limite 12h)      |
+//+------------------------------------------------------------------+
 int CalculatePauseTime(ENUM_TIMEFRAMES timeframe)
 {
-   // 🔥 CORREÇÃO CRÍTICA v4.24: NUNCA pausar por mais de 12 horas!
-   // Pausas longas impedem recuperação e bloqueiam trades válidos
-
-   const int MAX_PAUSE_SECONDS = 43200; // 12 horas (meio pregão)
+   // 🔥 v4.34: NOVA LÓGICA - Pausa baseada em perdas consecutivas
+   // Análise mostrou que pausas progressivas previnem cascatas
+   
+   const int MAX_PAUSE_SECONDS = 43200; // 12 horas (máximo absoluto)
    int pauseSeconds = 0;
-
-   switch(timeframe)
+   
+   // g_consecutiveLosses é global, declarado em NexusConfluenceEA.mq5
+   
+   if(g_consecutiveLosses >= 5)
    {
-      case PERIOD_M1:  pauseSeconds = 1800;    // 30 minutos (30 candles)
-                       break;
-      case PERIOD_M5:  pauseSeconds = 3600;    // 1 hora (12 candles)
-                       break;
-      case PERIOD_M15: pauseSeconds = 10800;   // 3 horas (12 candles)
-                       break;
-      case PERIOD_M30: pauseSeconds = 18000;   // 5 horas (10 candles)
-                       break;
-      case PERIOD_H1:  pauseSeconds = 28800;   // 8 horas (8 candles)
-                       break;
-      case PERIOD_H4:  pauseSeconds = 43200;   // 12 horas (3 candles)
-                       break;
-      case PERIOD_D1:  pauseSeconds = 43200;   // 12 horas (máximo permitido)
-                       break;
-      default:         pauseSeconds = 21600;   // 6 horas padrão
-                       break;
+      pauseSeconds = 14400;  // 4 horas (proteção máxima)
+      PrintFormat("🔥 PAUSA PROGRESSIVA: %d perdas → 4 horas", g_consecutiveLosses);
+   }
+   else if(g_consecutiveLosses == 4)
+   {
+      pauseSeconds = 7200;   // 2 horas
+      PrintFormat("🔥 PAUSA PROGRESSIVA: %d perdas → 2 horas", g_consecutiveLosses);
+   }
+   else if(g_consecutiveLosses == 3)
+   {
+      pauseSeconds = 3600;   // 1 hora
+      PrintFormat("🔥 PAUSA PROGRESSIVA: %d perdas → 1 hora", g_consecutiveLosses);
+   }
+   else
+   {
+      // Fallback: Pausa baseada em timeframe (drawdown diário/semanal)
+      switch(timeframe)
+      {
+         case PERIOD_M1:  pauseSeconds = 1800;    // 30 minutos (30 candles)
+                          break;
+         case PERIOD_M5:  pauseSeconds = 3600;    // 1 hora (12 candles)
+                          break;
+         case PERIOD_M15: pauseSeconds = 10800;   // 3 horas (12 candles)
+                          break;
+         case PERIOD_M30: pauseSeconds = 18000;   // 5 horas (10 candles)
+                          break;
+         case PERIOD_H1:  pauseSeconds = 28800;   // 8 horas (8 candles)
+                          break;
+         case PERIOD_H4:  pauseSeconds = 43200;   // 12 horas (3 candles)
+                          break;
+         case PERIOD_D1:  pauseSeconds = 43200;   // 12 horas (máximo permitido)
+                          break;
+         default:         pauseSeconds = 21600;   // 6 horas padrão
+                          break;
+      }
    }
 
    // Garantir que NUNCA ultrapasse 12 horas
    if(pauseSeconds > MAX_PAUSE_SECONDS)
+   {
+      PrintFormat("⚠️ LIMITE: Pausa reduzida de %d para %d segundos (12h max)", 
+                  pauseSeconds, MAX_PAUSE_SECONDS);
       pauseSeconds = MAX_PAUSE_SECONDS;
+   }
 
    return pauseSeconds;
 }

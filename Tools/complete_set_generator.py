@@ -18,13 +18,15 @@ class CompleteSetGenerator:
     # TEMPLATE COMPLETO - TODOS OS 90+ PARÂMETROS
     # ========================================================================
     
-    COMPLETE_TEMPLATE = """; Nexus Confluence EA v4.30 - {profile} Profile
+    COMPLETE_TEMPLATE = """; Nexus Confluence EA v4.34 - {profile} Profile
 ; saved on {timestamp}
 ; this file contains input parameters for testing/optimizing NexusConfluenceEA expert advisor
 ; to use it in the strategy tester, click Load in the context menu of the Inputs tab
 ;
 ; Symbol: {symbol} | Quality Score: {quality_score}/100 | Trades Analyzed: {total_trades}
+; 🔥 v4.34: CONFIG_SET tracking para análise separada CONSERVATIVE/MODERATE/AGGRESSIVE
 ;
+ConfigSetName={ConfigSetName}||"MODERATE"||||N
 AccountRiskPercent={AccountRiskPercent}||1.5||0.1||5.0||N
 MaxRiskPremium={MaxRiskPremium}||2.0||0.1||5.0||N
 MaxDailyDrawdown={MaxDailyDrawdown}||3.0||1.0||10.0||N
@@ -38,6 +40,7 @@ ValidateATRRange={ValidateATRRange}||false||0||true||N
 SendAlerts={SendAlerts}||false||0||true||N
 AllowCautiousSetups={AllowCautiousSetups}||false||0||true||N
 AllowGoodSetups={AllowGoodSetups}||false||0||true||N
+HourBlacklist={HourBlacklist}||""||||N
 FixedLotSize={FixedLotSize}||0.0||0.0||10.0||Y
 UseVolatilityMetric={UseVolatilityMetric}||0||0||2||N
 ATR_Period={ATR_Period}||5||3||50||Y
@@ -166,51 +169,68 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
     
     PROFILE_PARAMS = {
         'CONSERVATIVE': {
-            'AccountRiskPercent': 0.5,
-            'MaxRiskPremium': 1.0,
-            'TrailingATRMultiplier': 3.0,
+            'ConfigSetName': '"CONSERVATIVE"',  # 🔥 v4.34: Identificação do .set!
+            'AccountRiskPercent': 0.2,  # 🔥 v4.34: 0.5→0.2 (análise: DD 112%)
+            'MaxRiskPremium': 0.3,  # 🔥 v4.34: 1.0→0.3 (proporção mantida)
+            'TrailingActivationRR': 3.5,  # 🔥 v4.34: 1.5→3.5 (aguardar mais lucro)
+            'TrailingATRMultiplier': 4.5,  # 🔥 v4.34: 3.0→4.5 (mais espaço)
             'EnableBreakeven': 'true',
-            'BreakevenAfterRR': 0.8,
-            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
-            'MaxDailyDrawdown': 2.0,
-            'MaxWeeklyDrawdown': 4.0,
-        },
-        'MODERATE': {
-            'AccountRiskPercent': 1.0,
-            'MaxRiskPremium': 1.5,
-            'TrailingATRMultiplier': 2.5,
-            'EnableBreakeven': 'true',
-            'BreakevenAfterRR': 1.0,
-            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
+            'BreakevenAfterRR': 1.5,  # 🔥 v4.33: 0.8→1.5
+            'MinConfluenceScore': 85,  # 🔥 v4.34: 75→85 (mais rigoroso)
+            'AllowGoodSetups': 'false',  # 🔥 v4.34: apenas PREMIUM
+            'HourBlacklist': '"0,3,7,9,12,16,18,19,20,21"',  # 🔥 v4.34: 10 piores horas
             'MaxDailyDrawdown': 3.0,
             'MaxWeeklyDrawdown': 5.0,
+            'MaxConsecutiveLosses': 3,  # 🔥 v4.34: 2→3
         },
-        'AGGRESSIVE': {
-            'AccountRiskPercent': 1.5,
-            'MaxRiskPremium': 2.0,
-            'TrailingATRMultiplier': 2.0,
+        'MODERATE': {
+            'ConfigSetName': '"MODERATE"',  # 🔥 v4.34: Identificação do .set!
+            'AccountRiskPercent': 0.3,  # 🔥 v4.34: 1.0→0.3 (+50% vs CONSERVATIVE)
+            'MaxRiskPremium': 0.45,  # 🔥 v4.34: 1.5→0.45 (proporção)
+            'TrailingActivationRR': 3.0,  # 🔥 v4.34: Menos conservador
+            'TrailingATRMultiplier': 4.0,  # 🔥 v4.34: Menos espaço que CONSERVATIVE
             'EnableBreakeven': 'true',
-            'BreakevenAfterRR': 1.2,
-            'MinConfluenceScore': 75,  # 🔥 v4.30: TODOS perfis usam 75
+            'BreakevenAfterRR': 1.3,  # 🔥 v4.34: Intermediário
+            'MinConfluenceScore': 80,  # 🔥 v4.34: 75→80 (mais rigoroso que antes)
+            'AllowGoodSetups': 'false',  # 🔥 v4.34: apenas PREMIUM
+            'HourBlacklist': '"0,3,7,9,12,16,18,19,20,21"',  # 🔥 v4.34: Mesmas piores horas
             'MaxDailyDrawdown': 5.0,
             'MaxWeeklyDrawdown': 8.0,
+            'MaxConsecutiveLosses': 3,  # 🔥 v4.34: Mantido
+        },
+        'AGGRESSIVE': {
+            'ConfigSetName': '"AGGRESSIVE"',  # 🔥 v4.34: Identificação do .set!
+            'AccountRiskPercent': 0.5,  # 🔥 v4.34: 1.5→0.5 (+67% vs MODERATE, mas controlado)
+            'MaxRiskPremium': 0.75,  # 🔥 v4.34: 2.0→0.75 (proporção mantida)
+            'TrailingActivationRR': 2.5,  # 🔥 v4.34: Mais agressivo
+            'TrailingATRMultiplier': 3.5,  # 🔥 v4.34: Menos espaço (aceita mais risco)
+            'EnableBreakeven': 'true',
+            'BreakevenAfterRR': 1.0,  # 🔥 v4.34: BE mais rápido
+            'MinConfluenceScore': 75,  # 🔥 v4.34: Mantido (menos rigoroso = mais trades)
+            'AllowGoodSetups': 'true',  # 🔥 v4.34: PERMITE GOOD (mais trades)
+            'HourBlacklist': '"0,3,7"',  # 🔥 v4.34: Apenas piores 3 horas (mais liberdade)
+            'MaxDailyDrawdown': 8.0,
+            'MaxWeeklyDrawdown': 12.0,
+            'MaxConsecutiveLosses': 4,  # 🔥 v4.34: Mais tolerante
         }
     }
     
     DEFAULT_PARAMS = {
-        'AccountRiskPercent': 0.5,
-        'MaxRiskPremium': 1.0,
-        'MaxDailyDrawdown': 3.0,
-        'MaxWeeklyDrawdown': 5.0,
-        'MaxConsecutiveLosses': 3,
-        'MaxSimultaneousTrades': 3,
+        'ConfigSetName': '"MODERATE"',  # 🔥 v4.34: DEFAULT = MODERATE
+        'AccountRiskPercent': 0.3,  # 🔥 v4.34: 0.5→0.3 (reduzir exposição)
+        'MaxRiskPremium': 0.45,  # 🔥 v4.34: 1.0→0.45 (proporção)
+        'MaxDailyDrawdown': 5.0,  # 🔥 v4.34: 3.0→5.0 (MODERATE mais tolerante)
+        'MaxWeeklyDrawdown': 8.0,  # 🔥 v4.34: 5.0→8.0
+        'MaxConsecutiveLosses': 3,  # 🔥 v4.34: Mantido
+        'MaxSimultaneousTrades': 1,  # 🔥 v4.31: 3→1 (CRÍTICO)
         'EnableSecondaryHours': 'true',
         'EnableMorningB3': 'false',
         'AvoidNews': 'true',
         'ValidateATRRange': 'true',
         'SendAlerts': 'true',
         'AllowCautiousSetups': 'false',
-        'AllowGoodSetups': 'true',
+        'AllowGoodSetups': 'false',  # 🔥 v4.34: true→false (apenas PREMIUM por padrão)
+        'HourBlacklist': '"0,3,7,9,12,16,18,19,20,21"',  # 🔥 v4.34: NOVO!
         'FixedLotSize': 0.0,
         'UseVolatilityMetric': 0,
         'ATR_Period': 5,
@@ -257,9 +277,9 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         'EnableTrailing': 'true',
         'TrailingDistancePoints': 200.0,
         'TrailingStepPoints': 50.0,
-        'TrailingActivationRR': 1.5,
+        'TrailingActivationRR': 3.0,  # 🔥 v4.34: 1.5→3.0 (MODERADO, aguardar mais lucro)
         'TrailingUseATR': 'true',
-        'TrailingATRMultiplier': 2.5,
+        'TrailingATRMultiplier': 4.0,  # 🔥 v4.34: 2.5→4.0 (mais espaço)
         'TrailingStartAfterTP': 'true',
         'TrailingMinProfit': 0.5,
         'TrailingMaxRisk': 0.2,
@@ -269,8 +289,8 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         'MaxSpreadMultiplier': 5.0,
         'MinFreeMarginPercent': 20.0,
         'EnableBreakeven': 'true',
-        'BreakevenAfterRR': 1.0,
-        'BreakevenPlusPoints': 5.0,
+        'BreakevenAfterRR': 1.5,  # 🔥 v4.33/v4.34: 1.0→1.5 (aguardar mais lucro)
+        'BreakevenPlusPoints': 10.0,  # 🔥 v4.33: 5.0→10.0 (mais folga)
         'EnableProfitLock': 'true',
         'LockProfitAfterRR': 2.0,
         'LockProfitPercent': 50.0,
@@ -288,7 +308,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         'UseADXFilter': 'false',
         'ADX_Period': 14,
         'ADX_MinTrend': 25.0,
-        'MinConfluenceScore': 75,  # 🔥 v4.30: 60→75 (CRÍTICO: +8% WR, setups seletivos)
+        'MinConfluenceScore': 80,  # 🔥 v4.34: 75→80 (MODERATE = intermediário)
         'RequireSupertrend': 'false',
         'RequireADXConfirmation': 'false',
         'MinADXStrength': 20.0,
@@ -413,7 +433,7 @@ EA_MAGIC_NUMBER={EA_MAGIC_NUMBER}||20241015||1||999999||N
         
         return content
     
-    def save_set_file(self, content: str, symbol: str, profile: str, version: str = "v4.32") -> Path:
+    def save_set_file(self, content: str, symbol: str, profile: str, version: str = "v4.34") -> Path:
         """Salva arquivo .set com versão no nome"""
         timestamp = datetime.now().strftime('%Y%m%d')
         filename = f"NexusConfluence_{symbol}_{profile}_{version}_{timestamp}.set"

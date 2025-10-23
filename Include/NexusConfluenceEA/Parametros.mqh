@@ -325,8 +325,8 @@ input double MinFreeMarginPercent     = 20.0;  // 🏦 % Margem mínima livre ap
 
 input group "=== 🎯 BREAKEVEN E PROTEÇÃO DE LUCRO ==="
 input bool   EnableBreakeven          = true;   // 🛡️ Mover SL para breakeven
-input double BreakevenAfterRR         = 1.0;    // 🎯 Mover BE após X:1 RR - 🔥 v4.16: após TP1 fechado
-input double BreakevenPlusPoints      = 5.0;    // 📏 BE + X pontos (garantir lucro mínimo)
+input double BreakevenAfterRR         = 1.5;    // 🎯 Mover BE após X:1 RR - 🔥 v4.33: 1.0→1.5 (DIAGNÓSTICO: trades cortados prematuramente)
+input double BreakevenPlusPoints      = 10.0;   // 📏 BE + X pontos (garantir lucro mínimo) - 🔥 v4.33: 5→10 (maior margem)
 input bool   EnableProfitLock         = true;   // 🔒 Travar lucro parcial
 input double LockProfitAfterRR        = 2.0;    // 🎯 Travar lucro após X:1 RR
 input double LockProfitPercent        = 50.0;   // 📊 % do lucro flutuante a travar

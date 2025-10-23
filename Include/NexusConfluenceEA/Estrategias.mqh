@@ -256,16 +256,23 @@ bool UpdateBufferCache()
     g_bufferCache.lastUpdate = currentBar;
     
     static int updateCount = 0;
+    static int errorCount = 0;
     updateCount++;
+    
     if(updateCount >= 50)
     {
-        Print("🔥 BUFFER CACHE: 50 updates (19 CopyBuffer → 1/candle)");
+        PrintFormat("🔥 BUFFER CACHE: 50 updates (19 CopyBuffer → 1/candle) | Erros: %d (%.1f%%)",
+                    errorCount, (errorCount * 100.0) / updateCount);
         updateCount = 0;
+        errorCount = 0;
     }
     
     if(!success)
     {
-        PrintFormat("❌ Buffer Cache Error: %s", TimeToString(currentBar));
+        errorCount++;
+        PrintFormat("🔴 CRÍTICO: Buffer Cache Error em %s (erro #%d)", 
+                    TimeToString(currentBar), errorCount);
+        PrintFormat("   AÇÃO: Análise deste candle será PULADA (segurança)");
     }
     
     return success;
@@ -892,7 +899,9 @@ GGTrendBarSignal GetGGTrendBarSignal()
    // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer (9 chamadas → 0 chamadas!)
    if(!g_bufferCache.isValid)
    {
-      PrintFormat("❌ Cache inválido ao ler GG TrendBar");
+      PrintFormat("🔴 CRÍTICO: Cache inválido ao ler GG TrendBar - ANÁLISE REJEITADA!");
+      result.isValid = false;
+      result.allValid = false;
       return result;
    }
    
@@ -911,6 +920,23 @@ GGTrendBarSignal GetGGTrendBarSignal()
       gg_d1[i] = g_bufferCache.gg_d1[i];
       gg_w1[i] = g_bufferCache.gg_w1[i];
       gg_mn1[i] = g_bufferCache.gg_mn1[i];
+   }
+   
+   // 🔥 v4.33 DIAGNÓSTICO: VALIDAR DADOS NÃO-NULOS (CRÍTICO!)
+   // Problema identificado: Cache pode ter valores 0 (indicador não carregado)
+   // Resultado: EA opera sem macro alinhado de verdade (WR 34% → 40%+ esperado)
+   bool hasValidData = false;
+   hasValidData |= (MathAbs(gg_m1[1]) > 0.01 || MathAbs(gg_m5[1]) > 0.01);
+   hasValidData |= (MathAbs(gg_m15[1]) > 0.01 || MathAbs(gg_m30[1]) > 0.01);
+   hasValidData |= (MathAbs(gg_h1[1]) > 0.01 || MathAbs(gg_h4[1]) > 0.01);
+   
+   if(!hasValidData)
+   {
+      PrintFormat("🔴 CRÍTICO: GG TrendBar sem dados válidos (todos zeros) - ANÁLISE REJEITADA!");
+      PrintFormat("   Possível causa: Indicador não inicializou ou CopyBuffer falhou");
+      result.isValid = false;
+      result.allValid = false;
+      return result;
    }
    
    // 🔥 v4.26 CORREÇÃO CRÍTICA FINAL: LER CANDLE FECHADO [1]!

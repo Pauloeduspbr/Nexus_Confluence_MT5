@@ -254,31 +254,41 @@ void OnTick()
    ManageExistingTrades();
 
    // ═══════════════════════════════════════════════════════════════
-   // VERIFICAÇÃO CRÍTICA: Só executar ANÁLISE em NOVO CANDLE
+   // 🔥 v4.33 CORREÇÃO CRÍTICA: Analisar apenas CANDLE FECHADO [1]
    // ═══════════════════════════════════════════════════════════════
-   datetime currentCandleTime = iTime(_Symbol, Period(), 0);
+   // ANTES: iTime(..., 0) analisava candle EM FORMAÇÃO
+   // AGORA: iTime(..., 1) aguarda FECHAMENTO para sincronização perfeita
+   datetime currentCandleTime = iTime(_Symbol, Period(), 1);
 
-   // Se ainda é o mesmo candle, NÃO processar análise (evita logs por segundo)
+   // Se ainda é o mesmo candle FECHADO, NÃO processar análise novamente
    if(currentCandleTime == g_lastCandleTime)
    {
-      return; // Aguardar próximo candle para nova análise
+      return; // Aguardar próximo candle FECHAR para nova análise
    }
    
-   // Novo candle detectado! Atualizar timestamp
+   // Novo candle FECHADO detectado! Atualizar timestamp
    g_lastCandleTime = currentCandleTime;
    
-   PrintFormat("\n🕐 NOVO CANDLE %s: %s", 
+   PrintFormat("\n� NOVO CANDLE FECHADO %s: %s (v4.33: análise no [1])", 
                EnumToString(Period()), 
                TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
    PrintFormat("════════════════════════════════════════════════════════════════");
    
-   // 🔥 v2.0 OTIMIZAÇÃO CRÍTICA: ATUALIZAR BUFFER CACHE DE UMA VEZ
+   // 🔥 v4.33: ATUALIZAR BUFFER CACHE (sincronizado com candle [1])
    // Chamada ÚNICA no início do frame - todos indicadores são atualizados aqui
    // GetXXXSignal() vão ler do cache (zero CopyBuffer redundantes!)
    if(!UpdateBufferCache())
    {
       PrintFormat("❌ ERRO CRÍTICO: Falha ao atualizar Buffer Cache - abortando análise");
       return;
+   }
+   
+   // 🔥 v4.33: VALIDAÇÃO DE CACHE (prevenção de trades com dados inválidos)
+   if(!g_bufferCache.isValid)
+   {
+      PrintFormat("🔴 CRÍTICO: Buffer Cache INVÁLIDO após atualização - ANÁLISE ABORTADA");
+      PrintFormat("   AÇÃO: Este candle será PULADO (segurança anti-desincronização)");
+      return; // NÃO OPERAR se cache falhou!
    }
    
    // 🔥 v4.24: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO + FORÇAR DESBLOQUEIO
@@ -452,15 +462,66 @@ void OnTick()
                risk.positionSize, risk.stopLoss, risk.riskAmount);
 
    // ETAPA 8: Executar trade
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("🎯 SETUP %s DETECTADO!", (score.classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
-   PrintFormat("   Símbolo: %s", _Symbol);
-   PrintFormat("   Direção: %s", (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA");
-   PrintFormat("   Pontuação: %d/%d", score.totalPoints, score.requiredPoints);
-   PrintFormat("   Risco: %.2f%% (%.2f)", 
-               (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent,
-               risk.riskAmount);
-   PrintFormat("════════════════════════════════════════════════════════════════");
+   // 🔥 v4.33: LOG CONSOLIDADO DE ENTRADA (auditoria pós-backtest)
+   PrintFormat("\n");
+   PrintFormat("╔══════════════════════════════════════════════════════════════╗");
+   PrintFormat("║          🎯 DECISÃO DE ENTRADA - TODAS VALIDAÇÕES OK        ║");
+   PrintFormat("╚══════════════════════════════════════════════════════════════╝");
+   PrintFormat("");
+   PrintFormat("📌 CONTEXTO:");
+   PrintFormat("   Símbolo: %s | Timeframe: %s", _Symbol, EnumToString(Period()));
+   PrintFormat("   Data/Hora: %s", TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS));
+   PrintFormat("   Classificação: %s", (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM" : "⭐ GOOD");
+   PrintFormat("");
+   PrintFormat("📊 MULTI-TIMEFRAME (GG TrendBar):");
+   PrintFormat("   ✅ MACRO-1 (%s): ALINHADO %s", EnumToString(g_tfMacro1), 
+               (mtf.direction == TRADE_DIRECTION_BUY) ? "VERDE (BUY)" : "VERMELHO (SELL)");
+   PrintFormat("   ✅ MACRO-2 (%s): ALINHADO %s", EnumToString(g_tfMacro2),
+               (mtf.direction == TRADE_DIRECTION_BUY) ? "VERDE (BUY)" : "VERMELHO (SELL)");
+   if(g_numNiveisMacro >= 3) {
+      PrintFormat("   %s MACRO-3 (%s): %s %s", 
+                  mtf.m30Aligned ? "✅" : "⚠️",
+                  EnumToString(g_tfMacro3),
+                  mtf.m30Aligned ? "ALINHADO" : "DIVERGENTE",
+                  (mtf.direction == TRADE_DIRECTION_BUY) ? "(BUY)" : "(SELL)");
+   }
+   PrintFormat("");
+   PrintFormat("🔍 FILTROS MICRO (Timeframe Operacional %s):", EnumToString(g_tfOperacional));
+   PrintFormat("   ✅ Supertrend: ALINHADO (obrigatório)");
+   PrintFormat("   %s WAE: %s (%d pt)", 
+               score.waePoints > 0 ? "✅" : "❌",
+               score.waePoints > 0 ? "ALINHADO" : "DIVERGENTE",
+               score.waePoints);
+   PrintFormat("   %s RSI OMA: %s (%d pt)", 
+               score.rsiomaPoints > 0 ? "✅" : "❌",
+               score.rsiomaPoints > 0 ? "ALINHADO" : "DIVERGENTE",
+               score.rsiomaPoints);
+   if(g_currentAssetClass != ASSET_CLASS_INDEX_B3 && 
+      g_currentAssetClass != ASSET_CLASS_INDEX_US &&
+      g_currentAssetClass != ASSET_CLASS_INDEX_EU) {
+      PrintFormat("   %s Currency Strength: %s (%d pt)", 
+                  score.currencyStrengthPoints > 0 ? "✅" : "❌",
+                  score.currencyStrengthPoints > 0 ? "ALINHADO" : "DIVERGENTE",
+                  score.currencyStrengthPoints);
+   }
+   PrintFormat("   📈 TOTAL: %d/%d pontos (mínimo: %d)", 
+               score.totalPoints, score.requiredPoints, score.requiredPoints);
+   PrintFormat("");
+   PrintFormat("💰 GESTÃO DE RISCO:");
+   PrintFormat("   Direção: %s", (mtf.direction == TRADE_DIRECTION_BUY) ? "📈 COMPRA" : "📉 VENDA");
+   PrintFormat("   Risco: %.2f%% da conta (R$ %.2f)", 
+               risk.riskPercent, risk.riskAmount);
+   PrintFormat("   Lote: %.2f", risk.lotSize);
+   PrintFormat("   SL: %.5f (distância: %.1f pontos)", risk.slPrice, risk.slDistance / _Point);
+   PrintFormat("   TP1: %.5f (RR: %.1f:1)", risk.tp1Price, risk.tp1RR);
+   PrintFormat("   TP2: %.5f (RR: %.1f:1)", risk.tp2Price, risk.tp2RR);
+   PrintFormat("   TP3: %.5f (RR: %.1f:1)", risk.tp3Price, risk.tp3RR);
+   PrintFormat("");
+   PrintFormat("╔══════════════════════════════════════════════════════════════╗");
+   PrintFormat("║              🚀 EXECUTANDO ORDEM DE %s                    ║", 
+               (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA ");
+   PrintFormat("╚══════════════════════════════════════════════════════════════╝");
+   PrintFormat("");
 
    ExecuteTrade(_Symbol, mtf.direction, risk, score.classification);
   }

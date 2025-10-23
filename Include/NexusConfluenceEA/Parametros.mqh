@@ -224,14 +224,15 @@ input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
 input group "════════════════════════════════════════════════════════"
 
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
-input double AccountRiskPercent       = 0.5;   // 📊 Risco padrão por trade (%) - 🔥 v4.15: REDUZIDO 1.5→0.5
-input double MaxRiskPremium           = 1.0;   // 🏆 Risco máximo setup PREMIUM (%) - 🔥 v4.15: REDUZIDO 2.0→1.0
+input double AccountRiskPercent       = 0.3;   // 📊 Risco padrão por trade (%) - 🔥 v4.31: REDUZIDO 0.5→0.3 (CRÍTICO: DD 929%→<200%)
+input double MaxRiskPremium           = 0.5;   // 🏆 Risco máximo setup PREMIUM (%) - 🔥 v4.31: REDUZIDO 1.0→0.5 (PROTEÇÃO EXTREMA)
 // 🔥 REMOVIDO v4.9: input double MaxDrawdownPercent = 15.0; // Bloqueio por drawdown DESABILITADO
 // 🔥 v4.15: PROTEÇÕES DE DRAWDOWN REATIVADAS (versão melhorada)
-input double MaxDailyDrawdown         = 3.0;   // 🛡️ Drawdown máximo diário (%) - pausa trading
+// 🔥 v4.31: PROTEÇÃO CRÍTICA - Análise mostrou DD 929.8% com risco 0.5-1.0%
+input double MaxDailyDrawdown         = 3.0;   // 🛡️ Drawdown máximo diário (%) - pausa trading (ATIVADO v4.31)
 input double MaxWeeklyDrawdown        = 5.0;   // 🛡️ Drawdown máximo semanal (%) - pausa trading
-input int    MaxConsecutiveLosses     = 3;     // 🛡️ Máximo perdas consecutivas - pausa 24h
-input int    MaxSimultaneousTrades    = 3;     // 🔢 Máximo de trades simultâneos
+input int    MaxConsecutiveLosses     = 2;     // 🛡️ Máximo perdas consecutivas - 🔥 v4.31: 3→2 (pausa mais rápida)
+input int    MaxSimultaneousTrades    = 1;     // 🔢 Máximo de trades simultâneos - 🔥 v4.31: 3→1 (CRÍTICO: reduzir exposição)
 input bool   EnableSecondaryHours     = true;  // 🕐 Habilitar horários secundários Forex
 input bool   EnableMorningB3          = false; // 🇧🇷 Habilitar sessão da manhã B3
 input bool   AvoidNews                = true;  // 📰 Evitar operar próximo a notícias
@@ -272,35 +273,35 @@ input bool   TradeOnSunday            = false; // 📅 Operar no Domingo (Cripto
 
 input group "=== ⏰ HORÁRIOS CUSTOMIZÁVEIS (para otimização) ==="
 input bool   UseCustomTradingHours    = true;  // ⏰ Usar horários customizados - 🔥 v4.15: ATIVADO
-input int    CustomStartHour          = 10;    // ⏰ Horário início (hora) - 🔥 v4.15: Londres/NY overlap
+input int    CustomStartHour          = 11;    // ⏰ Horário início (hora) - 🔥 v4.31: 10→11 (evitar worst hours da análise)
 input int    CustomStartMinute        = 0;     // ⏰ Horário início (minuto)
-input int    CustomEndHour            = 16;    // ⏰ Horário fim (hora) - 🔥 v4.15: Fim overlap
-input int    CustomEndMinute          = 0;     // ⏰ Horário fim (minuto) - 🔥 v4.15: 30→0
+input int    CustomEndHour            = 17;    // ⏰ Horário fim (hora) - 🔥 v4.31: 16→17 (estender janela NY)
+input int    CustomEndMinute          = 0;     // ⏰ Horário fim (minuto)
 
 input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
 input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
 input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
 input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
-input double SL_MaxDistancePoints     = 150.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.30: 300→150 (CRÍTICO: -20% drawdown)
+input double SL_MaxDistancePoints     = 120.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.31: 150→120 (SLs menores, -20% risco)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
 input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
 input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
-input double SL_SafetyMultiplier      = 1.1;    // 🛡️ Margem de segurança - 🔥 v4.30: 1.2→1.1 (SLs menores)
+input double SL_SafetyMultiplier      = 1.05;   // 🛡️ Margem de segurança - 🔥 v4.31: 1.1→1.05 (SLs ainda menores)
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
-input double TP1_RR                   = 2.0;    // 🎯 TP1 Risk/Reward - 🔥 v4.17: 1.5→2.0 (+33%)
-input double TP2_RR                   = 4.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.17: 3.0→4.0 (+33%)
-input double TP3_RR                   = 6.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.17: 5.0→6.0 (+20%)
-input bool   UseTP3                   = false;  // 🎯 Ativar TP3
-input double TP1_ClosePercent         = 30.0;   // 📊 % posição fechar no TP1 - 🔥 v4.17: 40→30 (deixar correr)
-input double TP2_ClosePercent         = 50.0;   // 📊 % posição fechar no TP2 - 🔥 v4.17: 40→50 (fechar mais)
+input double TP1_RR                   = 2.5;    // 🎯 TP1 Risk/Reward - 🔥 v4.31: 2.0→2.5 (aumentar ganhos médios, PF 0.978→1.3+)
+input double TP2_RR                   = 5.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.31: 4.0→5.0 (capturar movimentos maiores)
+input double TP3_RR                   = 8.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.31: 6.0→8.0 (maximizar outliers)
+input bool   UseTP3                   = true;   // 🎯 Ativar TP3 - 🔥 v4.31: ATIVADO (necessário para PF >1.3)
+input double TP1_ClosePercent         = 40.0;   // 📊 % posição fechar no TP1 - 🔥 v4.31: 30→40 (proteger lucro inicial)
+input double TP2_ClosePercent         = 40.0;   // 📊 % posição fechar no TP2 - 🔥 v4.31: 50→40 (balancear com TP1)
 input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP3 (restante)
 input bool   TP_UseATR                = true;   // 📊 Usar ATR para cálculo de TP (dinâmico)
-input double TP1_ATRMultiplier        = 2.0;    // 📊 TP1 = X vezes ATR (se TP_UseATR=true)
-input double TP2_ATRMultiplier        = 4.0;    // 📊 TP2 = X vezes ATR (se TP_UseATR=true)
-input double TP3_ATRMultiplier        = 6.0;    // 📊 TP3 = X vezes ATR (se TP_UseATR=true)
-input double TP_MinRRRatio            = 1.2;    // 🎯 RR mínimo aceitável (rejeitar se SL/TP < X)
+input double TP1_ATRMultiplier        = 2.5;    // 📊 TP1 = X vezes ATR (se TP_UseATR=true)
+input double TP2_ATRMultiplier        = 5.0;    // 📊 TP2 = X vezes ATR (se TP_UseATR=true)
+input double TP3_ATRMultiplier        = 8.0;    // 📊 TP3 = X vezes ATR (se TP_UseATR=true)
+input double TP_MinRRRatio            = 1.5;    // 🎯 RR mínimo aceitável - 🔥 v4.31: 1.2→1.5 (rejeitar setups ruins)
 
 input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
 input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
@@ -349,8 +350,8 @@ input int    ADX_Period               = 14;    // 📊 Período ADX
 input double ADX_MinTrend             = 25.0;  // 📊 ADX mínimo para tendência (< 25 = ranging)
 
 input group "=== 🎯 QUALIDADE DE SETUP (Confluência) ==="
-input int    MinConfluenceScore       = 75;    // 📊 Pontuação mínima 0-100 - 🔥 v4.30: 60→75 (CRÍTICO: +8% WR, setups seletivos)
-input bool   RequireSupertrend        = false; // ⚠️ Supertrend obrigatório - 🔥 v4.17: true→false (TESTAR SEM)
+input int    MinConfluenceScore       = 85;    // 📊 Pontuação mínima 0-100 - 🔥 v4.31: 75→85 (CRÍTICO: WR 34.5%→50%+ estimado)
+input bool   RequireSupertrend        = true;  // ⚠️ Supertrend obrigatório - 🔥 v4.31: REATIVADO (filtro adicional crítico)
 input bool   RequireADXConfirmation   = false; // 📊 ADX deve confirmar direção
 input double MinADXStrength           = 20.0;  // 💪 Força mínima ADX se RequireADX=true
 input bool   RequireVolumeConfirm     = false; // 📊 Requer volume acima da média
@@ -454,7 +455,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.30";    // 🔥 v4.30: CORREÇÃO CRÍTICA - Validação Margem (36.6% rejeições → ~10%)
+const string EA_VERSION = "4.31";    // 🔥 v4.31: CORREÇÕES CRÍTICAS ANÁLISE (WR 34.5%→50%+, DD 929%→<200%)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

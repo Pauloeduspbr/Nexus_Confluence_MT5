@@ -1,16 +1,16 @@
-; Nexus Confluence EA v4.30 - CONSERVATIVE Profile
-; saved on 2025.10.23 11:35:03
+; Nexus Confluence EA v4.31 - CONSERVATIVE Profile (CORRECTED)
+; saved on 2025.10.23 11:50:51
 ; this file contains input parameters for testing/optimizing NexusConfluenceEA expert advisor
 ; to use it in the strategy tester, click Load in the context menu of the Inputs tab
 ;
-; Symbol: USDJPY | Quality Score: 42/100 | Trades Analyzed: 1115
+; Symbol: USDJPY | Quality Score: 0/100 | Trades Analyzed: 1116
 ;
-AccountRiskPercent=0.5||1.5||0.1||5.0||N
-MaxRiskPremium=1.0||2.0||0.1||5.0||N
+AccountRiskPercent=0.3||0.5||0.1||5.0||N
+MaxRiskPremium=0.5||1.0||0.1||5.0||N
 MaxDailyDrawdown=2.0||3.0||1.0||10.0||N
 MaxWeeklyDrawdown=4.0||5.0||2.0||15.0||N
-MaxConsecutiveLosses=3||3||1||10||N
-MaxSimultaneousTrades=3||3||1||10||N
+MaxConsecutiveLosses=2||3||1||10||N
+MaxSimultaneousTrades=1||3||1||10||N
 EnableSecondaryHours=true||false||0||true||N
 EnableMorningB3=false||false||0||true||N
 AvoidNews=true||false||0||true||N
@@ -38,29 +38,29 @@ TradeOnSunday=false||false||0||true||N
 UseCustomTradingHours=true||false||0||true||N
 CustomStartHour=11||10||0||23||Y
 CustomStartMinute=0||0||0||59||N
-CustomEndHour=17||18||0||23||Y
+CustomEndHour=17||16||0||23||Y
 CustomEndMinute=0||0||0||59||N
 SL_BufferPoints=10.0||10.0||0.0||100.0||Y
 SL_FallbackPercent=0.3||0.3||0.1||2.0||N
 SL_MinDistancePoints=50.0||50.0||10.0||500.0||Y
-SL_MaxDistancePoints=150.0||300.0||100.0||1000.0||Y
+SL_MaxDistancePoints=120.0||150.0||100.0||1000.0||Y
 SL_UseStructure=true||false||0||true||N
 SL_StructureCandles=50||50||10||200||Y
 SL_StructureStrength=2.0||2.0||0.5||5.0||Y
-SL_SafetyMultiplier=1.1||1.2||1.0||2.0||Y
+SL_SafetyMultiplier=1.05||1.1||1.0||2.0||Y
 EnablePartialTP=true||false||0||true||N
-TP1_RR=2.0||2.0||0.5||10.0||Y
-TP2_RR=4.0||4.0||1.0||20.0||Y
-TP3_RR=6.0||6.0||2.0||30.0||Y
-UseTP3=false||false||0||true||N
-TP1_ClosePercent=30.0||30.0||10.0||90.0||Y
-TP2_ClosePercent=50.0||50.0||10.0||90.0||Y
+TP1_RR=2.5||2.0||1.0||10.0||Y
+TP2_RR=5.0||4.0||2.0||15.0||Y
+TP3_RR=8.0||6.0||3.0||20.0||Y
+UseTP3=true||false||0||true||N
+TP1_ClosePercent=40.0||30.0||10.0||100.0||Y
+TP2_ClosePercent=40.0||50.0||10.0||100.0||Y
 TP3_ClosePercent=20.0||20.0||10.0||90.0||Y
 TP_UseATR=true||false||0||true||N
-TP1_ATRMultiplier=2.0||2.0||0.5||10.0||Y
-TP2_ATRMultiplier=4.0||4.0||1.0||20.0||Y
-TP3_ATRMultiplier=6.0||6.0||2.0||30.0||Y
-TP_MinRRRatio=1.2||1.2||0.5||5.0||Y
+TP1_ATRMultiplier=2.5||2.0||1.0||10.0||Y
+TP2_ATRMultiplier=5.0||4.0||2.0||15.0||Y
+TP3_ATRMultiplier=8.0||6.0||3.0||20.0||Y
+TP_MinRRRatio=1.5||1.2||1.0||5.0||N
 EnableTrailing=true||false||0||true||N
 TrailingDistancePoints=200.0||200.0||10.0||1000.0||Y
 TrailingStepPoints=50.0||50.0||5.0||500.0||Y
@@ -95,8 +95,8 @@ RecoveryMode=false||false||0||true||N
 UseADXFilter=false||false||0||true||N
 ADX_Period=14||14||5||50||Y
 ADX_MinTrend=25.0||25.0||10.0||50.0||Y
-MinConfluenceScore=75||60||0||100||Y
-RequireSupertrend=false||false||0||true||N
+MinConfluenceScore=85||75||50||100||Y
+RequireSupertrend=true||false||0||true||N
 RequireADXConfirmation=false||false||0||true||N
 MinADXStrength=20.0||20.0||10.0||50.0||Y
 RequireVolumeConfirm=false||false||0||true||N

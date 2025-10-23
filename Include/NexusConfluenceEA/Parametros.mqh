@@ -319,6 +319,9 @@ input int    LookbackStructureBars    = 80;    // 📊 Candles para buscar estru
 input int    BrokerGMTOffset          = 2;     // 🌍 Fuso horário do broker (horário inverno)
 input double MaxSpreadMultiplier      = 5.0;   // 🎯 Multiplicador spread máximo (5x = muito tolerante para testes)
 
+input group "=== 🏦 PROTEÇÕES DE MARGEM - v4.30 ==="
+input double MinFreeMarginPercent     = 20.0;  // 🏦 % Margem mínima livre após trade (20% = seguro, 10% = arriscado)
+
 input group "=== 🎯 BREAKEVEN E PROTEÇÃO DE LUCRO ==="
 input bool   EnableBreakeven          = true;   // 🛡️ Mover SL para breakeven
 input double BreakevenAfterRR         = 1.0;    // 🎯 Mover BE após X:1 RR - 🔥 v4.16: após TP1 fechado
@@ -451,7 +454,7 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.27";    // 🔥 v4.27: RSI SIMPLES + SUPERTREND [1] - Sincronização 100% completa!
+const string EA_VERSION = "4.30";    // 🔥 v4.30: CORREÇÃO CRÍTICA - Validação Margem (36.6% rejeições → ~10%)
 const string EA_NAME         = "Nexus Confluence Universal Multi-TF";
 
 //+------------------------------------------------------------------+

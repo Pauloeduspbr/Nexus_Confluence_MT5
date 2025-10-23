@@ -466,11 +466,25 @@ bool ValidateRiskCalculation(const RiskCalculation &risk, string symbol)
       return false;
    }
    
-   if(requiredMargin > freeMargin * 0.7) // Usar no máximo 70% da margem
+   // 🔥 CORREÇÃO v4.30: Validação correta de margem livre
+   // Garantir que sobre pelo menos X% da margem APÓS o trade (não ANTES!)
+   double minFreeMarginDecimal = MinFreeMarginPercent / 100.0;
+   double marginAfterTrade = freeMargin - requiredMargin;
+   double percentFreeAfterTrade = (marginAfterTrade / freeMargin) * 100.0;
+   
+   if(marginAfterTrade < (freeMargin * minFreeMarginDecimal))
    {
-      PrintFormat("❌ Margem insuficiente: Necessário $%.2f, Disponível $%.2f", requiredMargin, freeMargin);
+      PrintFormat("❌ Margem insuficiente:");
+      PrintFormat("   📊 Margem necessária: $%.2f | Margem livre: $%.2f", requiredMargin, freeMargin);
+      PrintFormat("   📉 Sobraria: $%.2f (%.1f%%) < %.1f%% mínimo configurado",
+                  marginAfterTrade, percentFreeAfterTrade, MinFreeMarginPercent);
+      PrintFormat("   💡 Solução: Aumentar capital OU reduzir MinFreeMarginPercent (atual: %.0f%%)",
+                  MinFreeMarginPercent);
       return false;
    }
+   
+   PrintFormat("   ✅ Margem validada: Necessário $%.2f | Livre $%.2f | Sobrará $%.2f (%.1f%% > %.1f%% mínimo)",
+               requiredMargin, freeMargin, marginAfterTrade, percentFreeAfterTrade, MinFreeMarginPercent);
    
    // 🔥 v4.22 CORREÇÃO CRÍTICA: REJEITAR se SL muito distante
    // BUG v4.21: Apenas alertava mas permitia SL de 800 pontos (limite 500!)

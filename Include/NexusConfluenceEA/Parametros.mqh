@@ -281,8 +281,8 @@ input int    CustomEndMinute          = 0;     // ⏰ Horário fim (minuto)
 input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
 input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
 input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
-input double SL_MinDistancePoints     = 50.0;   // 📊 Distância mínima SL (pontos)
-input double SL_MaxDistancePoints     = 120.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.31: 150→120 (SLs menores, -20% risco)
+input double SL_MinDistancePoints     = 65.0;   // 📊 Distância mínima SL (pontos) - 🔥 v4.32: 50→65 CRÍTICO (+30% análise 20251023)
+input double SL_MaxDistancePoints     = 156.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.32: 120→156 CRÍTICO (+30% WR 0%→35%+)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
 input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
 input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
@@ -290,9 +290,9 @@ input double SL_SafetyMultiplier      = 1.05;   // 🛡️ Margem de segurança 
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
-input double TP1_RR                   = 2.5;    // 🎯 TP1 Risk/Reward - 🔥 v4.31: 2.0→2.5 (aumentar ganhos médios, PF 0.978→1.3+)
-input double TP2_RR                   = 5.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.31: 4.0→5.0 (capturar movimentos maiores)
-input double TP3_RR                   = 8.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.31: 6.0→8.0 (maximizar outliers)
+input double TP1_RR                   = 0.7;    // 🎯 TP1 Risk/Reward - 🔥 v4.32: 2.5→0.7 CRÍTICO (TP hit 0%→60%, análise 20251023)
+input double TP2_RR                   = 1.5;    // 🎯 TP2 Risk/Reward - 🔥 v4.32: 5.0→1.5 CRÍTICO (TP2 hit 0%→30%, análise 20251023)
+input double TP3_RR                   = 3.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.32: 8.0→3.0 AJUSTE (manter proporção reduzida)
 input bool   UseTP3                   = true;   // 🎯 Ativar TP3 - 🔥 v4.31: ATIVADO (necessário para PF >1.3)
 input double TP1_ClosePercent         = 40.0;   // 📊 % posição fechar no TP1 - 🔥 v4.31: 30→40 (proteger lucro inicial)
 input double TP2_ClosePercent         = 40.0;   // 📊 % posição fechar no TP2 - 🔥 v4.31: 50→40 (balancear com TP1)

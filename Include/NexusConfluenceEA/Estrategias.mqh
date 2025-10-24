@@ -127,8 +127,7 @@ struct BufferCache {
 
 BufferCache g_bufferCache;
 
-// 🔥 Arrays e variáveis temporárias GLOBAIS para UpdateBufferCache (workaround compilador MQL5)
-int g_temp_idx;  // Índice para loops
+// 🔥 Arrays temporários GLOBAIS para UpdateBufferCache (workaround compilador MQL5)
 double g_temp_wae_up[3];
 double g_temp_wae_down[3];
 double g_temp_wae_exp[1];
@@ -171,10 +170,10 @@ bool UpdateBufferCache()
            CopyBuffer(g_handles.wae_oper, 1, 0, 3, g_temp_wae_down) == 3 &&
            CopyBuffer(g_handles.wae_oper, 2, 0, 1, g_temp_wae_exp) == 1)
         {
-            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            for(int idx = 0; idx < 3; idx++)
             {
-                g_bufferCache.wae_trendUp[g_temp_idx] = g_temp_wae_up[g_temp_idx];
-                g_bufferCache.wae_trendDown[g_temp_idx] = g_temp_wae_down[g_temp_idx];
+                g_bufferCache.wae_trendUp[idx] = g_temp_wae_up[idx];
+                g_bufferCache.wae_trendDown[idx] = g_temp_wae_down[idx];
             }
             g_bufferCache.wae_explosion[0] = g_temp_wae_exp[0];
         }
@@ -187,10 +186,10 @@ bool UpdateBufferCache()
         if(CopyBuffer(g_handles.rsi_oper, 0, 0, 3, g_temp_rsi_red) == 3 &&
            CopyBuffer(g_handles.rsi_oper, 1, 0, 3, g_temp_rsi_blue) == 3)
         {
-            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            for(int idx = 0; idx < 3; idx++)
             {
-                g_bufferCache.rsi_red[g_temp_idx] = g_temp_rsi_red[g_temp_idx];
-                g_bufferCache.rsi_blue[g_temp_idx] = g_temp_rsi_blue[g_temp_idx];
+                g_bufferCache.rsi_red[idx] = g_temp_rsi_red[idx];
+                g_bufferCache.rsi_blue[idx] = g_temp_rsi_blue[idx];
             }
         }
         else success = false;
@@ -214,10 +213,10 @@ bool UpdateBufferCache()
         if(CopyBuffer(g_handles.st_oper, 0, 0, 3, g_temp_supertrend_up) == 3 &&
            CopyBuffer(g_handles.st_oper, 1, 0, 3, g_temp_supertrend_down) == 3)
         {
-            for(g_temp_idx = 0; g_temp_idx < 3; g_temp_idx++)
+            for(int idx = 0; idx < 3; idx++)
             {
-                g_bufferCache.trend_up[g_temp_idx] = g_temp_supertrend_up[g_temp_idx];
-                g_bufferCache.trend_down[g_temp_idx] = g_temp_supertrend_down[g_temp_idx];
+                g_bufferCache.trend_up[idx] = g_temp_supertrend_up[idx];
+                g_bufferCache.trend_down[idx] = g_temp_supertrend_down[idx];
             }
         }
         else success = false;
@@ -236,17 +235,17 @@ bool UpdateBufferCache()
            CopyBuffer(g_handles.gg_global, 14, 0, 2, g_temp_gg_w1) == 2 &&
            CopyBuffer(g_handles.gg_global, 16, 0, 2, g_temp_gg_mn1) == 2)
         {
-            for(g_temp_idx = 0; g_temp_idx < 2; g_temp_idx++)
+            for(int idx = 0; idx < 2; idx++)
             {
-                g_bufferCache.gg_m1[g_temp_idx] = g_temp_gg_m1[g_temp_idx];
-                g_bufferCache.gg_m5[g_temp_idx] = g_temp_gg_m5[g_temp_idx];
-                g_bufferCache.gg_m15[g_temp_idx] = g_temp_gg_m15[g_temp_idx];
-                g_bufferCache.gg_m30[g_temp_idx] = g_temp_gg_m30[g_temp_idx];
-                g_bufferCache.gg_h1[g_temp_idx] = g_temp_gg_h1[g_temp_idx];
-                g_bufferCache.gg_h4[g_temp_idx] = g_temp_gg_h4[g_temp_idx];
-                g_bufferCache.gg_d1[g_temp_idx] = g_temp_gg_d1[g_temp_idx];
-                g_bufferCache.gg_w1[g_temp_idx] = g_temp_gg_w1[g_temp_idx];
-                g_bufferCache.gg_mn1[g_temp_idx] = g_temp_gg_mn1[g_temp_idx];
+                g_bufferCache.gg_m1[idx] = g_temp_gg_m1[idx];
+                g_bufferCache.gg_m5[idx] = g_temp_gg_m5[idx];
+                g_bufferCache.gg_m15[idx] = g_temp_gg_m15[idx];
+                g_bufferCache.gg_m30[idx] = g_temp_gg_m30[idx];
+                g_bufferCache.gg_h1[idx] = g_temp_gg_h1[idx];
+                g_bufferCache.gg_h4[idx] = g_temp_gg_h4[idx];
+                g_bufferCache.gg_d1[idx] = g_temp_gg_d1[idx];
+                g_bufferCache.gg_w1[idx] = g_temp_gg_w1[idx];
+                g_bufferCache.gg_mn1[idx] = g_temp_gg_mn1[idx];
             }
         }
         else success = false;

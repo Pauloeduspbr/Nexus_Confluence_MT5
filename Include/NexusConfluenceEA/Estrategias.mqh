@@ -914,22 +914,49 @@ GGTrendBarSignal GetGGTrendBarSignal()
       gg_mn1[i] = g_bufferCache.gg_mn1[i];
    }
    
-   // 🔥 v4.33 DIAGNÓSTICO: VALIDAR DADOS NÃO-NULOS (CRÍTICO!)
-   // Problema identificado: Cache pode ter valores 0 (indicador não carregado)
-   // Resultado: EA opera sem macro alinhado de verdade (WR 34% → 40%+ esperado)
-   bool hasValidData = false;
+   // 🔥 v4.40.2 CORREÇÃO CRÍTICA: VALIDAR APENAS TIMEFRAMES USADOS PELO EA!
+   // PROBLEMA v4.33: Validava TODOS os TFs (M1-MN1) - se algum fosse neutro=0, rejeitava tudo!
+   // SOLUÇÃO v4.40.2: Validar APENAS os timeframes que o EA vai usar (Macro1, Macro2, Macro3)
    
-   // Verificar se pelo menos um timeframe tem dados válidos (não-zero)
-   if(MathAbs(gg_m1[1]) > 0.01 || MathAbs(gg_m5[1]) > 0.01)
-      hasValidData = true;
-   if(MathAbs(gg_m15[1]) > 0.01 || MathAbs(gg_m30[1]) > 0.01)
-      hasValidData = true;
-   if(MathAbs(gg_h1[1]) > 0.01 || MathAbs(gg_h4[1]) > 0.01)
-      hasValidData = true;
+   // Determinar qual timeframe do GG TrendBar corresponde ao g_tfMacro1
+   double macro1Data = 0.0;
+   double macro2Data = 0.0;
+   double macro3Data = 0.0;
    
-   if(!hasValidData)
+   // Mapear g_tfMacro1 para os dados do GG TrendBar
+   if(g_tfMacro1 == PERIOD_H4)       macro1Data = gg_h4[1];
+   else if(g_tfMacro1 == PERIOD_D1)  macro1Data = gg_d1[1];
+   else if(g_tfMacro1 == PERIOD_W1)  macro1Data = gg_w1[1];
+   else if(g_tfMacro1 == PERIOD_M30) macro1Data = gg_m30[1];
+   else if(g_tfMacro1 == PERIOD_H1)  macro1Data = gg_h1[1];
+   
+   // Mapear g_tfMacro2 para os dados do GG TrendBar
+   if(g_tfMacro2 == PERIOD_H1)       macro2Data = gg_h1[1];
+   else if(g_tfMacro2 == PERIOD_H4)  macro2Data = gg_h4[1];
+   else if(g_tfMacro2 == PERIOD_D1)  macro2Data = gg_d1[1];
+   else if(g_tfMacro2 == PERIOD_M30) macro2Data = gg_m30[1];
+   else if(g_tfMacro2 == PERIOD_M15) macro2Data = gg_m15[1];
+   
+   // Mapear g_tfMacro3 para os dados do GG TrendBar (se aplicável)
+   if(g_numNiveisMacro == 3)
    {
-      PrintFormat("🔴 CRÍTICO: GG TrendBar sem dados válidos (todos zeros) - ANÁLISE REJEITADA!");
+      if(g_tfMacro3 == PERIOD_M30)       macro3Data = gg_m30[1];
+      else if(g_tfMacro3 == PERIOD_H1)   macro3Data = gg_h1[1];
+      else if(g_tfMacro3 == PERIOD_M15)  macro3Data = gg_m15[1];
+      else if(g_tfMacro3 == PERIOD_M5)   macro3Data = gg_m5[1];
+   }
+   
+   // Validar se PELO MENOS OS TIMEFRAMES MACRO TÊM DADOS
+   // (Não interessa se M1, M5, MN1, etc têm dados - só precisamos dos que vamos usar!)
+   bool hasValidMacroData = (macro1Data != 0.0 || macro2Data != 0.0);
+   
+   if(!hasValidMacroData)
+   {
+      PrintFormat("🔴 CRÍTICO: GG TrendBar sem dados válidos nos timeframes MACRO!");
+      PrintFormat("   MACRO-1 (%s): %.0f", TimeframeToString(g_tfMacro1), macro1Data);
+      PrintFormat("   MACRO-2 (%s): %.0f", TimeframeToString(g_tfMacro2), macro2Data);
+      if(g_numNiveisMacro == 3)
+         PrintFormat("   MACRO-3 (%s): %.0f", TimeframeToString(g_tfMacro3), macro3Data);
       PrintFormat("   Possível causa: Indicador não inicializou ou CopyBuffer falhou");
       result.isValid = false;
       return result;

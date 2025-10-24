@@ -241,8 +241,9 @@ bool IsValidTradingHour()
 bool HasOpenPosition()
 {
    int total = PositionsTotal();
+   int i;
    
-   for(int i = total - 1; i >= 0; i--)
+   for(i = total - 1; i >= 0; i--)
    {
       if(PositionSelectByIndex(i))
       {

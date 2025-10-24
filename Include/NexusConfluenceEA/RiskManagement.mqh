@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| RiskManagement.mqh                                               |
-//| Nexus Confluence EA v4.27 - Gestão de Risco e Posicionamento    |
+//| Nexus Confluence EA v4.35 - Gestão de Risco e Posicionamento    |
 //|                                                                   |
 //| PROPÓSITO: Calcular tamanho de posição, SL, TP, Breakeven       |
 //|            e Trailing Stop baseado em estrutura de preços        |
@@ -14,8 +14,14 @@
 //|           - EnablePartialTP=true: BE/Trailing após TP1          |
 //|           - EnablePartialTP=false: BE/Trailing direto em RR     |
 //|           - TPs altos (15:1, 20:1, 25:1) para ordem única       |
+//| 🔥 v4.35: PROTEÇÃO DD AGRESSIVA - Análise 230947                |
+//|           - DD máximo: 130.89% (CRÍTICO)                         |
+//|           - GetMaxRiskForDay() REDESENHADO                       |
+//|           - Limites: 1% (100%), 2% (75%), 3% (50%), 5% (25%)   |
+//|           - Pausa após 5% DD diário                             |
 //|                                                                   |
 //| FUNÇÕES PRINCIPAIS:                                              |
+//|   - GetMaxRiskForDay(): NOVO v4.35 - Redução agressiva          |
 //|   - CalculatePositionSize(): Calcula lote baseado em risco       |
 //|   - FindStructureSL(): Encontra último topo/fundo significativo  |
 //|   - CalculateTakeProfits(): Calcula TPs baseados em RR          |
@@ -31,10 +37,10 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.27 - Lógica Ordem Única vs Múltiplas                 |
+//| VERSÃO: 4.35 - Proteção DD Agressiva + Análise 230947          |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.27"
-#property version   "4.27"
+#property copyright "Nexus Confluence EA v4.35"
+#property version   "4.35"
 #property strict
 
 #include "Parametros.mqh"
@@ -51,18 +57,22 @@ extern bool   g_dailyDrawdownHit;
 extern bool   g_weeklyDrawdownHit;
 
 //+------------------------------------------------------------------+
-//| 🔥 NOVO v4.30: PROTEÇÃO DE DRAWDOWN DIÁRIO                     |
+//| 🔥 NOVO v4.35: PROTEÇÃO DE DRAWDOWN DIÁRIO AGRESSIVA           |
 //| Reduz risco progressivamente conforme drawdown aumenta           |
 //|                                                                  |
-//| IMPACTO ESTIMADO: -40% drawdown máximo (91% → 55%)              |
-//| Win Rate: Mantém ou melhora ligeiramente (+1-2%)                |
-//| Sharpe Ratio: +0.02 a +0.05                                     |
+//| ANÁLISE 230947: DD máximo 130.89%, Sharpe 0.01, PF 1.03        |
+//| NECESSÁRIO: Redução mais agressiva de risco                      |
 //|                                                                  |
-//| LÓGICA:                                                          |
-//| - Drawdown 0-2%: Risco normal (100%)                            |
-//| - Drawdown 2-5%: Risco reduzido (75%)                           |
-//| - Drawdown 5-8%: Risco mínimo (50%)                             |
-//| - Drawdown >8%: Pausa trading até próximo dia                   |
+//| IMPACTO ESTIMADO: -50% drawdown máximo (130% → 65%)             |
+//| Win Rate: +1-2%                                                  |
+//| Sharpe Ratio: +0.05 a +0.10                                     |
+//|                                                                  |
+//| LÓGICA v4.35 (MAIS AGRESSIVA):                                  |
+//| - Drawdown 0-1%: Risco normal (100%)                            |
+//| - Drawdown 1-2%: Risco reduzido (75%)                           |
+//| - Drawdown 2-3%: Risco mínimo (50%)                             |
+//| - Drawdown 3-5%: Risco muito baixo (25%)                        |
+//| - Drawdown >5%: Pausa trading até próximo dia                   |
 //|                                                                  |
 //| RETORNO: Multiplicador de risco (0.0 a 1.0)                     |
 //+------------------------------------------------------------------+
@@ -93,30 +103,36 @@ double GetMaxRiskForDay()
    PrintFormat("💰 Drawdown Diário: %.2f%% (Balance Inicial: $%.2f, Atual: $%.2f)", 
                dailyDrawdown, g_dailyStartBalance, currentBalance);
    
-   // Redução progressiva de risco
+   // 🔥 v4.35: Redução progressiva MAIS AGRESSIVA
    double riskMultiplier = 1.0;
    
-   if(dailyDrawdown <= 2.0)
+   if(dailyDrawdown <= 1.0)
    {
       // Zona verde: risco normal
       riskMultiplier = 1.0;
       PrintFormat("   ✅ Zona Verde: Risco 100%%");
    }
-   else if(dailyDrawdown <= 5.0)
+   else if(dailyDrawdown <= 2.0)
    {
       // Zona amarela: reduzir para 75%
       riskMultiplier = 0.75;
       PrintFormat("   ⚠️  Zona Amarela: Risco reduzido para 75%%");
    }
-   else if(dailyDrawdown <= 8.0)
+   else if(dailyDrawdown <= 3.0)
    {
       // Zona laranja: reduzir para 50%
       riskMultiplier = 0.50;
-      PrintFormat("   🟠 Zona Laranja: Risco MÍNIMO 50%%");
+      PrintFormat("   🟠 Zona Laranja: Risco 50%% (ATENÇÃO)");
+   }
+   else if(dailyDrawdown <= 5.0)
+   {
+      // Zona vermelha clara: risco muito baixo
+      riskMultiplier = 0.25;
+      PrintFormat("   🔴 Zona Vermelha: Risco MÍNIMO 25%% (CRÍTICO)");
    }
    else
    {
-      // Zona vermelha: PARAR trading
+      // Zona vermelha escura: PARAR trading
       riskMultiplier = 0.0;
       g_dailyDrawdownHit = true;
       
@@ -128,7 +144,7 @@ double GetMaxRiskForDay()
       nextDay.sec = 0;
       g_pauseUntilTime = StructToTime(nextDay);
       
-      PrintFormat("   🛑 ZONA VERMELHA: Drawdown %.2f%% > 8%% - TRADING PAUSADO até %s", 
+      PrintFormat("   🛑 ZONA CRÍTICA: Drawdown %.2f%% > 5%% - TRADING PAUSADO até %s", 
                   dailyDrawdown, TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
    }
    

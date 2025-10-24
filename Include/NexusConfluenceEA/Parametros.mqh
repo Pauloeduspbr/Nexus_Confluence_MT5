@@ -1,9 +1,15 @@
 //+------------------------------------------------------------------+
 //| Parametros.mqh                                                    |
-//| Nexus Confluence EA v4.16 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.35 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODOS os inputs e enumerações do EA       |
-//| 🔥 v4.16: PARAMETRIZAÇÃO TOTAL - Zero Hardcode                  |
+//| 🔥 v4.35: CORREÇÕES ANÁLISE 230947 - Filtros Horário + DD      |
+//|                                                                   |
+//| CHANGELOG v4.35:                                                 |
+//|   - MaxDailyDrawdown: 3.0% → 2.5% (análise mostrou DD 130.89%) |
+//|   - HourBlacklist: simplificado para "0,18" (piores horários)   |
+//|   - Novos inputs: EnableHourFilter, TradingStartHour, EndHour   |
+//|   - Evitar 00:00 (WR=0%) e 18:00 (PF=0.59)                     |
 //|                                                                   |
 //| ORGANIZAÇÃO:                                                      |
 //|   1. Enumerações (enums)                                         |
@@ -13,10 +19,10 @@
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.16 - Parametrização Completa para Otimização         |
+//| VERSÃO: 4.35 - Correções Baseadas em Análise Real              |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.16"
-#property version   "4.16"
+#property copyright "Nexus Confluence EA v4.35"
+#property version   "4.35"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -223,8 +229,8 @@ input group "══════════════════════�
 input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
 input group "════════════════════════════════════════════════════════"
 
-input group "=== 🏷️ IDENTIFICAÇÃO DO BACKTEST - v4.34 ==="
-input string ConfigSetName            = "CONSERVATIVE"; // 🔥 v4.34: Nome do .set rodando (CONSERVATIVE/MODERATE/AGGRESSIVE) - CRÍTICO para análise separada!
+input group "=== 🏷️ IDENTIFICAÇÃO DO BACKTEST - v4.35 ==="
+input string ConfigSetName            = "CONSERVATIVE"; // 🔥 v4.35: Nome do .set rodando (CONSERVATIVE/MODERATE/AGGRESSIVE) - CRÍTICO para análise separada!
 
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
 input double AccountRiskPercent       = 0.2;    // � % Conta em risco por trade (CONSERVADOR) - 🔥 v4.34: 0.3→0.2 (Análise: DD 112%, reduzir exposição)
@@ -232,7 +238,8 @@ input double MaxRiskPremium           = 0.3;    // 💎 Máx % risco para setups
 // 🔥 REMOVIDO v4.9: input double MaxDrawdownPercent = 15.0; // Bloqueio por drawdown DESABILITADO
 // 🔥 v4.15: PROTEÇÕES DE DRAWDOWN REATIVADAS (versão melhorada)
 // 🔥 v4.31: PROTEÇÃO CRÍTICA - Análise mostrou DD 929.8% com risco 0.5-1.0%
-input double MaxDailyDrawdown         = 3.0;   // 🛡️ Drawdown máximo diário (%) - pausa trading (ATIVADO v4.31)
+// 🔥 v4.35: PROTEÇÃO AGRESSIVA - Análise 230947: DD 130.89%, Sharpe 0.01, PF 1.03
+input double MaxDailyDrawdown         = 2.5;   // 🛡️ Drawdown máximo diário (%) - 🔥 v4.35: 3.0→2.5 (reduzir limite)
 input double MaxWeeklyDrawdown        = 5.0;   // 🛡️ Drawdown máximo semanal (%) - pausa trading
 input int    MaxConsecutiveLosses     = 3;     // 🛡️ Máximo perdas consecutivas - 🔥 v4.34: 2→3 (Análise: balancear proteção/oportunidades)
 input int    MaxSimultaneousTrades    = 1;     // 🔢 Máximo de trades simultâneos - 🔥 v4.31: 3→1 (CRÍTICO: reduzir exposição)
@@ -243,7 +250,10 @@ input bool   ValidateATRRange         = true;  // 📏 Validar ATR ideal por ati
 input bool   SendAlerts               = true;  // 🔔 Enviar notificações push
 input bool   AllowCautiousSetups      = false; // ⚠️ Permitir setups CAUTELOSOS (2/2 + MACRO-3 oposto)
 input bool   AllowGoodSetups          = false; // 🔥 v4.34: DESABILITADO (Análise: GOOD tem WR 35-40%, apenas PREMIUM 50-55%)
-input string HourBlacklist            = "0,3,7,9,12,16,18,19,20,21"; // ⏰ v4.34: Horas a evitar (análise: 10 piores horas, separar por vírgula)
+input string HourBlacklist            = "0,18"; // ⏰ v4.35: Horas a evitar (0=00:00 WR 0%, 18=18:00 PF 0.59)
+input bool   EnableHourFilter         = true;  // 🔥 v4.35: Ativar filtro de horários críticos
+input string TradingStartHour         = "01:00"; // 🔥 v4.35: Hora início (evitar 00:00 WR=0%)
+input string TradingEndHour           = "22:59"; // 🔥 v4.35: Hora fim (evitar 23:00+)
 
 input group "=== 💰 GESTÃO DE LOTE ==="
 input double FixedLotSize             = 0.0;   // 📌 Lote Fixo (0 = cálculo automático por risco %)

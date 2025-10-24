@@ -581,8 +581,7 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
    
    // Usar dados do cache global (copiar manualmente)
    double bufferUp[3], bufferDown[3];
-   int i;
-   for(i = 0; i < 3; i++)
+   for(int i = 0; i < 3; i++)
    {
       bufferUp[i] = g_bufferCache.trend_up[i];
       bufferDown[i] = g_bufferCache.trend_down[i];
@@ -768,8 +767,7 @@ RSISignal GetRSIOMASignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES
    
    // Usar dados do cache global (copiar manualmente para manter compatibilidade)
    double rsiRed[3], rsiBlue[3];
-   int i;
-   for(i = 0; i < 3; i++)
+   for(int i = 0; i < 3; i++)
    {
       rsiRed[i] = g_bufferCache.rsi_red[i];
       rsiBlue[i] = g_bufferCache.rsi_blue[i];
@@ -840,8 +838,7 @@ WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES ti
    
    // Usar dados do cache global (copiar manualmente para evitar problemas com tipos)
    double trendUp[3], trendDown[3], explosion[1];
-   int i;
-   for(i = 0; i < 3; i++)
+   for(int i = 0; i < 3; i++)
    {
       trendUp[i] = g_bufferCache.wae_trendUp[i];
       trendDown[i] = g_bufferCache.wae_trendDown[i];
@@ -906,9 +903,8 @@ GGTrendBarSignal GetGGTrendBarSignal()
    
    // Usar dados do cache global (copiar manualmente todos os 9 timeframes)
    double gg_m1[2], gg_m5[2], gg_m15[2], gg_m30[2], gg_h1[2], gg_h4[2], gg_d1[2], gg_w1[2], gg_mn1[2];
-   int i;
    
-   for(i = 0; i < 2; i++)
+   for(int i = 0; i < 2; i++)
    {
       gg_m1[i] = g_bufferCache.gg_m1[i];
       gg_m5[i] = g_bufferCache.gg_m5[i];

@@ -72,6 +72,18 @@ int OnInit()
       return INIT_PARAMETERS_INCORRECT;
    }
    
+   // 🔥 v4.40 CORREÇÃO CRÍTICA: Definir timeframes multi-TF ANTES de inicializar indicadores
+   ENUM_TIMEFRAMES tfM1, tfM2, tfM3;
+   int numNiveisMacro;
+   DefineMultiTimeframes(_Period, tfM1, tfM2, tfM3, numNiveisMacro);
+   
+   PrintFormat("🎯 Timeframes Multi-TF Definidos:");
+   PrintFormat("   MACRO-1: %s", EnumToString(tfM1));
+   PrintFormat("   MACRO-2: %s", EnumToString(tfM2));
+   if(numNiveisMacro == 3)
+      PrintFormat("   MACRO-3: %s", EnumToString(tfM3));
+   PrintFormat("   Níveis: %d", numNiveisMacro);
+   
    // Inicializar indicadores
    if(!InitializeIndicators(_Symbol))
    {
@@ -110,6 +122,18 @@ void OnTick()
       return; // Ainda no mesmo candle
    
    g_lastCandleTime = currentCandleTime;
+   
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 0: ATUALIZAR BUFFER CACHE (1x por candle novo)
+   // ═══════════════════════════════════════════════════════════════
+   
+   // 🔥 v4.40 CORREÇÃO CRÍTICA #2: Atualizar cache ANTES de analisar indicadores
+   if(!UpdateBufferCache())
+   {
+      // Se cache falhar, não analisar (evitar trades com dados incorretos)
+      PrintFormat("🔴 CRÍTICO: Buffer cache inválido - pulando análise neste candle");
+      return;
+   }
    
    // ═══════════════════════════════════════════════════════════════
    // ETAPA 1: VALIDAÇÕES BÁSICAS

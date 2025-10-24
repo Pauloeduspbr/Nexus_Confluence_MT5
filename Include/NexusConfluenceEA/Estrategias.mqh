@@ -1002,14 +1002,6 @@ GGTrendBarSignal GetGGTrendBarSignal()
 //+------------------------------------------------------------------+
 MultiTFResult AnalyzeMultiTimeframeAlignment()
 {
-   // 🔥 CORREÇÃO v4.40: Garantir que os timeframes macro sejam definidos
-   // Se g_tfOperacional não foi definido, significa que DefineMultiTimeframes não foi chamado.
-   if(g_tfOperacional != _Period)
-   {
-      PrintFormat("⚠️ AVISO: Timeframes não inicializados. Executando DefineMultiTimeframes() automaticamente.");
-      DefineMultiTimeframes(_Period, g_tfMacro1, g_tfMacro2, g_tfMacro3, g_numNiveisMacro);
-   }
-
    MultiTFResult result;
    result.isValid = false;
    result.direction = TRADE_DIRECTION_NONE;
@@ -1021,6 +1013,16 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    PrintFormat("════════════════════════════════════════════════════════════════");
    PrintFormat("🎯 Analisando Multi-Timeframe com GG TRENDBAR (FILTRO MESTRE)");
    PrintFormat("════════════════════════════════════════════════════════════════");
+   
+   // 🔥 v4.40 CORREÇÃO CRÍTICA #3: Validar se timeframes foram inicializados
+   if(g_tfOperacional == 0 || g_tfMacro1 == 0 || g_tfMacro2 == 0)
+   {
+      PrintFormat("🔴 ERRO CRÍTICO: Timeframes multi-TF não foram inicializados!");
+      PrintFormat("   g_tfOperacional=%d, g_tfMacro1=%d, g_tfMacro2=%d",
+                  g_tfOperacional, g_tfMacro1, g_tfMacro2);
+      PrintFormat("   CAUSA: DefineMultiTimeframes() não foi chamado no OnInit()!");
+      return result;
+   }
    
    // Obter sinais GG TrendBar de todos os timeframes
    GGTrendBarSignal gg = GetGGTrendBarSignal();

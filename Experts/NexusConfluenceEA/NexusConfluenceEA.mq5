@@ -142,24 +142,35 @@ void OnTick()
    // 1.1 Validar dia da semana
    if(!IsValidTradingDay())
    {
-      return; // Dia não permitido para trading
+      // Silencioso - não logar (muito frequente)
+      return;
    }
    
    // 1.2 Validar horário
    if(!IsValidTradingHour())
    {
-      return; // Fora do horário permitido
+      // Silencioso - não logar (muito frequente)
+      return;
    }
    
    // 1.3 Verificar se já tem posição aberta
    if(HasOpenPosition())
    {
-      return; // Já tem posição aberta
+      // Silencioso - não logar (muito frequente)
+      return;
    }
    
    // ═══════════════════════════════════════════════════════════════
    // ETAPA 2: ANÁLISE DE SETUP
    // ═══════════════════════════════════════════════════════════════
+   
+   // 🔥 DEBUG v4.40.3: Log a cada 100 candles para ver se chega aqui
+   static int analysisCount = 0;
+   analysisCount++;
+   if(analysisCount % 100 == 0)
+   {
+      PrintFormat("🔍 [DEBUG] Análise de setup rodando - %d análises realizadas", analysisCount);
+   }
    
    // Classificar ativo
    ASSET_CLASS assetClass = ClassifyAsset(_Symbol);
@@ -169,7 +180,14 @@ void OnTick()
    
    if(!mtf.isValid)
    {
-      return; // Multi-TF não alinhado
+      // 🔥 DEBUG v4.40.3: Log DETALHADO do motivo da rejeição
+      static int rejectCount = 0;
+      rejectCount++;
+      if(rejectCount % 100 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Multi-TF rejeitado %d vezes - verificar AnalyzeMultiTimeframeAlignment()", rejectCount);
+      }
+      return;
    }
    
    // Calcular pontuação do setup

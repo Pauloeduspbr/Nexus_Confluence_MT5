@@ -253,7 +253,52 @@ input double TP_Points                = 200.0; // 🎯 Take Profit em pontos (Fo
 input group "=== 💰 LOTE FIXO ==="
 input double FixedLotSize             = 0.01;  // 📌 Lote Fixo (Forex: 0.01 | B3: 1.0 | Índices: 0.1)
 
-input group "=== 🔐 IDENTIFICAÇÃO ==="
+input group "=== � INDICADORES - Caminhos dos Arquivos ==="
+input string IndicatorsBasePath       = "NexusConfluenceEA\\"; // 📂 Pasta relativa em MQL5/Indicators
+input string GGTrendBarIndicator      = "GG_TrendBar_Indicator";
+input string TrendMagicIndicator      = "TrendMagic_MT5";
+input string CurrencyStrengthIndicator= "CurrencyStrengthMeter_MT5";
+input string RSIOMAIndicator          = "RSIOMA_v2HHLSX_MT5";
+input string WAEIndicator             = "WaddahAttarExplosion_Professional";
+
+input group "=== 📈 SUPERTREND (Trend Magic Operacional) ==="
+input int    ST_OPER_CCI_Period       = 50;    // CCI Period
+input int    ST_OPER_ATR_Period       = 5;     // ATR Period
+input double ST_OPER_ATR_Multiplier   = 1.0;   // ATR Multiplier
+
+input group "=== 💱 CURRENCY STRENGTH - OPERACIONAL ==="
+input int    CS_CalculationPeriod     = 24;    // Período de cálculo
+input int    CS_SmoothingPeriod       = 5;     // Período de suavização
+input bool   CS_ShowInPercent         = true;  // Exibir em porcentagem
+
+input group "=== 📊 RSI OMA (Operacional) ==="
+input int              RSI_OPER_Period      = 14;        // RSI Period
+input int              RSI_OPER_MA_Period   = 9;         // Moving Average Period
+input ENUM_MA_METHOD   RSI_OPER_MA_Method   = MODE_SMA;  // MA Method
+input double           RSI_OPER_HighLevel   = 70.0;      // High Level (sobrecompra)
+input double           RSI_OPER_LowLevel    = 30.0;      // Low Level (sobrevenda)
+input bool             RSI_OPER_ShowLevels  = true;      // Show Levels
+
+input group "=== 💥 WAE (Operacional) ==="
+input int    WAE_OPER_FastMA          = 20;    // Fast MA Period
+input int    WAE_OPER_SlowMA          = 40;    // Slow MA Period
+input int    WAE_OPER_BBLength        = 20;    // Bollinger Bands Length
+input double WAE_OPER_BBMultiplier    = 2.0;   // Bollinger Bands Multiplier
+input int    WAE_OPER_Sensitivity     = 150;   // Sensitivity
+
+input group "=== 📊 GG TRENDBAR - GLOBAL ==="
+input color              GG_UpColor       = clrLime;      // Up Trend Color
+input color              GG_DownColor     = clrRed;       // Down Trend Color
+input color              GG_FlatColor     = clrYellow;    // Flat/Neutral Color
+input color              GG_TextColor     = clrAqua;      // Text Color
+input ENUM_BASE_CORNER   GG_Corner        = CORNER_LEFT_UPPER; // Corner for Display
+input bool               GG_CreateVisualObjects = true;   // Create Visual Objects
+input int                GG_ADX_Period = 14;           // ADX Period
+input ENUM_APPLIED_PRICE GG_ADX_Price  = PRICE_CLOSE;  // Price Type
+input double             GG_Step_Psar  = 0.02;         // PSAR Step
+input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
+
+input group "=== �🔐 IDENTIFICAÇÃO ==="
 input int    EA_MAGIC_NUMBER          = 20241024; // 🔐 Magic Number (único por instância!)
 
 input group "════════════════════════════════════════════════════════"
@@ -266,4 +311,7 @@ input group "══════════════════════�
 const string EA_VERSION = "4.40";    // 🔥 v4.40: SIMPLIFICAÇÃO RADICAL
 const string EA_NAME    = "Nexus Confluence Basic";
 
+//+------------------------------------------------------------------+
+//| NOTA: Variáveis globais g_handles e g_tfOperacional             |
+//|       já estão declaradas em Estrategias.mqh                    |
 //+------------------------------------------------------------------+

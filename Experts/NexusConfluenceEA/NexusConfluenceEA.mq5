@@ -242,7 +242,9 @@ bool HasOpenPosition()
    int total=PositionsTotal();
    if(total<=0)
       return(false);
-   for(int i=0; i<total; i++)
+   
+   int i;
+   for(i=0; i<total; i++)
    {
       if(PositionSelectByIndex(i))
       {

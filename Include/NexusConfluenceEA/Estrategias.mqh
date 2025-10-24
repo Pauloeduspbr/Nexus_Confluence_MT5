@@ -882,12 +882,29 @@ WAESignal GetWAESignal(int handle, TRADE_DIRECTION direction, ENUM_TIMEFRAMES ti
 //+------------------------------------------------------------------+
 GGTrendBarSignal GetGGTrendBarSignal()
 {
+   // 🔥 DEBUG v4.40.3: Contagem de chamadas
+   static int callCount = 0;
+   callCount++;
+   
    GGTrendBarSignal result;
    result.isValid = false;
    
    if(g_handles.gg_global == INVALID_HANDLE)
    {
+      // 🔥 DEBUG v4.40.3: Log erro handle
+      static int handleErrorCount = 0;
+      handleErrorCount++;
+      if(handleErrorCount % 100 == 0)
+      {
+         PrintFormat("🔴 [DEBUG] Handle GG TrendBar INVÁLIDO - erro #%d", handleErrorCount);
+      }
       return result;
+   }
+   
+   // 🔥 DEBUG v4.40.3: Log a cada 200 chamadas
+   if(callCount % 200 == 0)
+   {
+      PrintFormat("🔍 [DEBUG] GetGGTrendBarSignal() chamado %d vezes", callCount);
    }
    
    // 🔥 v2.0 OTIMIZADO: LER DO CACHE ao invés de CopyBuffer (9 chamadas → 0 chamadas!)
@@ -895,6 +912,15 @@ GGTrendBarSignal GetGGTrendBarSignal()
    {
       PrintFormat("🔴 CRÍTICO: Cache inválido ao ler GG TrendBar - ANÁLISE REJEITADA!");
       result.isValid = false;
+      
+      // 🔥 DEBUG v4.40.3: Contador de cache inválido
+      static int cacheInvalidCount = 0;
+      cacheInvalidCount++;
+      if(cacheInvalidCount % 50 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Cache inválido detectado %d vezes", cacheInvalidCount);
+      }
+      
       return result;
    }
    
@@ -1029,6 +1055,10 @@ GGTrendBarSignal GetGGTrendBarSignal()
 //+------------------------------------------------------------------+
 MultiTFResult AnalyzeMultiTimeframeAlignment()
 {
+   // 🔥 DEBUG v4.40.3: Contagem de chamadas
+   static int callCount = 0;
+   callCount++;
+   
    MultiTFResult result;
    result.isValid = false;
    result.direction = TRADE_DIRECTION_NONE;
@@ -1036,6 +1066,12 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    result.h1Aligned = false;
    result.m30Aligned = false;
    result.structureValid = false;
+   
+   // 🔥 DEBUG v4.40.3: Log a cada 100 chamadas
+   if(callCount % 100 == 0)
+   {
+      PrintFormat("🔍 [DEBUG] AnalyzeMultiTimeframeAlignment() chamado %d vezes", callCount);
+   }
    
    PrintFormat("════════════════════════════════════════════════════════════════");
    PrintFormat("🎯 Analisando Multi-Timeframe com GG TRENDBAR (FILTRO MESTRE)");
@@ -1048,6 +1084,12 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       PrintFormat("   g_tfOperacional=%d, g_tfMacro1=%d, g_tfMacro2=%d",
                   g_tfOperacional, g_tfMacro1, g_tfMacro2);
       PrintFormat("   CAUSA: DefineMultiTimeframes() não foi chamado no OnInit()!");
+      
+      // 🔥 DEBUG v4.40.3: Contador de erros
+      static int initErrorCount = 0;
+      initErrorCount++;
+      PrintFormat("⚠️ [DEBUG] Erro de inicialização detectado %d vezes", initErrorCount);
+      
       return result;
    }
    

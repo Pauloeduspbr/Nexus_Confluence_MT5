@@ -197,11 +197,31 @@ void OnTick()
    // ETAPA 3: EXECUTAR ORDEM (se setup válido)
    // ═══════════════════════════════════════════════════════════════
    
+   // 🔥 DEBUG v4.40.3: Log da pontuação antes de verificar
+   static int scoreCalcCount = 0;
+   scoreCalcCount++;
+   if(scoreCalcCount % 100 == 0)
+   {
+      PrintFormat("🔍 [DEBUG] Score calculado #%d - Class: %d, Points: %d/%d", 
+                  scoreCalcCount, score.classification, score.totalPoints, score.requiredPoints);
+   }
+   
    // Verificar se setup é válido (PREMIUM ou GOOD)
    if(score.classification != SETUP_PREMIUM && score.classification != SETUP_GOOD)
    {
+      // 🔥 DEBUG v4.40.3: Log rejeições por classificação
+      static int classRejectCount = 0;
+      classRejectCount++;
+      if(classRejectCount % 50 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Setup rejeitado %d vezes - Last classification: %d", 
+                     classRejectCount, score.classification);
+      }
       return; // Setup rejeitado
    }
+   
+   // 🎯 DEBUG v4.40.3: LOG CRÍTICO - SETUP APROVADO!
+   PrintFormat("\n🎯🎯🎯 [CRITICAL] SETUP APROVADO! VAI EXECUTAR TRADE AGORA! 🎯🎯🎯");
    
    // Determinar direção
    bool isBuy = (mtf.direction == TRADE_DIRECTION_BUY);

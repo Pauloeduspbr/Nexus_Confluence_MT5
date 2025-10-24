@@ -283,11 +283,12 @@ void OnTick()
    // 🔥 v4.24: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO + FORÇAR DESBLOQUEIO
    if(g_pauseUntilTime > TimeCurrent())
    {
-      // 🔥 v4.24 PROTEÇÃO: Forçar desbloqueio se passou mais de 12 horas
+      // 🔥 v4.36: Limite configurável via input (não hardcode!)
       int secondsPaused = (int)(g_pauseUntilTime - TimeCurrent());
-      if(secondsPaused > 43200)  // Mais de 12 horas? FORÇAR DESBLOQUEIO!
+      if(secondsPaused > MaxPauseTimeSeconds)  // Excedeu tempo máximo de pausa?
       {
-         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa excedeu 12h (era %d segundos)", secondsPaused);
+         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa excedeu %ds (%dh) - era %d segundos", 
+                     MaxPauseTimeSeconds, MaxPauseTimeSeconds/3600, secondsPaused);
          PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
          g_pauseUntilTime = 0;
          g_consecutiveLosses = 0;
@@ -1572,99 +1573,110 @@ void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculatio
 //+------------------------------------------------------------------+
 bool ValidateInputParameters()
   {
-   // Validar riscos básicos
-   if(AccountRiskPercent <= 0 || AccountRiskPercent > 10)
-     {
-      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0.1-10%%)", AccountRiskPercent);
-      return false;
-     }
-
-   if(MaxRiskPremium <= 0 || MaxRiskPremium > 10)
-     {
-      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0.1-10%%)", MaxRiskPremium);
-      return false;
-     }
-
-   // 🔥 REMOVIDO v4.9: Validação MaxDrawdownPercent (bloqueio desabilitado)
-
-   if(MaxSimultaneousTrades <= 0 || MaxSimultaneousTrades > 10)
-     {
-      PrintFormat("❌ MaxSimultaneousTrades inválido: %d (deve ser 1-10)", MaxSimultaneousTrades);
-      return false;
-     }
+   // 🔥 v4.36: ZERO HARDCODES - Todos os limites são inputs configuráveis!
    
-   // ✅ VALIDAR NOVOS PARÂMETROS v4.4
+   // Validar riscos básicos
+   if(AccountRiskPercent <= 0 || AccountRiskPercent > MaxAccountRiskPercent)
+     {
+      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0.1-%.1f%%)", 
+                  AccountRiskPercent, MaxAccountRiskPercent);
+      return false;
+     }
+
+   if(MaxRiskPremium <= 0 || MaxRiskPremium > MaxRiskPremiumLimit)
+     {
+      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0.1-%.1f%%)", 
+                  MaxRiskPremium, MaxRiskPremiumLimit);
+      return false;
+     }
+
+   if(MaxSimultaneousTrades <= 0 || MaxSimultaneousTrades > MaxSimultaneousTradesLimit)
+     {
+      PrintFormat("❌ MaxSimultaneousTrades inválido: %d (deve ser 1-%d)", 
+                  MaxSimultaneousTrades, MaxSimultaneousTradesLimit);
+      return false;
+     }
    
    // Stop Loss
-   if(SL_BufferPoints < 0 || SL_BufferPoints > 1000)
+   if(SL_BufferPoints < 0 || SL_BufferPoints > MaxSL_BufferPoints)
      {
-      PrintFormat("❌ SL_BufferPoints inválido: %.1f (deve ser 0-1000)", SL_BufferPoints);
+      PrintFormat("❌ SL_BufferPoints inválido: %.1f (deve ser 0-%.1f)", 
+                  SL_BufferPoints, MaxSL_BufferPoints);
       return false;
      }
    
-   if(SL_FallbackPercent < 0.1 || SL_FallbackPercent > 10)
+   if(SL_FallbackPercent < 0.1 || SL_FallbackPercent > MaxSL_FallbackPercent)
      {
-      PrintFormat("❌ SL_FallbackPercent inválido: %.2f (deve ser 0.1-10%%)", SL_FallbackPercent);
+      PrintFormat("❌ SL_FallbackPercent inválido: %.2f (deve ser 0.1-%.1f%%)", 
+                  SL_FallbackPercent, MaxSL_FallbackPercent);
       return false;
      }
    
-   if(SL_MinDistancePoints < 0 || SL_MinDistancePoints > 10000)
+   if(SL_MinDistancePoints < 0 || SL_MinDistancePoints > MaxSL_DistancePoints)
      {
-      PrintFormat("❌ SL_MinDistancePoints inválido: %.1f (deve ser 0-10000)", SL_MinDistancePoints);
+      PrintFormat("❌ SL_MinDistancePoints inválido: %.1f (deve ser 0-%.1f)", 
+                  SL_MinDistancePoints, MaxSL_DistancePoints);
       return false;
      }
    
-   if(SL_MaxDistancePoints < SL_MinDistancePoints || SL_MaxDistancePoints > 50000)
+   if(SL_MaxDistancePoints < SL_MinDistancePoints || SL_MaxDistancePoints > MaxSL_MaxDistanceLimit)
      {
-      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser >= SL_Min e <= 50000)", SL_MaxDistancePoints);
+      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser >= SL_Min e <= %.1f)", 
+                  SL_MaxDistancePoints, MaxSL_MaxDistanceLimit);
       PrintFormat("   SL_MinDistancePoints: %.1f", SL_MinDistancePoints);
       return false;
      }
    
-   // Take Profit
-   if(TP1_RR < 0.1 || TP1_RR > 20)
+   // Take Profit - 🔥 v4.36: SEM HARDCODES, limites via inputs!
+   if(TP1_RR < MinTP_RR || TP1_RR > MaxTP_RR)
      {
-      PrintFormat("❌ TP1_RR inválido: %.2f (deve ser 0.1-20)", TP1_RR);
+      PrintFormat("❌ TP1_RR inválido: %.2f (deve ser %.1f-%.1f)", 
+                  TP1_RR, MinTP_RR, MaxTP_RR);
       return false;
      }
    
-   if(TP2_RR < TP1_RR || TP2_RR > 20)
+   if(TP2_RR < TP1_RR || TP2_RR > MaxTP_RR)
      {
-      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser >= TP1_RR e <= 20)", TP2_RR);
+      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser >= TP1_RR e <= %.1f)", 
+                  TP2_RR, MaxTP_RR);
       return false;
      }
    
    if(UseTP3)
      {
-      if(TP3_RR < TP2_RR || TP3_RR > 20)
+      if(TP3_RR < TP2_RR || TP3_RR > MaxTP_RR)
         {
-         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser >= TP2_RR e <= 20)", TP3_RR);
+         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser >= TP2_RR e <= %.1f)", 
+                     TP3_RR, MaxTP_RR);
          return false;
         }
      }
    
-   // Validar percentuais individuais (soma será validada na execução)
+   // Validar percentuais individuais
    if(EnablePartialTP)
      {
-      if(TP1_ClosePercent < 0 || TP1_ClosePercent > 100)
+      if(TP1_ClosePercent < 0 || TP1_ClosePercent > MaxTP_ClosePercent)
         {
-         PrintFormat("❌ TP1_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP1_ClosePercent);
+         PrintFormat("❌ TP1_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
+                     TP1_ClosePercent, MaxTP_ClosePercent);
          return false;
         }
       
-      if(TP2_ClosePercent < 0 || TP2_ClosePercent > 100)
+      if(TP2_ClosePercent < 0 || TP2_ClosePercent > MaxTP_ClosePercent)
         {
-         PrintFormat("❌ TP2_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP2_ClosePercent);
+         PrintFormat("❌ TP2_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
+                     TP2_ClosePercent, MaxTP_ClosePercent);
          return false;
         }
       
-      if(UseTP3 && (TP3_ClosePercent < 0 || TP3_ClosePercent > 100))
+      if(UseTP3 && (TP3_ClosePercent < 0 || TP3_ClosePercent > MaxTP_ClosePercent))
         {
-         PrintFormat("❌ TP3_ClosePercent inválido: %.1f%% (deve ser 0-100%%)", TP3_ClosePercent);
+         PrintFormat("❌ TP3_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
+                     TP3_ClosePercent, MaxTP_ClosePercent);
          return false;
         }
       
-      // Avisar se soma não é 100%, mas permitir (pode ser estratégia intencional)
+      // Avisar se soma não é ~100%, mas permitir (pode ser estratégia intencional)
       double totalClosePercent = TP1_ClosePercent + TP2_ClosePercent;
       if(UseTP3)
          totalClosePercent += TP3_ClosePercent;
@@ -1672,33 +1684,38 @@ bool ValidateInputParameters()
       if(totalClosePercent < 95 || totalClosePercent > 105)
         {
          PrintFormat("⚠️ AVISO: Soma dos TP ClosePercent: %.1f%% (recomendado ~100%%)", totalClosePercent);
-         PrintFormat("   TP1: %.1f%%, TP2: %.1f%%, TP3: %.1f%%", TP1_ClosePercent, TP2_ClosePercent, TP3_ClosePercent);
-         // Não retornar false, apenas avisar
+         PrintFormat("   TP1: %.1f%%, TP2: %.1f%%, TP3: %.1f%%", 
+                     TP1_ClosePercent, TP2_ClosePercent, TP3_ClosePercent);
         }
      }
    
-   // Trailing Stop
-   if(TrailingDistancePoints < 0 || TrailingDistancePoints > 10000)
+   // Trailing Stop - 🔥 v4.36: SEM HARDCODES
+   if(TrailingDistancePoints < 0 || TrailingDistancePoints > MaxTrailingDistancePoints)
      {
-      PrintFormat("❌ TrailingDistancePoints inválido: %.1f (deve ser 0-10000)", TrailingDistancePoints);
+      PrintFormat("❌ TrailingDistancePoints inválido: %.1f (deve ser 0-%.1f)", 
+                  TrailingDistancePoints, MaxTrailingDistancePoints);
       return false;
      }
    
    if(TrailingStepPoints < 0 || TrailingStepPoints > TrailingDistancePoints)
      {
-      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser 0-%.1f)", TrailingStepPoints, TrailingDistancePoints);
+      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser 0-%.1f)", 
+                  TrailingStepPoints, TrailingDistancePoints);
       return false;
      }
    
-   if(TrailingActivationRR < 0 || TrailingActivationRR > 10)
+   if(TrailingActivationRR < 0 || TrailingActivationRR > MaxTrailingActivationRR)
      {
-      PrintFormat("❌ TrailingActivationRR inválido: %.2f (deve ser 0-10)", TrailingActivationRR);
+      PrintFormat("❌ TrailingActivationRR inválido: %.2f (deve ser 0-%.1f)", 
+                  TrailingActivationRR, MaxTrailingActivationRR);
       return false;
      }
    
-   if(TrailingUseATR && (TrailingATRMultiplier < 0.1 || TrailingATRMultiplier > 10))
+   if(TrailingUseATR && (TrailingATRMultiplier < MinTrailingATRMultiplier || 
+                          TrailingATRMultiplier > MaxTrailingATRMultiplier))
      {
-      PrintFormat("❌ TrailingATRMultiplier inválido: %.2f (deve ser 0.1-10)", TrailingATRMultiplier);
+      PrintFormat("❌ TrailingATRMultiplier inválido: %.2f (deve ser %.1f-%.1f)", 
+                  TrailingATRMultiplier, MinTrailingATRMultiplier, MaxTrailingATRMultiplier);
       return false;
      }
    
@@ -1731,6 +1748,7 @@ bool ValidateInputParameters()
      }
    
    PrintFormat("✅ Todos os parâmetros validados com sucesso");
+   PrintFormat("   Limites configuráveis via inputs (ZERO hardcodes!)");
    return true;
   }
 

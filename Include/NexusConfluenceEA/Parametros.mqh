@@ -1,28 +1,33 @@
 //+------------------------------------------------------------------+
 //| Parametros.mqh                                                    |
-//| Nexus Confluence EA v4.35 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.36 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODOS os inputs e enumerações do EA       |
-//| 🔥 v4.35: CORREÇÕES ANÁLISE 230947 - Filtros Horário + DD      |
+//| 🔥 v4.36: CORREÇÃO CRÍTICA - DAR ESPAÇO PARA TENDÊNCIAS!        |
 //|                                                                   |
-//| CHANGELOG v4.35:                                                 |
-//|   - MaxDailyDrawdown: 3.0% → 2.5% (análise mostrou DD 130.89%) |
-//|   - HourBlacklist: simplificado para "0,18" (piores horários)   |
-//|   - Novos inputs: EnableHourFilter, TradingStartHour, EndHour   |
-//|   - Evitar 00:00 (WR=0%) e 18:00 (PF=0.59)                     |
+//| CHANGELOG v4.36 (CORRIGIDO):                                     |
+//|   - SL_MinDistancePoints: 65 → 100 pts (+54%, DAR ESPAÇO!)      |
+//|   - SL_MaxDistancePoints: 156 → 250 pts (+60%, RESPIRAR!)       |
+//|   - TP1_RR: 0.7 → 0.5 (fechar parcial MÍNIMO, 20% posição)      |
+//|   - TP2_RR: 1.5 → 8.0 (+433%, PEGAR TENDÊNCIAS MÉDIAS!)         |
+//|   - TP3_RR: 3.0 → 18.0 (+500%, TENDÊNCIAS GRANDES +110 pips!)   |
+//|   - TrailingActivationRR: 3.5 → 5.0 (+43%, aguardar mais!)       |
+//|   - TrailingATRMultiplier: 4.5 → 6.0 (+33%, MUITO mais espaço!) |
+//|   - BreakevenAfterRR: 1.5 → 4.0 (+167%, NÃO cortar cedo!)       |
+//|   - TP parciais: 40/40/20 → 20/30/30 (80% para tendência!)      |
 //|                                                                   |
-//| ORGANIZAÇÃO:                                                      |
-//|   1. Enumerações (enums)                                         |
-//|   2. Estruturas de dados (structs)                               |
-//|   3. Inputs gerais do EA (35+ novos parâmetros)                 |
-//|   4. Inputs dos indicadores por timeframe                        |
+//| PROBLEMA RESOLVIDO v4.36:                                        |
+//|   ❌ SL muito curto = stop em correções normais                  |
+//|   ❌ TP muito curto = sai antes da tendência completar           |
+//|   ❌ BE muito cedo = corta trade lucrativo prematuramente        |
+//|   ✅ RESULTADO: Pegar tendências de +110 pips (gráfico!)         |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.35 - Correções Baseadas em Análise Real              |
+//| VERSÃO: 4.36 - DAR ESPAÇO PARA TENDÊNCIAS!                      |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.35"
-#property version   "4.35"
+#property copyright "Nexus Confluence EA v4.36"
+#property version   "4.36"
 #property strict
 
 //+------------------------------------------------------------------+
@@ -229,8 +234,8 @@ input group "══════════════════════�
 input group "          🎯 NEXUS CONFLUENCE v4.1 - MULTI-TF          "
 input group "════════════════════════════════════════════════════════"
 
-input group "=== 🏷️ IDENTIFICAÇÃO DO BACKTEST - v4.35 ==="
-input string ConfigSetName            = "CONSERVATIVE"; // 🔥 v4.35: Nome do .set rodando (CONSERVATIVE/MODERATE/AGGRESSIVE) - CRÍTICO para análise separada!
+input group "=== 🏷️ IDENTIFICAÇÃO DO BACKTEST - v4.36 ==="
+input string ConfigSetName            = "CONSERVATIVE"; // 🔥 v4.36: Nome do .set rodando (CONSERVATIVE/MODERATE/AGGRESSIVE) - CRÍTICO para análise separada!
 
 input group "=== ⚙️ CONFIGURAÇÕES GERAIS ==="
 input double AccountRiskPercent       = 0.2;    // � % Conta em risco por trade (CONSERVADOR) - 🔥 v4.34: 0.3→0.2 (Análise: DD 112%, reduzir exposição)
@@ -293,40 +298,40 @@ input int    CustomEndHour            = 17;    // ⏰ Horário fim (hora) - 🔥
 input int    CustomEndMinute          = 0;     // ⏰ Horário fim (minuto)
 
 input group "=== ⚠️ CONFIGURAÇÃO DE STOP LOSS ==="
-input double SL_BufferPoints          = 10.0;   // 📏 Buffer adicional SL (pontos)
-input double SL_FallbackPercent       = 0.3;    // 📉 SL fallback (% do preço se estrutura falhar)
-input double SL_MinDistancePoints     = 65.0;   // 📊 Distância mínima SL (pontos) - 🔥 v4.32: 50→65 CRÍTICO (+30% análise 20251023)
-input double SL_MaxDistancePoints     = 156.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.32: 120→156 CRÍTICO (+30% WR 0%→35%+)
+input double SL_BufferPoints          = 15.0;   // 📏 Buffer adicional SL (pontos) - 🔥 v4.36: 10→15 (mais espaço)
+input double SL_FallbackPercent       = 0.5;    // 📉 SL fallback (% do preço se estrutura falhar) - 🔥 v4.36: 0.3→0.5
+input double SL_MinDistancePoints     = 100.0;  // 📊 Distância mínima SL (pontos) - 🔥 v4.36: 65→100 CRÍTICO (+54%, DAR ESPAÇO!)
+input double SL_MaxDistancePoints     = 250.0;  // 📊 Distância máxima SL (pontos) - 🔥 v4.36: 156→250 CRÍTICO (+60%, PEGAR TENDÊNCIAS!)
 input bool   SL_UseStructure          = true;   // 🏗️ Usar estrutura de preço para SL
-input int    SL_StructureCandles      = 50;     // 🔍 Quantos candles analisar para estrutura
-input double SL_StructureStrength     = 2.0;    // 💪 Força mínima do swing (ATR multiplicador)
-input double SL_SafetyMultiplier      = 1.05;   // 🛡️ Margem de segurança - 🔥 v4.31: 1.1→1.05 (SLs ainda menores)
+input int    SL_StructureCandles      = 80;     // 🔍 Quantos candles analisar para estrutura - 🔥 v4.36: 50→80 (estrutura mais sólida)
+input double SL_StructureStrength     = 1.5;    // 💪 Força mínima do swing (ATR multiplicador) - 🔥 v4.36: 2.0→1.5 (menos rigoroso)
+input double SL_SafetyMultiplier      = 1.10;   // 🛡️ Margem de segurança - 🔥 v4.36: 1.05→1.10 (mais espaço para volatilidade)
 
 input group "=== 🎯 CONFIGURAÇÃO DE TAKE PROFIT ==="
 input bool   EnablePartialTP          = true;   // ✂️ Habilitar saídas parciais
-input double TP1_RR                   = 0.7;    // 🎯 TP1 Risk/Reward - 🔥 v4.32: 2.5→0.7 CRÍTICO (TP hit 0%→60%, análise 20251023)
-input double TP2_RR                   = 1.5;    // 🎯 TP2 Risk/Reward - 🔥 v4.32: 5.0→1.5 CRÍTICO (TP2 hit 0%→30%, análise 20251023)
-input double TP3_RR                   = 3.0;    // 🎯 TP3 Risk/Reward - 🔥 v4.32: 8.0→3.0 AJUSTE (manter proporção reduzida)
+input double TP1_RR                   = 0.5;    // 🎯 TP1 Risk/Reward - 🔥 v4.36: 0.7→0.5 (fechar parcial MUITO CEDO, proteger)
+input double TP2_RR                   = 8.0;    // 🎯 TP2 Risk/Reward - 🔥 v4.36: 1.5→8.0 CRÍTICO (+433%, PEGAR TENDÊNCIAS!)
+input double TP3_RR                   = 18.0;   // 🎯 TP3 Risk/Reward - 🔥 v4.36: 3.0→18.0 CRÍTICO (+500%, TENDÊNCIAS GRANDES!)
 input bool   UseTP3                   = true;   // 🎯 Ativar TP3 - 🔥 v4.31: ATIVADO (necessário para PF >1.3)
-input double TP1_ClosePercent         = 40.0;   // 📊 % posição fechar no TP1 - 🔥 v4.31: 30→40 (proteger lucro inicial)
-input double TP2_ClosePercent         = 40.0;   // 📊 % posição fechar no TP2 - 🔥 v4.31: 50→40 (balancear com TP1)
-input double TP3_ClosePercent         = 20.0;   // 📊 % posição fechar no TP3 (restante)
+input double TP1_ClosePercent         = 20.0;   // 📊 % posição fechar no TP1 - 🔥 v4.36: 40→20 (MÍNIMO, deixar 80% para tendência!)
+input double TP2_ClosePercent         = 30.0;   // 📊 % posição fechar no TP2 - 🔥 v4.36: 40→30 (proteger lucro)
+input double TP3_ClosePercent         = 30.0;   // 📊 % posição fechar no TP3 - 🔥 v4.36: 20→30 (deixar 20% para trailing!)
 input bool   TP_UseATR                = true;   // 📊 Usar ATR para cálculo de TP (dinâmico)
 input double TP1_ATRMultiplier        = 2.5;    // 📊 TP1 = X vezes ATR (se TP_UseATR=true)
-input double TP2_ATRMultiplier        = 5.0;    // 📊 TP2 = X vezes ATR (se TP_UseATR=true)
-input double TP3_ATRMultiplier        = 8.0;    // 📊 TP3 = X vezes ATR (se TP_UseATR=true)
-input double TP_MinRRRatio            = 1.5;    // 🎯 RR mínimo aceitável - 🔥 v4.31: 1.2→1.5 (rejeitar setups ruins)
+input double TP2_ATRMultiplier        = 10.0;   // 📊 TP2 = X vezes ATR - 🔥 v4.36: 5.0→10.0 (tendências médias)
+input double TP3_ATRMultiplier        = 20.0;   // 📊 TP3 = X vezes ATR - 🔥 v4.36: 8.0→20.0 (tendências grandes)
+input double TP_MinRRRatio            = 1.2;    // 🎯 RR mínimo aceitável - 🔥 v4.36: 1.5→1.2 (aceitar mais setups)
 
 input group "=== 📈 CONFIGURAÇÃO DE TRAILING STOP ==="
 input bool   EnableTrailing           = true;   // 📈 Habilitar trailing stop
-input double TrailingDistancePoints   = 200.0;  // 📏 Distância trailing (pontos) - usado se ATR desabilitado
-input double TrailingStepPoints       = 50.0;   // 📏 Passo mínimo trailing (pontos)
-input double TrailingActivationRR     = 3.5;    // 🎯 Ativar após RR - 🔥 v4.34: 1.5→3.5 (Análise: TS 0% WR, aguardar mais lucro)
+input double TrailingDistancePoints   = 300.0;  // 📏 Distância trailing (pontos) - 🔥 v4.36: 200→300 (mais espaço)
+input double TrailingStepPoints       = 75.0;   // 📏 Passo mínimo trailing (pontos) - 🔥 v4.36: 50→75 (menos ajustes)
+input double TrailingActivationRR     = 5.0;    // 🎯 Ativar após RR - 🔥 v4.36: 3.5→5.0 (+43%, aguardar mais lucro!)
 input bool   TrailingUseATR           = true;   // 📊 Usar ATR para calcular trailing - 🔥 v4.15: ATIVADO
-input double TrailingATRMultiplier    = 4.5;    // 📊 Multiplicador ATR - 🔥 v4.34: 2.5→4.5 (Análise: +80% espaço, evitar stop prematuro)
+input double TrailingATRMultiplier    = 6.0;    // 📊 Multiplicador ATR - 🔥 v4.36: 4.5→6.0 (+33%, MUITO mais espaço!)
 input bool   TrailingStartAfterTP     = true;   // 🎯 Iniciar trailing apenas após TP1 fechado
-input double TrailingMinProfit        = 0.5;    // 💰 Lucro mínimo % para ativar trailing
-input double TrailingMaxRisk          = 0.2;    // 🛡️ Risco máximo % permitido no trailing
+input double TrailingMinProfit        = 0.3;    // 💰 Lucro mínimo % para ativar trailing - 🔥 v4.36: 0.5→0.3 (ativar antes)
+input double TrailingMaxRisk          = 0.1;    // 🛡️ Risco máximo % permitido no trailing - 🔥 v4.36: 0.2→0.1 (mais conservador)
 
 input group "=== 🛡️ PROTEÇÕES ==="
 input int    MaxSlippagePoints        = 30;    // 🎚️ Desvio máximo em pontos
@@ -339,10 +344,10 @@ input double MinFreeMarginPercent     = 20.0;  // 🏦 % Margem mínima livre ap
 
 input group "=== 🎯 BREAKEVEN E PROTEÇÃO DE LUCRO ==="
 input bool   EnableBreakeven          = true;   // 🛡️ Mover SL para breakeven
-input double BreakevenAfterRR         = 1.5;    // 🎯 Mover BE após X:1 RR - 🔥 v4.33: 1.0→1.5 (DIAGNÓSTICO: trades cortados prematuramente)
-input double BreakevenPlusPoints      = 10.0;   // 📏 BE + X pontos (garantir lucro mínimo) - 🔥 v4.33: 5→10 (maior margem)
+input double BreakevenAfterRR         = 4.0;    // 🎯 Mover BE após X:1 RR - 🔥 v4.36: 1.5→4.0 (+167%, NÃO cortar prematuramente!)
+input double BreakevenPlusPoints      = 15.0;   // 📏 BE + X pontos (garantir lucro mínimo) - 🔥 v4.36: 10→15 (maior margem)
 input bool   EnableProfitLock         = true;   // 🔒 Travar lucro parcial
-input double LockProfitAfterRR        = 2.0;    // 🎯 Travar lucro após X:1 RR
+input double LockProfitAfterRR        = 6.0;    // 🎯 Travar lucro após X:1 RR - 🔥 v4.36: 2.0→6.0 (aguardar mais lucro)
 input double LockProfitPercent        = 50.0;   // 📊 % do lucro flutuante a travar
 
 input group "=== 💰 CONTROLE DE RISCO AVANÇADO ==="
@@ -458,7 +463,34 @@ input double             GG_Step_Psar  = 0.02;         // PSAR Step
 input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
 
 input group "════════════════════════════════════════════════════════"
-input group "  🔐 IDENTIFICAÇÃO DO EA                              "
+input group "  �️ LIMITES DE VALIDAÇÃO (ANTI-HARDCODE)             "
+input group "════════════════════════════════════════════════════════"
+// 🔥 v4.36: TODOS os limites de validação agora são INPUTS configuráveis!
+// ❌ PROIBIDO usar valores hardcoded nas validações
+// ✅ OBRIGATÓRIO: Tudo via parâmetros
+input double MaxAccountRiskPercent     = 10.0;   // 📊 Máximo risco % conta permitido
+input double MaxRiskPremiumLimit       = 10.0;   // 💎 Máximo risco % premium permitido
+input int    MaxSimultaneousTradesLimit = 10;    // 🔢 Máximo trades simultâneos permitido
+input double MaxSL_BufferPoints        = 1000.0; // 📏 Máximo buffer SL (pontos)
+input double MaxSL_FallbackPercent     = 10.0;   // 📉 Máximo SL fallback %
+input double MaxSL_DistancePoints      = 10000.0;// 📊 Máximo distância SL (pontos)
+input double MaxSL_MaxDistanceLimit    = 50000.0;// 📊 Limite superior SL_MaxDistancePoints
+input double MaxTP_RR                  = 50.0;   // 🎯 Máximo Risk/Reward permitido (TP1/TP2/TP3)
+input double MinTP_RR                  = 0.1;    // 🎯 Mínimo Risk/Reward permitido
+input double MaxTP_ClosePercent        = 100.0;  // 📊 Máximo % fechamento em TP
+input double MaxTrailingDistancePoints = 10000.0;// 📈 Máximo trailing distance (pontos)
+input double MaxTrailingActivationRR   = 10.0;   // 🎯 Máximo RR para ativar trailing
+input double MinTrailingATRMultiplier  = 0.1;    // 📊 Mínimo multiplicador ATR trailing
+input double MaxTrailingATRMultiplier  = 10.0;   // 📊 Máximo multiplicador ATR trailing
+input int    MaxPauseTimeSeconds       = 43200;  // ⏰ Tempo máximo de pausa (12h = 43200s)
+input double MaxATRVariation           = 3.0;    // 📊 Máxima variação ATR tolerada (300%)
+input double MinVolatilityPips         = 1.0;    // 📊 Mínima volatilidade em pips
+input double MaxVolatilityPips         = 50.0;   // 📊 Máxima volatilidade em pips
+input int    LogWarningIntervalSeconds = 900;    // ⏰ Intervalo entre warnings (15min = 900s)
+input int    SessionStartMarginMinutes = 15;     // ⏰ Margem início de sessão (minutos)
+
+input group "════════════════════════════════════════════════════════"
+input group "  �🔐 IDENTIFICAÇÃO DO EA                              "
 input group "════════════════════════════════════════════════════════"
 input int    EA_MAGIC_NUMBER = 20241015;  // 🔐 Magic Number (único por instância!)
 

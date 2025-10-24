@@ -1619,15 +1619,21 @@ bool ValidateInputParameters()
       return false;
      }
    
-   if(SL_MaxDistancePoints < SL_MinDistancePoints || SL_MaxDistancePoints > MaxSL_MaxDistanceLimit)
+   if(SL_MaxDistancePoints > MaxSL_MaxDistanceLimit)
      {
-      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser >= SL_Min e <= %.1f)", 
+      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser <= %.1f)", 
                   SL_MaxDistancePoints, MaxSL_MaxDistanceLimit);
-      PrintFormat("   SL_MinDistancePoints: %.1f", SL_MinDistancePoints);
       return false;
      }
    
-   // Take Profit - 🔥 v4.36: SEM HARDCODES, limites via inputs!
+   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO se SL_Max < SL_Min
+   if(SL_MaxDistancePoints < SL_MinDistancePoints)
+     {
+      PrintFormat("⚠️ AVISO: SL_Max (%.1f) < SL_Min (%.1f) - configuração invertida, mas permitida", 
+                  SL_MaxDistancePoints, SL_MinDistancePoints);
+     }
+   
+   // Take Profit - 🔥 v4.37: VALIDAÇÃO FLEXÍVEL - permite otimização genética!
    if(TP1_RR < MinTP_RR || TP1_RR > MaxTP_RR)
      {
       PrintFormat("❌ TP1_RR inválido: %.2f (deve ser %.1f-%.1f)", 
@@ -1635,20 +1641,34 @@ bool ValidateInputParameters()
       return false;
      }
    
-   if(TP2_RR < TP1_RR || TP2_RR > MaxTP_RR)
+   if(TP2_RR < MinTP_RR || TP2_RR > MaxTP_RR)
      {
-      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser >= TP1_RR e <= %.1f)", 
-                  TP2_RR, MaxTP_RR);
+      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser %.1f-%.1f)", 
+                  TP2_RR, MinTP_RR, MaxTP_RR);
       return false;
+     }
+   
+   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO para ordem não crescente
+   if(TP2_RR < TP1_RR)
+     {
+      PrintFormat("⚠️ AVISO: TP2 (%.2f) < TP1 (%.2f) - configuração incomum, mas permitida", 
+                  TP2_RR, TP1_RR);
      }
    
    if(UseTP3)
      {
-      if(TP3_RR < TP2_RR || TP3_RR > MaxTP_RR)
+      if(TP3_RR < MinTP_RR || TP3_RR > MaxTP_RR)
         {
-         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser >= TP2_RR e <= %.1f)", 
-                     TP3_RR, MaxTP_RR);
+         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser %.1f-%.1f)", 
+                     TP3_RR, MinTP_RR, MaxTP_RR);
          return false;
+        }
+      
+      // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO
+      if(TP3_RR < TP2_RR)
+        {
+         PrintFormat("⚠️ AVISO: TP3 (%.2f) < TP2 (%.2f) - configuração incomum, mas permitida", 
+                     TP3_RR, TP2_RR);
         }
      }
    
@@ -1697,11 +1717,18 @@ bool ValidateInputParameters()
       return false;
      }
    
-   if(TrailingStepPoints < 0 || TrailingStepPoints > TrailingDistancePoints)
+   if(TrailingStepPoints < 0)
      {
-      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser 0-%.1f)", 
-                  TrailingStepPoints, TrailingDistancePoints);
+      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser >= 0)", 
+                  TrailingStepPoints);
       return false;
+     }
+   
+   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO se Step > Distance
+   if(TrailingStepPoints > TrailingDistancePoints)
+     {
+      PrintFormat("⚠️ AVISO: TrailingStep (%.1f) > TrailingDistance (%.1f) - configuração incomum", 
+                  TrailingStepPoints, TrailingDistancePoints);
      }
    
    if(TrailingActivationRR < 0 || TrailingActivationRR > MaxTrailingActivationRR)

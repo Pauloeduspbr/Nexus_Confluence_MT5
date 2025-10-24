@@ -74,7 +74,7 @@ int OnInit()
    }
    
    // Inicializar indicadores
-   if(!InitializeIndicators())
+   if(!InitializeIndicators(_Symbol))
    {
       PrintFormat("❌ ERRO: Falha ao inicializar indicadores!");
       return INIT_FAILED;
@@ -138,63 +138,60 @@ void OnTick()
    // ETAPA 2: ANÁLISE DE SETUP
    // ═══════════════════════════════════════════════════════════════
    
-   // Analisar setup (usa funções de Estrategias.mqh)
-   SetupScore buySetup, sellSetup;
+   // Classificar ativo
+   ASSET_CLASS assetClass = ClassifyAsset(_Symbol);
    
-   AnalyzeSetup(_Symbol, true, buySetup);   // Análise BUY
-   AnalyzeSetup(_Symbol, false, sellSetup); // Análise SELL
+   // Analisar alinhamento multi-timeframe
+   MultiTFResult mtf = AnalyzeMultiTimeframeAlignment();
+   
+   if(!mtf.isValid)
+   {
+      return; // Multi-TF não alinhado
+   }
+   
+   // Calcular pontuação do setup
+   SetupScore score = CalculateSetupScore(_Symbol, assetClass, mtf.direction, mtf.m30Aligned);
    
    // ═══════════════════════════════════════════════════════════════
    // ETAPA 3: EXECUTAR ORDEM (se setup válido)
    // ═══════════════════════════════════════════════════════════════
    
-   bool setupFound = false;
-   bool isBuy = false;
-   
-   // Verificar qual setup é válido
-   if(buySetup.classification == SETUP_PREMIUM || buySetup.classification == SETUP_GOOD)
+   // Verificar se setup é válido (PREMIUM ou GOOD)
+   if(score.classification != SETUP_PREMIUM && score.classification != SETUP_GOOD)
    {
-      setupFound = true;
-      isBuy = true;
-      PrintFormat("\n🔵 SETUP BUY DETECTADO:");
-      PrintFormat("   Classificação: %s", 
-         (buySetup.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
-      PrintFormat("   Pontos: %d/%d", buySetup.totalPoints, buySetup.requiredPoints);
-   }
-   else if(sellSetup.classification == SETUP_PREMIUM || sellSetup.classification == SETUP_GOOD)
-   {
-      setupFound = true;
-      isBuy = false;
-      PrintFormat("\n🔴 SETUP SELL DETECTADO:");
-      PrintFormat("   Classificação: %s", 
-         (sellSetup.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
-      PrintFormat("   Pontos: %d/%d", sellSetup.totalPoints, sellSetup.requiredPoints);
+      return; // Setup rejeitado
    }
    
-   // Executar ordem se setup válido
-   if(setupFound)
+   // Determinar direção
+   bool isBuy = (mtf.direction == TRADE_DIRECTION_BUY);
+   
+   PrintFormat("\n%s SETUP %s DETECTADO:",
+      isBuy ? "🔵" : "🔴",
+      (score.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
+   PrintFormat("   Pontos: %d/%d", score.totalPoints, score.requiredPoints);
+   
+   // Executar ordem
+   string comment = StringFormat("Nexus_%s_%s", 
+      isBuy ? "BUY" : "SELL",
+      (score.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
+   
+   bool success = ExecuteSimpleTrade(
+      _Symbol,
+      isBuy,
+      FixedLotSize,
+      SL_Points,
+      TP_Points,
+      EA_MAGIC_NUMBER,
+      comment
+   );
+   
+   if(success)
    {
-      string comment = StringFormat("Nexus_%s", 
-         isBuy ? "BUY" : "SELL");
-      
-      bool success = ExecuteSimpleTrade(
-         _Symbol,
-         isBuy,
-         FixedLotSize,
-         SL_Points,
-         TP_Points,
-         EA_MAGIC_NUMBER,
-         comment
-      );
-      
-      if(success)
-      {
-         PrintFormat("✅ Ordem executada com sucesso!\n");
-      }
-      else
-      {
-         PrintFormat("❌ Falha ao executar ordem\n");
-      }
+      PrintFormat("✅ Ordem executada com sucesso!\n");
+   }
+   else
+   {
+      PrintFormat("❌ Falha ao executar ordem\n");
    }
 }
 
@@ -256,6 +253,59 @@ bool HasOpenPosition()
    }
    
    return false;
+}
+
+//+------------------------------------------------------------------+
+//| Classifica o ativo atual                                        |
+//+------------------------------------------------------------------+
+ASSET_CLASS ClassifyAsset(const string symbol)
+{
+   string sym = symbol;
+   StringToUpper(sym);
+
+   // Metais
+   if(sym == "XAUUSD" || sym == "XAGUSD" || StringFind(sym,"XAU") == 0 || StringFind(sym,"XAG") == 0)
+      return ASSET_CLASS_METALS;
+
+   // B3 Brasil
+   if(StringFind(sym,"WIN") == 0 || StringFind(sym,"IND") == 0)
+      return ASSET_CLASS_INDEX_B3;
+   if(StringFind(sym,"WDO") == 0 || StringFind(sym,"DOL") == 0)
+      return ASSET_CLASS_CURRENCY_B3;
+
+   // Índices US
+   if(StringFind(sym,"US500") == 0 || StringFind(sym,"NAS100") == 0 || StringFind(sym,"US30") == 0)
+      return ASSET_CLASS_INDEX_US;
+
+   // Índices Europa
+   if(StringFind(sym,"GER") == 0 || StringFind(sym,"UK") == 0 || StringFind(sym,"FRA") == 0)
+      return ASSET_CLASS_INDEX_EU;
+
+   // Crypto
+   if(StringFind(sym,"BTC") == 0 || StringFind(sym,"ETH") == 0)
+      return ASSET_CLASS_CRYPTO;
+
+   // Forex
+   if(StringLen(sym) >= 6)
+   {
+      if(StringFind(sym,"USD") >= 0)
+      {
+         if(sym == "EURUSD" || sym == "GBPUSD" || sym == "USDJPY" ||
+            sym == "AUDUSD" || sym == "NZDUSD" || sym == "USDCHF" || sym == "USDCAD")
+            return ASSET_CLASS_FOREX_MAJOR;
+
+         if(StringFind(sym,"BRL") >= 0 || StringFind(sym,"MXN") >= 0 || StringFind(sym,"ZAR") >= 0)
+            return ASSET_CLASS_FOREX_EXOTIC;
+
+         return ASSET_CLASS_FOREX_MINOR;
+      }
+      else
+      {
+         return ASSET_CLASS_FOREX_MINOR;
+      }
+   }
+
+   return ASSET_CLASS_UNKNOWN;
 }
 
 //+------------------------------------------------------------------+

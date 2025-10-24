@@ -38,8 +38,8 @@
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>
 #include "..\..\Include\NexusConfluenceEA\Parametros.mqh"
-#include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
-#include "..\..\Include\NexusConfluenceEA\RiskManagement.mqh"
+// #include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
+// #include "..\..\Include\NexusConfluenceEA\RiskManagement.mqh"
 
 //--- Variáveis globais
 datetime g_lastCandleTime = 0;

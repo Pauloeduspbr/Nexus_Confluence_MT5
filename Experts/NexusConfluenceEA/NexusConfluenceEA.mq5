@@ -244,23 +244,19 @@ bool HasOpenPosition()
    if(total <= 0)
       return false;
 
-   // --- CORREÇÃO: Usando um loop 'while' para evitar o erro do 'for' ---
-   int i = 0;
-   while(i < total)
+   for(int idx = 0; idx < total; idx++)
    {
-      if(PositionSelectByIndex(i))
+      if(PositionSelectByIndex(idx))
       {
          if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
             PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
          {
-            return true; // Encontrou a posição
+            return true;
          }
       }
-      i++; // Incrementa o contador
    }
-   // --------------------------------------------------------------------
 
-   return false; // Nenhuma posição encontrada
+   return false;
 }
 
 

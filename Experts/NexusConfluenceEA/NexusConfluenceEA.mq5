@@ -241,11 +241,13 @@ bool IsValidTradingHour()
 bool HasOpenPosition()
 {
    int total = PositionsTotal();
-   int i;
    
-   for(i = total - 1; i >= 0; i--)
+   if(total <= 0)
+      return false;
+   
+   for(int idx = 0; idx < total; idx++)
    {
-      if(PositionSelectByIndex(i))
+      if(PositionSelectByIndex(idx))
       {
          if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
             PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)

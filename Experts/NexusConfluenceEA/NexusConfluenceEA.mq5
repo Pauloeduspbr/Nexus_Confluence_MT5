@@ -139,24 +139,47 @@ void OnTick()
    // ETAPA 1: VALIDAÇÕES BÁSICAS
    // ═══════════════════════════════════════════════════════════════
    
+   // 🔥 DEBUG v4.40.4: Contador de ticks processados
+   static int tickCount = 0;
+   tickCount++;
+   if(tickCount % 1000 == 0)
+   {
+      PrintFormat("🔍 [DEBUG] OnTick() processou %d ticks", tickCount);
+   }
+   
    // 1.1 Validar dia da semana
+   static int dayRejectCount = 0;
    if(!IsValidTradingDay())
    {
-      // Silencioso - não logar (muito frequente)
+      dayRejectCount++;
+      if(dayRejectCount % 1000 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Dia inválido rejeitado %d vezes", dayRejectCount);
+      }
       return;
    }
    
    // 1.2 Validar horário
+   static int hourRejectCount = 0;
    if(!IsValidTradingHour())
    {
-      // Silencioso - não logar (muito frequente)
+      hourRejectCount++;
+      if(hourRejectCount % 1000 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Horário inválido rejeitado %d vezes", hourRejectCount);
+      }
       return;
    }
    
    // 1.3 Verificar se já tem posição aberta
+   static int positionRejectCount = 0;
    if(HasOpenPosition())
    {
-      // Silencioso - não logar (muito frequente)
+      positionRejectCount++;
+      if(positionRejectCount % 100 == 0)
+      {
+         PrintFormat("⚠️ [DEBUG] Posição aberta detectada %d vezes (aguardando fechamento)", positionRejectCount);
+      }
       return;
    }
    

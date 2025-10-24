@@ -45,7 +45,6 @@
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA v4.27"
 #property version   "4.27"
-#property strict
 
 #include "Parametros.mqh"
 

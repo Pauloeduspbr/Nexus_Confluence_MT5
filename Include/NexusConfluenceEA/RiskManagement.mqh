@@ -22,7 +22,6 @@
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA v4.40"
 #property version   "4.40"
-#property strict
 
 #include "Parametros.mqh"
 #include <Trade\Trade.mqh>

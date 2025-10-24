@@ -31,7 +31,6 @@
 //| DATA: Outubro 2025                                               |
 //| VERSÃO: 4.40 - SIMPLIFICADO                                     |
 //+------------------------------------------------------------------+
-#property strict
 #property copyright "Nexus Confluence EA v4.40"
 #property version   "4.40"
 
@@ -243,7 +242,7 @@ bool HasOpenPosition()
    int total=PositionsTotal();
    if(total<=0)
       return(false);
-   for(int i=0;i<total;i++)
+   for(int i=0; i<total; i++)
    {
       if(PositionSelectByIndex(i))
       {

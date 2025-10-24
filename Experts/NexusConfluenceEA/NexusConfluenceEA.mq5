@@ -239,20 +239,17 @@ bool IsValidTradingHour()
 //+------------------------------------------------------------------+
 bool HasOpenPosition()
 {
-   int total=PositionsTotal();
-   if(total<=0)
-      return(false);
-   
-   int i;
-   for(i=0; i<total; i++)
+   for(int pos=PositionsTotal()-1; pos>=0; pos--)
    {
-      if(PositionSelectByIndex(i))
+      if(PositionSelectByIndex(pos))
       {
          if(PositionGetString(POSITION_SYMBOL)==_Symbol && PositionGetInteger(POSITION_MAGIC)==EA_MAGIC_NUMBER)
-            return(true);
+         {
+            return true;
+         }
       }
    }
-   return(false);
+   return false;
 }
 
 //+------------------------------------------------------------------+

@@ -241,24 +241,28 @@ bool IsValidTradingHour()
 bool HasOpenPosition()
 {
    int total = PositionsTotal();
-   
    if(total <= 0)
       return false;
-   
-   for(int idx = 0; idx < total; idx++)
+
+   // --- CORREÇÃO: Usando um loop 'while' para evitar o erro do 'for' ---
+   int i = 0;
+   while(i < total)
    {
-      if(PositionSelectByIndex(idx))
+      if(PositionSelectByIndex(i))
       {
          if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
             PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
          {
-            return true;
+            return true; // Encontrou a posição
          }
       }
+      i++; // Incrementa o contador
    }
-   
-   return false;
+   // --------------------------------------------------------------------
+
+   return false; // Nenhuma posição encontrada
 }
+
 
 //+------------------------------------------------------------------+
 //| Classifica o ativo atual                                        |

@@ -244,9 +244,9 @@ bool HasOpenPosition()
    if(total <= 0)
       return false;
 
-   for(int idx = 0; idx < total; idx++)
+   for(int posIndex = 0; posIndex < total; posIndex++)
    {
-      if(PositionSelectByIndex(idx))
+      if(PositionSelectByIndex(posIndex))
       {
          if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
             PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)

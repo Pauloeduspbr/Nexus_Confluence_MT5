@@ -150,6 +150,7 @@ class TradeReconstructor:
         self.log_file = Path(log_file)
         self.trades: Dict[int, Trade] = {}
         self.open_positions: Dict[int, Trade] = {}
+        self.current_config_set: Optional[str] = None  # 🔥 v4.34: Rastreia CONFIG_SET atual
         
         # Regex patterns
         self.patterns = {
@@ -205,8 +206,13 @@ class TradeReconstructor:
                 r'Breakeven\s+ativado.*ticket\s+#?(\d+)',
                 re.IGNORECASE
             ),
-            # 🔥 v4.34: Extrai CONFIG_SET de cada trade
-            'config_set': re.compile(
+            # 🔥 v4.34: Extrai CONFIG_SET dos parâmetros de entrada (início do backtest)
+            'config_set_param': re.compile(
+                r'ConfigSetName=(\w+)',
+                re.IGNORECASE
+            ),
+            # 🔥 v4.34: Também detecta no log do trade (se existir)
+            'config_set_log': re.compile(
                 r'CONFIG_SET:\s*(\w+)',
                 re.IGNORECASE
             ),
@@ -325,8 +331,16 @@ class TradeReconstructor:
                 self.open_positions[ticket].tp2_hit = True
             return
         
-        # 🔥 v4.34: CONFIG_SET extraction
-        match = self.patterns['config_set'].search(line)
+        # 🔥 v4.34: CONFIG_SET nos parâmetros (início de cada backtest)
+        match = self.patterns['config_set_param'].search(line)
+        if match:
+            config_set_name = match.group(1)
+            self.current_config_set = config_set_name
+            print(f"  🏷️  Detectado CONFIG_SET: {config_set_name}")
+            return
+        
+        # 🔥 v4.34: CONFIG_SET no log do trade (formato alternativo)
+        match = self.patterns['config_set_log'].search(line)
         if match:
             config_set_name = match.group(1)
             # Associar ao último trade aberto (heurística: CONFIG_SET vem logo após trade aberto)
@@ -369,7 +383,8 @@ class TradeReconstructor:
             entry_price=entry_price,
             initial_sl=sl,
             current_sl=sl,
-            volume=volume
+            volume=volume,
+            config_set_name=self.current_config_set  # 🔥 v4.34: Aplicar CONFIG_SET atual
         )
         
         self.open_positions[ticket] = trade
@@ -489,7 +504,8 @@ class TradeReconstructor:
             open_time=datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S'),
             entry_price=price,
             volume=volume,
-            initial_sl=0.0  # Backtest não mostra SL nos deals
+            initial_sl=0.0,  # Backtest não mostra SL nos deals
+            config_set_name=self.current_config_set  # 🔥 v4.34: Aplicar CONFIG_SET atual
         )
         
         self.open_positions[ticket] = new_trade

@@ -239,20 +239,20 @@ bool IsValidTradingHour()
 //| Verifica se já tem posição aberta                               |
 //+------------------------------------------------------------------+
 bool HasOpenPosition()
-  {
+{
    int total=PositionsTotal();
    if(total<=0)
       return(false);
    for(int i=0;i<total;i++)
-     {
+   {
       if(PositionSelectByIndex(i))
-        {
+      {
          if(PositionGetString(POSITION_SYMBOL)==_Symbol && PositionGetInteger(POSITION_MAGIC)==EA_MAGIC_NUMBER)
             return(true);
-        }
-     }
+      }
+   }
    return(false);
-  }
+}
 
 //+------------------------------------------------------------------+
 //| Classifica o ativo atual                                        |

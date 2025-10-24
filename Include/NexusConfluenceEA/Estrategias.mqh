@@ -252,24 +252,22 @@ bool UpdateBufferCache()
     g_bufferCache.isValid = success;
     g_bufferCache.lastUpdate = currentBar;
     
-    static int updateCount = 0;
-    static int errorCount = 0;
-    updateCount++;
-    
-    if(updateCount >= 50)
-    {
-        PrintFormat("🔥 BUFFER CACHE: 50 updates (19 CopyBuffer → 1/candle) | Erros: %d (%.1f%%)",
-                    errorCount, (errorCount * 100.0) / updateCount);
-        updateCount = 0;
-        errorCount = 0;
-    }
+    // 🔥 v4.40.5: LOGS DE CACHE REMOVIDOS (poluíam o log)
+    // Log apenas erros críticos consecutivos
+    static int consecutiveErrors = 0;
     
     if(!success)
     {
-        errorCount++;
-        PrintFormat("🔴 CRÍTICO: Buffer Cache Error em %s (erro #%d)", 
-                    TimeToString(currentBar), errorCount);
-        PrintFormat("   AÇÃO: Análise deste candle será PULADA (segurança)");
+        consecutiveErrors++;
+        if(consecutiveErrors >= 10)
+        {
+            PrintFormat("🔴 CRÍTICO: Buffer Cache com %d erros consecutivos!", consecutiveErrors);
+            consecutiveErrors = 0;
+        }
+    }
+    else
+    {
+        consecutiveErrors = 0;
     }
     
     return success;
@@ -1055,10 +1053,6 @@ GGTrendBarSignal GetGGTrendBarSignal()
 //+------------------------------------------------------------------+
 MultiTFResult AnalyzeMultiTimeframeAlignment()
 {
-   // 🔥 DEBUG v4.40.3: Contagem de chamadas
-   static int callCount = 0;
-   callCount++;
-   
    MultiTFResult result;
    result.isValid = false;
    result.direction = TRADE_DIRECTION_NONE;
@@ -1067,28 +1061,26 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    result.m30Aligned = false;
    result.structureValid = false;
    
-   // 🔥 DEBUG v4.40.3: Log a cada 100 chamadas
-   if(callCount % 100 == 0)
+   // 🔥 v4.40.5: Log APENAS primeira chamada
+   static bool firstCallLogged = false;
+   if(!firstCallLogged)
    {
-      PrintFormat("🔍 [DEBUG] AnalyzeMultiTimeframeAlignment() chamado %d vezes", callCount);
+      PrintFormat("\n🔍 [PRIMEIRA ANÁLISE] AnalyzeMultiTimeframeAlignment() iniciando...");
+      firstCallLogged = true;
    }
    
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("🎯 Analisando Multi-Timeframe com GG TRENDBAR (FILTRO MESTRE)");
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   
-   // 🔥 v4.40 CORREÇÃO CRÍTICA #3: Validar se timeframes foram inicializados
+   // Validar se timeframes foram inicializados
    if(g_tfOperacional == 0 || g_tfMacro1 == 0 || g_tfMacro2 == 0)
    {
-      PrintFormat("🔴 ERRO CRÍTICO: Timeframes multi-TF não foram inicializados!");
-      PrintFormat("   g_tfOperacional=%d, g_tfMacro1=%d, g_tfMacro2=%d",
-                  g_tfOperacional, g_tfMacro1, g_tfMacro2);
-      PrintFormat("   CAUSA: DefineMultiTimeframes() não foi chamado no OnInit()!");
-      
-      // 🔥 DEBUG v4.40.3: Contador de erros
-      static int initErrorCount = 0;
-      initErrorCount++;
-      PrintFormat("⚠️ [DEBUG] Erro de inicialização detectado %d vezes", initErrorCount);
+      static bool initErrorLogged = false;
+      if(!initErrorLogged)
+      {
+         PrintFormat("\n🔴 ERRO CRÍTICO: Timeframes multi-TF não foram inicializados!");
+         PrintFormat("   g_tfOperacional=%d, g_tfMacro1=%d, g_tfMacro2=%d",
+                     g_tfOperacional, g_tfMacro1, g_tfMacro2);
+         PrintFormat("   CAUSA: DefineMultiTimeframes() não foi chamado no OnInit()!\n");
+         initErrorLogged = true;
+      }
       
       return result;
    }

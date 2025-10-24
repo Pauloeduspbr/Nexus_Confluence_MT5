@@ -139,61 +139,89 @@ void OnTick()
    // ETAPA 1: VALIDAÇÕES BÁSICAS
    // ═══════════════════════════════════════════════════════════════
    
-   // 🔥 DEBUG v4.40.4: Contador de ticks processados
-   static int tickCount = 0;
-   tickCount++;
-   if(tickCount % 1000 == 0)
+   // 🔥 v4.40.5: LOG SIMPLIFICADO - apenas primeira rejeição de cada tipo
+   static bool firstTickLogged = false;
+   static bool dayRejectLogged = false;
+   static bool hourRejectLogged = false;
+   static bool positionWaitLogged = false;
+   
+   if(!firstTickLogged)
    {
-      PrintFormat("🔍 [DEBUG] OnTick() processou %d ticks", tickCount);
+      PrintFormat("\n� [v4.40.5] EA INICIANDO ANÁLISE DE VALIDAÇÕES...\n");
+      firstTickLogged = true;
    }
    
    // 1.1 Validar dia da semana
-   static int dayRejectCount = 0;
    if(!IsValidTradingDay())
    {
-      dayRejectCount++;
-      if(dayRejectCount % 1000 == 0)
+      if(!dayRejectLogged)
       {
-         PrintFormat("⚠️ [DEBUG] Dia inválido rejeitado %d vezes", dayRejectCount);
+         MqlDateTime dt;
+         TimeToStruct(TimeCurrent(), dt);
+         PrintFormat("⛔ [BLOQUEIO] Dia da semana inválido! DayOfWeek=%d (%s)", 
+                     dt.day_of_week, 
+                     dt.day_of_week == 0 ? "Domingo" :
+                     dt.day_of_week == 1 ? "Segunda" :
+                     dt.day_of_week == 2 ? "Terça" :
+                     dt.day_of_week == 3 ? "Quarta" :
+                     dt.day_of_week == 4 ? "Quinta" :
+                     dt.day_of_week == 5 ? "Sexta" : "Sábado");
+         PrintFormat("   CONFIGURAÇÃO: Mon=%s, Tue=%s, Wed=%s, Thu=%s, Fri=%s, Sat=%s, Sun=%s",
+                     TradeOnMonday ? "ON" : "OFF",
+                     TradeOnTuesday ? "ON" : "OFF",
+                     TradeOnWednesday ? "ON" : "OFF",
+                     TradeOnThursday ? "ON" : "OFF",
+                     TradeOnFriday ? "ON" : "OFF",
+                     TradeOnSaturday ? "ON" : "OFF",
+                     TradeOnSunday ? "ON" : "OFF");
+         dayRejectLogged = true;
       }
       return;
    }
    
    // 1.2 Validar horário
-   static int hourRejectCount = 0;
    if(!IsValidTradingHour())
    {
-      hourRejectCount++;
-      if(hourRejectCount % 1000 == 0)
+      if(!hourRejectLogged)
       {
-         PrintFormat("⚠️ [DEBUG] Horário inválido rejeitado %d vezes", hourRejectCount);
+         MqlDateTime dt;
+         TimeToStruct(TimeCurrent(), dt);
+         PrintFormat("⛔ [BLOQUEIO] Horário inválido! HoraAtual=%02d:%02d", dt.hour, dt.min);
+         PrintFormat("   CONFIGURAÇÃO: UseCustomHours=%s, Start=%02d:%02d, End=%02d:%02d",
+                     UseCustomTradingHours ? "YES" : "NO",
+                     CustomStartHour, CustomStartMinute,
+                     CustomEndHour, CustomEndMinute);
+         hourRejectLogged = true;
       }
       return;
    }
    
    // 1.3 Verificar se já tem posição aberta
-   static int positionRejectCount = 0;
    if(HasOpenPosition())
    {
-      positionRejectCount++;
-      if(positionRejectCount % 100 == 0)
+      if(!positionWaitLogged)
       {
-         PrintFormat("⚠️ [DEBUG] Posição aberta detectada %d vezes (aguardando fechamento)", positionRejectCount);
+         PrintFormat("⏳ [AGUARDANDO] Posição já aberta - aguardando fechamento...");
+         positionWaitLogged = true;
       }
       return;
+   }
+   
+   // ✅ PASSOU TODAS AS VALIDAÇÕES BÁSICAS!
+   static bool validationsPassedLogged = false;
+   if(!validationsPassedLogged)
+   {
+      PrintFormat("\n✅ [SUCESSO] PASSOU TODAS AS VALIDAÇÕES BÁSICAS!");
+      PrintFormat("   ✓ Dia da semana: OK");
+      PrintFormat("   ✓ Horário: OK");
+      PrintFormat("   ✓ Sem posições abertas: OK");
+      PrintFormat("\n🔍 Iniciando análise de setup Multi-TF...\n");
+      validationsPassedLogged = true;
    }
    
    // ═══════════════════════════════════════════════════════════════
    // ETAPA 2: ANÁLISE DE SETUP
    // ═══════════════════════════════════════════════════════════════
-   
-   // 🔥 DEBUG v4.40.3: Log a cada 100 candles para ver se chega aqui
-   static int analysisCount = 0;
-   analysisCount++;
-   if(analysisCount % 100 == 0)
-   {
-      PrintFormat("🔍 [DEBUG] Análise de setup rodando - %d análises realizadas", analysisCount);
-   }
    
    // Classificar ativo
    ASSET_CLASS assetClass = ClassifyAsset(_Symbol);
@@ -203,14 +231,25 @@ void OnTick()
    
    if(!mtf.isValid)
    {
-      // 🔥 DEBUG v4.40.3: Log DETALHADO do motivo da rejeição
-      static int rejectCount = 0;
-      rejectCount++;
-      if(rejectCount % 100 == 0)
+      // 🔥 v4.40.5: Log APENAS primeira rejeição
+      static bool mtfRejectLogged = false;
+      if(!mtfRejectLogged)
       {
-         PrintFormat("⚠️ [DEBUG] Multi-TF rejeitado %d vezes - verificar AnalyzeMultiTimeframeAlignment()", rejectCount);
+         PrintFormat("\n⛔ [BLOQUEIO] Multi-TF NÃO ALINHADO!");
+         PrintFormat("   Verificar função AnalyzeMultiTimeframeAlignment()");
+         PrintFormat("   (Esse log aparece apenas 1 vez)\n");
+         mtfRejectLogged = true;
       }
       return;
+   }
+   
+   // ✅ Multi-TF PASSOU!
+   static bool mtfPassedLogged = false;
+   if(!mtfPassedLogged)
+   {
+      PrintFormat("\n✅ [SUCESSO] Multi-TF ALINHADO!");
+      PrintFormat("   Direction: %s\n", mtf.direction == TRADE_DIRECTION_BUY ? "BUY" : "SELL");
+      mtfPassedLogged = true;
    }
    
    // Calcular pontuação do setup
@@ -220,30 +259,23 @@ void OnTick()
    // ETAPA 3: EXECUTAR ORDEM (se setup válido)
    // ═══════════════════════════════════════════════════════════════
    
-   // 🔥 DEBUG v4.40.3: Log da pontuação antes de verificar
-   static int scoreCalcCount = 0;
-   scoreCalcCount++;
-   if(scoreCalcCount % 100 == 0)
-   {
-      PrintFormat("🔍 [DEBUG] Score calculado #%d - Class: %d, Points: %d/%d", 
-                  scoreCalcCount, score.classification, score.totalPoints, score.requiredPoints);
-   }
-   
    // Verificar se setup é válido (PREMIUM ou GOOD)
    if(score.classification != SETUP_PREMIUM && score.classification != SETUP_GOOD)
    {
-      // 🔥 DEBUG v4.40.3: Log rejeições por classificação
-      static int classRejectCount = 0;
-      classRejectCount++;
-      if(classRejectCount % 50 == 0)
+      // � v4.40.5: Log APENAS primeira rejeição
+      static bool scoreRejectLogged = false;
+      if(!scoreRejectLogged)
       {
-         PrintFormat("⚠️ [DEBUG] Setup rejeitado %d vezes - Last classification: %d", 
-                     classRejectCount, score.classification);
+         PrintFormat("\n⛔ [BLOQUEIO] Setup REJEITADO por pontuação!");
+         PrintFormat("   Classification: %d (precisa ser GOOD=1 ou PREMIUM=2)", score.classification);
+         PrintFormat("   Points: %d/%d", score.totalPoints, score.requiredPoints);
+         PrintFormat("   (Esse log aparece apenas 1 vez)\n");
+         scoreRejectLogged = true;
       }
       return; // Setup rejeitado
    }
    
-   // 🎯 DEBUG v4.40.3: LOG CRÍTICO - SETUP APROVADO!
+   // 🎯🎯🎯 SETUP APROVADO! VAI EXECUTAR TRADE! 🎯🎯🎯
    PrintFormat("\n🎯🎯🎯 [CRITICAL] SETUP APROVADO! VAI EXECUTAR TRADE AGORA! 🎯🎯🎯");
    
    // Determinar direção

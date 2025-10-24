@@ -151,14 +151,6 @@ class TradeReconstructor:
         self.trades: Dict[str, Trade] = {}  # 🔥 v4.34 FIX: Chave = "CONFIG_ticket" para evitar sobrescrita
         self.open_positions: Dict[str, Trade] = {}  # 🔥 v4.34 FIX: Chave = "CONFIG_ticket"
         self.current_config_set: Optional[str] = None  # 🔥 v4.34: Rastreia CONFIG_SET atual
-    
-    def _get_trade_key(self, ticket: int) -> str:
-        """
-        🔥 v4.34 FIX: Gera chave única para trade baseada em CONFIG_SET + ticket
-        Isso evita que trades com mesmo ticket de diferentes backtests se sobrescrevam
-        """
-        config = self.current_config_set or 'UNKNOWN'
-        return f"{config}_{ticket}"
         
         # Regex patterns
         self.patterns = {
@@ -229,6 +221,14 @@ class TradeReconstructor:
                 re.IGNORECASE
             ),
         }
+    
+    def _get_trade_key(self, ticket: int) -> str:
+        """
+        🔥 v4.34 FIX: Gera chave única para trade baseada em CONFIG_SET + ticket
+        Isso evita que trades com mesmo ticket de diferentes backtests se sobrescrevam
+        """
+        config = self.current_config_set or 'UNKNOWN'
+        return f"{config}_{ticket}"
     
     def parse_log_streaming(self, chunk_size: int = 50 * 1024 * 1024) -> List[Trade]:
         """
@@ -339,16 +339,18 @@ class TradeReconstructor:
         match = self.patterns['tp1_hit'].search(line)
         if match:
             ticket = int(match.group(1))
-            if ticket in self.open_positions:
-                self.open_positions[ticket].tp1_hit = True
+            trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+            if trade_key in self.open_positions:
+                self.open_positions[trade_key].tp1_hit = True
             return
         
         # TP2 hit
         match = self.patterns['tp2_hit'].search(line)
         if match:
             ticket = int(match.group(1))
-            if ticket in self.open_positions:
-                self.open_positions[ticket].tp2_hit = True
+            trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+            if trade_key in self.open_positions:
+                self.open_positions[trade_key].tp2_hit = True
             return
         
         # 🔥 v4.34: CONFIG_SET nos parâmetros (início de cada backtest)
@@ -371,24 +373,27 @@ class TradeReconstructor:
             config_set_name = match.group(1)
             # Associar ao último trade aberto (heurística: CONFIG_SET vem logo após trade aberto)
             if self.open_positions:
-                last_ticket = max(self.open_positions.keys())
-                self.open_positions[last_ticket].config_set_name = config_set_name
+                # 🔥 v4.34 FIX: keys agora são strings "CONFIG_ticket", pegar último por ordem de inserção
+                last_trade_key = list(self.open_positions.keys())[-1]
+                self.open_positions[last_trade_key].config_set_name = config_set_name
             return
         
         # BE activated
         match = self.patterns['be_activated'].search(line)
         if match:
             ticket = int(match.group(1))
-            if ticket in self.open_positions:
-                self.open_positions[ticket].be_activated = True
+            trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+            if trade_key in self.open_positions:
+                self.open_positions[trade_key].be_activated = True
             return
         
         # TS activated
         match = self.patterns['ts_activated'].search(line)
         if match:
             ticket = int(match.group(1))
-            if ticket in self.open_positions:
-                self.open_positions[ticket].ts_activated = True
+            trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+            if trade_key in self.open_positions:
+                self.open_positions[trade_key].ts_activated = True
             return
     
     def _handle_order_open(self, match):
@@ -486,10 +491,13 @@ class TradeReconstructor:
         symbol = match.group(5)
         price = float(match.group(6))
         
+        # 🔥 v4.34 FIX: Usar chave composta
+        trade_key = self._get_trade_key(ticket)
+        
         # Verificar se há posição aberta OPOSTA
         open_tickets = list(self.open_positions.keys())
-        for open_ticket in open_tickets:
-            open_trade = self.open_positions[open_ticket]
+        for open_trade_key in open_tickets:
+            open_trade = self.open_positions[open_trade_key]
             
             # Se o tipo do deal é OPOSTO ao da posição aberta, é um fechamento
             if (open_trade.trade_type == 'BUY' and trade_type == 'SELL') or \
@@ -522,8 +530,8 @@ class TradeReconstructor:
                 else:
                     open_trade.close_reason = 'SL'
                 
-                # Remover de posições abertas
-                del self.open_positions[open_ticket]
+                # Remover de posições abertas - 🔥 v4.34 FIX: usar chave composta
+                del self.open_positions[open_trade_key]
                 break
         
         # Sempre criar nova posição com este deal
@@ -542,8 +550,9 @@ class TradeReconstructor:
         if self.current_config_set and len([t for t in self.trades.values() if t.config_set_name == self.current_config_set]) == 0:
             print(f"      📍 Primeiro trade do CONFIG_SET '{self.current_config_set}': Ticket #{ticket}")
         
-        self.open_positions[ticket] = new_trade
-        self.trades[ticket] = new_trade
+        # 🔥 v4.34 FIX: Usar chave composta
+        self.open_positions[trade_key] = new_trade
+        self.trades[trade_key] = new_trade
     
     def _handle_position_closed(self, match):
         """Trata fechamento de posição no backtest"""
@@ -557,8 +566,11 @@ class TradeReconstructor:
         entry_price = float(match.group(7))
         sl = float(match.group(8)) if match.group(8) else 0.0
         
-        if ticket in self.open_positions:
-            trade = self.open_positions[ticket]
+        # 🔥 v4.34 FIX: Usar chave composta
+        trade_key = self._get_trade_key(ticket)
+        
+        if trade_key in self.open_positions:
+            trade = self.open_positions[trade_key]
             trade.close_time = datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S')
             trade.close_price = close_price
             trade.initial_sl = sl
@@ -591,8 +603,8 @@ class TradeReconstructor:
             else:
                 trade.close_reason = 'TP'
             
-            # Remover de posições abertas
-            del self.open_positions[ticket]
+            # Remover de posições abertas - 🔥 v4.34 FIX: usar chave composta
+            del self.open_positions[trade_key]
 
 
 # ============================================================================
@@ -1024,8 +1036,8 @@ class ProductionAnalyzer:
         if not self.trades:
             return ""
         
-        # Serializar trades
-        data_str = json.dumps([asdict(t) for t in self.trades], sort_keys=True, default=str)
+        # Serializar trades - 🔥 v4.34 FIX: iterar sobre .values()
+        data_str = json.dumps([asdict(t) for t in self.trades.values()], sort_keys=True, default=str)
         return hashlib.sha256(data_str.encode()).hexdigest()
     
     def run_full_analysis(self) -> Dict:
@@ -1078,8 +1090,8 @@ class ProductionAnalyzer:
             },
             'trades': {
                 'total': len(self.trades),
-                'closed': sum(1 for t in self.trades if t.is_closed),
-                'open': sum(1 for t in self.trades if not t.is_closed)
+                'closed': sum(1 for t in self.trades.values() if t.is_closed),  # 🔥 v4.34 FIX
+                'open': sum(1 for t in self.trades.values() if not t.is_closed)  # 🔥 v4.34 FIX
             },
             'metrics': asdict(self.metrics) if self.metrics else {},
             'bootstrap': {k: asdict(v) for k, v in self.bootstrap_results.items()}

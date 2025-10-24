@@ -24,8 +24,8 @@
 #property version   "4.40"
 #property strict
 
-#include "Parametros.mqh"
-#include <Trade\Trade.mqh>
+// NOTA: Parametros.mqh e Trade.mqh já são incluídos pelo arquivo principal
+// Não incluir novamente para evitar redefinições
 
 //+------------------------------------------------------------------+
 //| Normaliza lote para o símbolo                                   |

@@ -47,8 +47,8 @@
 #property version   "4.27"
 #property strict
 
-// Incluir primeiro o arquivo de parâmetros
-#include "Parametros.mqh"
+// NOTA: Parametros.mqh já é incluído pelo arquivo principal
+// Não incluir novamente para evitar redefinições
 
 //+------------------------------------------------------------------+
 //| FUNÇÕES AUXILIARES DO MÓDULO                                     |

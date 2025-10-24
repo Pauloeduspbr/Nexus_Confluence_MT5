@@ -1,544 +1,265 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.34 - Sistema Universal Multi-Timeframe    |
-//| 🔥 v4.34: AJUSTES BASEADOS EM ANÁLISE REAL DE 710 TRADES       |
+//| Nexus Confluence EA v4.40 - VERSÃO SIMPLIFICADA                 |
+//| 🔥 v4.40: SIMPLIFICAÇÃO RADICAL - APENAS O BÁSICO               |
 //|                                                                  |
-//|   � CONTEXTO: Análise completa 23/10/2025 (710 trades, 9M):   |
-//|      • Win Rate: 39.6% (target: 47-52%)                         |
-//|      • Profit Factor: 1.05 (target: 1.25-1.45)                  |
-//|      • Sharpe Ratio: 0.01 (target: 0.20-0.30)                   |
-//|      • Max Drawdown: 112.0% (target: 25-35%)                    |
-//|      • Trailing Stop Win Rate: 0% (CRÍTICO!)                    |
-//|      • Quality Score: 44/100 (target: 65-75)                    |
+//| ✅ O QUE TEM:                                                    |
+//|   - Filtro semanal (dias da semana)                             |
+//|   - Horário início/fim                                          |
+//|   - TP fixo (em pontos)                                          |
+//|   - SL fixo (em pontos)                                          |
+//|   - Lote fixo (Forex/B3 compatível)                            |
+//|   - Análise de setup dos indicadores (mantida)                  |
 //|                                                                  |
-//|   ✅ CORREÇÕES v4.34:                                           |
-//|      1. FILTROS DE ENTRADA (Estrategias.mqh)                    |
-//|         • MinConfluenceScore: 75→85 (+10pts mais rigoroso)     |
-//|         • AllowGoodSetups: true→false (apenas PREMIUM)         |
-//|         • HourBlacklist: 10 piores horas (0,3,7,9,12,16...)    |
+//| ❌ O QUE FOI REMOVIDO:                                           |
+//|   - Gestão de risco automática                                  |
+//|   - Cálculo ATR                                                  |
+//|   - Breakeven                                                    |
+//|   - Trailing Stop                                                |
+//|   - TP parcial                                                   |
+//|   - SL estrutural                                                |
+//|   - Proteção drawdown complexa                                  |
+//|   - Redução progressiva de risco                                |
 //|                                                                  |
-//|      2. TRAILING STOP (RiskManagement.mqh)                      |
-//|         • TrailingActivationRR: 1.5→3.5 (+133% aguardar lucro) |
-//|         • TrailingATRMultiplier: 2.5→4.5 (+80% espaço)         |
-//|         → Objetivo: TS Win Rate 0%→40-50%                       |
-//|                                                                  |
-//|      3. GESTÃO DE RISCO (Parametros.mqh)                        |
-//|         • AccountRiskPercent: 0.3%→0.2% (-33% exposição)       |
-//|         • MaxRiskPremium: 0.5%→0.3% (-40% exposição)           |
-//|         • MaxConsecutiveLosses: 2→3 (balanceado)               |
-//|         → Objetivo: DD 112%→35-50%                              |
-//|                                                                  |
-//|      4. PROTEÇÃO CONSECUTIVA (RiskManagement.mqh)               |
-//|         • Pause após 3 perdas: 1h                               |
-//|         • Pause após 4 perdas: 2h                               |
-//|         • Pause após 5+ perdas: 4h                              |
-//|         → Objetivo: evitar cascatas de perdas                   |
-//|                                                                  |
-//|   📊 IMPACTO ESPERADO (CONSERVADOR):                            |
-//|      Win Rate: 39.6% → 47-52% (+7-12pp)                        |
-//|      Profit Factor: 1.05 → 1.25-1.45 (+19-38%)                 |
-//|      Sharpe Ratio: 0.01 → 0.20-0.30 (+20-30x)                  |
-//|      Max Drawdown: 112% → 35-50% (-56-70%)                     |
-//|      Quality Score: 44 → 65-75 (+21-31pts)                     |
-//|                                                                  |
-//|   🎯 VALIDAÇÃO:                                                 |
-//|      Backtest completo v4.34 → Comparar com v4.33 →            |
-//|      Confirmar melhorias métricas → Iterar se necessário        |
-//+------------------------------------------------------------------+
-//| CHANGELOG v4.33-v4.34:                                           |
-//|   v4.34 (23/01/2025): Ajustes baseados em análise 710 trades   |
-//|   v4.33 (23/01/2025): Correções estruturais pós-diagnóstico     |
-//|   v4.32 (Anterior): Ajuste SL estrutural (+30%)                 |
-//|   v4.31 (Anterior): Redução risco emergencial (-40%)            |
+//| FUNCIONAMENTO:                                                   |
+//|   1. Valida dia da semana                                       |
+//|   2. Valida horário                                              |
+//|   3. Analisa setup dos indicadores                              |
+//|   4. Se setup válido: Abre ordem com SL/TP fixos               |
+//|   5. FIM - sem gestão ativa de posições                         |
 //+------------------------------------------------------------------+
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
-//| DATA: Janeiro 2025                                               |
-//| VERSÃO: 4.34                                                     |
-//+------------------------------------------------------------------+
-//+------------------------------------------------------------------+
-//| ARQUIVO: NexusConfluenceEA.mq5                                   |
-//| PROPÓSITO: Execução automatizada do Sistema Nexus Confluence     |
-//| DEPENDÊNCIAS: Include/NexusConfluenceEA/*.mqh                    |
-//|               Indicators/NexusConfluenceEA/*.mq5                 |
-//| VERSÃO: 4.34 (Ajustes Baseados em Análise Real de 710 Trades)   |
+//| DATA: Outubro 2025                                               |
+//| VERSÃO: 4.40 - SIMPLIFICADO                                     |
 //+------------------------------------------------------------------+
 #property strict
+#property copyright "Nexus Confluence EA v4.40"
+#property version   "4.40"
 
-//--- Incluir módulos do EA (ORDEM IMPORTANTE!)
+//--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>
 #include "..\..\Include\NexusConfluenceEA\Parametros.mqh"
-#include "..\..\Include\NexusConfluenceEA\RogersSatchell.mqh"  // 🔥 v4.28: NOVO - Volatilidade alternativa
 #include "..\..\Include\NexusConfluenceEA\Estrategias.mqh"
 #include "..\..\Include\NexusConfluenceEA\RiskManagement.mqh"
 
-//--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
-//--- NOTA: Todas as funções de estratégia estão agora em Estrategias.mqh
-//--- NOTA: Gestão de risco, SL, TP, Trailing em RiskManagement.mqh
-
-
-//--- NOTA: Todos os inputs, enums e structs estão agora em Parametros.mqh
-//--- NOTA: Todas as funções de estratégia estão agora em Estrategias.mqh
-
-//--- Variáveis globais do EA principal
-CTrade g_trade;
-double g_initialBalance = 0.0;      // Balance inicial (apenas referência)
-
-double g_pointValueCache = 0.0;
-ASSET_CLASS g_currentAssetClass = ASSET_CLASS_UNKNOWN;
-
-// Controle de novo candle para evitar análise redundante
+//--- Variáveis globais
 datetime g_lastCandleTime = 0;
-
-// 🔥 v4.15: Variáveis de controle de drawdown
-double g_dailyStartBalance    = 0.0;      // Balance início do dia
-double g_weeklyStartBalance   = 0.0;      // Balance início da semana
-int    g_consecutiveLosses    = 0;        // Contador de perdas consecutivas
-datetime g_lastTradeCloseTime = 0;        // Última vez que trade fechou
-datetime g_pauseUntilTime     = 0;        // Pausado até (timestamp)
-bool   g_dailyDrawdownHit     = false;    // Flag drawdown diário atingido
-bool   g_weeklyDrawdownHit    = false;    // Flag drawdown semanal atingido
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
 int OnInit()
-  {
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("   🎯 INICIANDO %s v%s", EA_NAME, EA_VERSION);
-   PrintFormat("════════════════════════════════════════════════════════════════");
-
-   // 1. Detectar timeframe operacional
-   ENUM_TIMEFRAMES tfOper = Period();
-   PrintFormat("📊 Timeframe Operacional: %s", EnumToString(tfOper));
-
-   // 2. Validar se timeframe é suportado
-   if(!IsSupportedTimeframe(tfOper))
-     {
-      PrintFormat("❌ ERRO: Timeframe %s não é suportado pelo sistema!", EnumToString(tfOper));
-      PrintFormat("   Timeframes suportados: M1, M5, M15, M30, H1, H4");
-      Alert("Nexus Confluence: Timeframe não suportado! Use M1, M5, M15, M30, H1 ou H4.");
-      return INIT_FAILED;
-     }
-
-   // 3. Definir timeframes macro conforme TF operacional
-   DefineMultiTimeframes(tfOper, g_tfMacro1, g_tfMacro2, g_tfMacro3, g_numNiveisMacro);
+{
+   PrintFormat("════════════════════════════════════════════════════════");
+   PrintFormat("  🚀 %s v%s - SIMPLIFICADO", EA_NAME, EA_VERSION);
+   PrintFormat("════════════════════════════════════════════════════════");
+   PrintFormat("📌 Símbolo: %s", _Symbol);
+   PrintFormat("📊 Timeframe: %s", EnumToString(_Period));
+   PrintFormat("💰 Lote Fixo: %.2f", FixedLotSize);
+   PrintFormat("⚠️  Stop Loss: %.0f pontos", SL_Points);
+   PrintFormat("🎯 Take Profit: %.0f pontos", TP_Points);
+   PrintFormat("🔐 Magic Number: %d", EA_MAGIC_NUMBER);
+   PrintFormat("════════════════════════════════════════════════════════");
    
-   PrintFormat("🎯 Sistema Multi-Timeframe definido:");
-   PrintFormat("   MACRO-1: %s", EnumToString(g_tfMacro1));
-   PrintFormat("   MACRO-2: %s", EnumToString(g_tfMacro2));
-   if(g_numNiveisMacro == 3)
-      PrintFormat("   MACRO-3: %s", EnumToString(g_tfMacro3));
-   else
-      PrintFormat("   MACRO-3: N/A (sistema de 2 níveis)");
-   PrintFormat("   OPERACIONAL: %s", EnumToString(tfOper));
-
-   // 4. Classificar ativo atual
-   g_currentAssetClass = ClassifyAsset(_Symbol);
-   PrintFormat("📈 Ativo %s classificado como: %s", _Symbol, AssetClassToString(g_currentAssetClass));
-
-   if(g_currentAssetClass == ASSET_CLASS_UNKNOWN)
-     {
-      PrintFormat("❌ ERRO: Ativo %s não pôde ser classificado!", _Symbol);
-      Alert("Nexus Confluence: Ativo desconhecido!");
-      return INIT_FAILED;
-     }
-
-   // 5. Validar parâmetros de entrada
-   if(!ValidateInputParameters())
-     {
-      PrintFormat("❌ ERRO: Parâmetros inválidos!");
-      return INIT_PARAMETERS_INCORRECT;
-     }
-
-   // 6. Inicializar todos os indicadores
-   if(!InitializeIndicators(_Symbol))
-     {
-      PrintFormat("❌ ERRO: Falha ao inicializar indicadores!");
-      Alert("Nexus Confluence: Erro ao inicializar indicadores. Verifique os logs.");
-      return INIT_FAILED;
-     }
-
-   // 7. Configurar trade object
-   g_trade.SetExpertMagicNumber(EA_MAGIC_NUMBER);
-   g_trade.SetDeviationInPoints(MaxSlippagePoints);
-   g_trade.SetTypeFilling(ORDER_FILLING_FOK);
-   g_trade.SetAsyncMode(false);
-
-   // 8. Salvar saldo inicial
-   g_initialBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-   PrintFormat("💰 Saldo inicial: %.2f", g_initialBalance);
-   
-   // 🔥 v4.28: Informar métrica de volatilidade selecionada
-   PrintFormat("");
-   PrintFormat("📊 ═══════════════════════════════════════════════════════════");
-   PrintFormat("📊 MÉTRICA DE VOLATILIDADE CONFIGURADA:");
-   switch(UseVolatilityMetric)
+   // Validar inputs básicos
+   if(FixedLotSize <= 0)
    {
-      case VOLATILITY_ATR:
-         PrintFormat("📊   ATR Tradicional (Período: %d)", ATR_Period);
-         PrintFormat("📊   ✅ Rápido e responsivo");
-         PrintFormat("📊   ⚠️ CV esperado: 0.50 (moderado)");
-         break;
-         
-      case VOLATILITY_ROGERS_SATCHELL:
-         PrintFormat("📊   Rogers-Satchell (Período: %d)", RS_Period);
-         PrintFormat("📊   ✅ +35%% mais estável que ATR");
-         PrintFormat("📊   ✅ CV esperado: 0.33 (estável)");
-         PrintFormat("📊   ℹ️ Multiplicadores ajustados: ST=%.1fx, Trail=%.1fx, TP1=%.1fx",
-                     RS_Multiplier_Supertrend, RS_Multiplier_Trailing, RS_Multiplier_TP1);
-         break;
-         
-      case VOLATILITY_SATR_BLEND:
-         PrintFormat("📊   SATR Blend (Futuro)");
-         PrintFormat("📊   ⚠️ Ainda não implementado, usando ATR");
-         break;
+      PrintFormat("❌ ERRO: Lote fixo deve ser maior que zero!");
+      return INIT_PARAMETERS_INCORRECT;
    }
-   PrintFormat("📊 ═══════════════════════════════════════════════════════════");
-   PrintFormat("");
-
-   // 9. Configurar timer (1 hora)
-   EventSetTimer(3600);
-
-   // 10. Exibir configuração final
-   PrintConfiguration();
-
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("   ✅ EA INICIALIZADO COM SUCESSO!");
-   PrintFormat("════════════════════════════════════════════════════════════════");
-
+   
+   if(SL_Points <= 0 || TP_Points <= 0)
+   {
+      PrintFormat("❌ ERRO: SL e TP devem ser maiores que zero!");
+      return INIT_PARAMETERS_INCORRECT;
+   }
+   
+   // Inicializar indicadores
+   if(!InitializeIndicators(_Symbol))
+   {
+      PrintFormat("❌ ERRO: Falha ao inicializar indicadores!");
+      return INIT_FAILED;
+   }
+   
+   PrintFormat("✅ EA inicializado com sucesso!");
+   PrintFormat("⏳ Aguardando setup válido...\n");
+   
    return INIT_SUCCEEDED;
-  }
-
+}
 
 //+------------------------------------------------------------------+
 //| Expert deinitialization function                                 |
 //+------------------------------------------------------------------+
 void OnDeinit(const int reason)
-  {
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("   🔴 FINALIZANDO %s v%s", EA_NAME, EA_VERSION);
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("📋 Razão: %s", GetDeinitReasonText(reason));
-
-   // Liberar todos os handles dos indicadores
+{
+   PrintFormat("\n════════════════════════════════════════════════════════");
+   PrintFormat("  🛑 EA Finalizado - Motivo: %s", GetUninitReasonText(reason));
+   PrintFormat("════════════════════════════════════════════════════════");
+   
+   // Liberar handles dos indicadores
    ReleaseIndicators();
-
-   // Cancelar timer
-   EventKillTimer();
-
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("   ✅ EA FINALIZADO COM SUCESSO");
-   PrintFormat("════════════════════════════════════════════════════════════════");
-  }
+}
 
 //+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
-  {
-   // ═══════════════════════════════════════════════════════════════
-   // 🔥 v4.27: GESTÃO DE TRADES A CADA TICK (breakeven/trailing)
-   // ═══════════════════════════════════════════════════════════════
-   // IMPORTANTE: Executar ANTES do check de novo candle para
-   // que breakeven e trailing atualizem a cada tick!
-   ManageExistingTrades();
-
-   // ═══════════════════════════════════════════════════════════════
-   // 🔥 v4.33 CORREÇÃO CRÍTICA: Analisar apenas CANDLE FECHADO [1]
-   // ═══════════════════════════════════════════════════════════════
-   // ANTES: iTime(..., 0) analisava candle EM FORMAÇÃO
-   // AGORA: iTime(..., 1) aguarda FECHAMENTO para sincronização perfeita
-   datetime currentCandleTime = iTime(_Symbol, Period(), 1);
-
-   // Se ainda é o mesmo candle FECHADO, NÃO processar análise novamente
-   if(currentCandleTime == g_lastCandleTime)
-   {
-      return; // Aguardar próximo candle FECHAR para nova análise
-   }
+{
+   // Verificar novo candle
+   datetime currentCandleTime = iTime(_Symbol, _Period, 0);
    
-   // Novo candle FECHADO detectado! Atualizar timestamp
+   if(currentCandleTime == g_lastCandleTime)
+      return; // Ainda no mesmo candle
+   
    g_lastCandleTime = currentCandleTime;
    
-   PrintFormat("\n� NOVO CANDLE FECHADO %s: %s (v4.33: análise no [1])", 
-               EnumToString(Period()), 
-               TimeToString(currentCandleTime, TIME_DATE|TIME_MINUTES));
-   PrintFormat("════════════════════════════════════════════════════════════════");
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 1: VALIDAÇÕES BÁSICAS
+   // ═══════════════════════════════════════════════════════════════
    
-   // 🔥 v4.33: ATUALIZAR BUFFER CACHE (sincronizado com candle [1])
-   // Chamada ÚNICA no início do frame - todos indicadores são atualizados aqui
-   // GetXXXSignal() vão ler do cache (zero CopyBuffer redundantes!)
-   if(!UpdateBufferCache())
+   // 1.1 Validar dia da semana
+   if(!IsValidTradingDay())
    {
-      PrintFormat("❌ ERRO CRÍTICO: Falha ao atualizar Buffer Cache - abortando análise");
-      return;
+      return; // Dia não permitido para trading
    }
    
-   // 🔥 v4.33: VALIDAÇÃO DE CACHE (prevenção de trades com dados inválidos)
-   if(!g_bufferCache.isValid)
+   // 1.2 Validar horário
+   if(!IsValidTradingHour())
    {
-      PrintFormat("🔴 CRÍTICO: Buffer Cache INVÁLIDO após atualização - ANÁLISE ABORTADA");
-      PrintFormat("   AÇÃO: Este candle será PULADO (segurança anti-desincronização)");
-      return; // NÃO OPERAR se cache falhou!
+      return; // Fora do horário permitido
    }
    
-   // 🔥 v4.24: ETAPA 0: VERIFICAR SE SISTEMA ESTÁ PAUSADO + FORÇAR DESBLOQUEIO
-   if(g_pauseUntilTime > TimeCurrent())
+   // 1.3 Verificar se já tem posição aberta
+   if(HasOpenPosition())
    {
-      // 🔥 v4.36: Limite configurável via input (não hardcode!)
-      int secondsPaused = (int)(g_pauseUntilTime - TimeCurrent());
-      if(secondsPaused > MaxPauseTimeSeconds)  // Excedeu tempo máximo de pausa?
-      {
-         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa excedeu %ds (%dh) - era %d segundos", 
-                     MaxPauseTimeSeconds, MaxPauseTimeSeconds/3600, secondsPaused);
-         PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
-         g_pauseUntilTime = 0;
-         g_consecutiveLosses = 0;
-      }
-      else
-      {
-         // Mostrar log A CADA TICK (não apenas 1x por hora)
-         int minutesRemaining = secondsPaused / 60;
-         int hoursRemaining = minutesRemaining / 60;
-         int minsOnly = minutesRemaining % 60;
-
-         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
-         PrintFormat("⏸️ SISTEMA PAUSADO - Aguardando liberação");
-         PrintFormat("⏸️ Tempo restante: %d hora(s) e %d minuto(s)", hoursRemaining, minsOnly);
-         PrintFormat("⏸️ Motivo: %d perdas consecutivas (limite: %d)",
-                     g_consecutiveLosses, MaxConsecutiveLosses);
-         PrintFormat("⏸️ Pausado até: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
-         return;
-      }
-   }
-
-   // ETAPA 1: Validações básicas de segurança
-   if(!ValidateBasicConditions())
-      return;
-
-   // 🔥 v4.17: ETAPA 1.5: VERIFICAR DRAWDOWN ANTES DE QUALQUER ANÁLISE
-   if(!ValidateDrawdownLimits())
-   {
-      PrintFormat("🛑 DRAWDOWN LIMIT ATINGIDO - Sistema pausado");
-      return;
+      return; // Já tem posição aberta
    }
    
-   // 🔥 v4.34: ETAPA 1.6: VERIFICAR HOURLY BLACKLIST (10 piores horas)
-   if(!ValidateHourlyBlacklist())
-   {
-      PrintFormat("⏰ HORA ATUAL EM BLACKLIST - Análise evitada (proteção estatística)");
-      return;
-   }
-
-   // ETAPA 2: Análise multi-timeframe OBRIGATÓRIA
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 2: ANÁLISE DE SETUP
+   // ═══════════════════════════════════════════════════════════════
+   
+   // Classificar ativo
+   ASSET_CLASS assetClass = ClassifyAsset(_Symbol);
+   
+   // Analisar alinhamento multi-timeframe
    MultiTFResult mtf = AnalyzeMultiTimeframeAlignment();
+   
    if(!mtf.isValid)
-     {
-      // MACRO-1 e MACRO-2 não alinhados ou indecisos
-      PrintFormat("❌ DEBUG ETAPA 2: Multi-timeframe NÃO ALINHADO - MACRO-1 e MACRO-2 indecisos ou opostos");
-      return;
-     }
-   PrintFormat("✅ DEBUG ETAPA 2: Multi-timeframe ALINHADO - Direção: %s", 
-               (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA");
-
-   // 🔥 v4.17: DEBUG DETALHADO DIREÇÃO DETECTADA
-   string directionStr = (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : 
-                         (mtf.direction == TRADE_DIRECTION_SELL) ? "VENDA" : "NENHUMA";
-   PrintFormat("🎯 v4.17 DEBUG: Direção detectada = %s (%d)", directionStr, mtf.direction);
-   
-   if(mtf.direction == TRADE_DIRECTION_SELL)
    {
-      PrintFormat("═══════════════════════════════════════════════════════════════");
-      PrintFormat("🔍 v4.17: SINAL DE VENDA DETECTADO - ANÁLISE COMPLETA");
-      PrintFormat("═══════════════════════════════════════════════════════════════");
-      PrintFormat("  📊 Multi-TF Válido: %s", mtf.isValid ? "SIM" : "NÃO");
-      PrintFormat("  📊 H4 Alinhado: %s", mtf.h4Aligned ? "SIM" : "NÃO");
-      PrintFormat("  📊 H1 Alinhado: %s", mtf.h1Aligned ? "SIM" : "NÃO");
-      PrintFormat("  📊 M30 Alinhado: %s", mtf.m30Aligned ? "SIM" : "NÃO");
-      PrintFormat("═══════════════════════════════════════════════════════════════");
+      return; // Multi-TF não alinhado
    }
-
-   // ETAPA 3: Calcular pontuação dos filtros micro
-   SetupScore score = CalculateSetupScore(_Symbol, g_currentAssetClass, mtf.direction, mtf.m30Aligned);
-   PrintFormat("📊 DEBUG ETAPA 3: Setup calculado - Pontos: %d/%d | Classificação: %s",
-               score.totalPoints, score.requiredPoints,
-               (score.classification == SETUP_PREMIUM) ? "PREMIUM" : 
-               (score.classification == SETUP_GOOD) ? "GOOD" : "REJECT");
    
-   // 🔥 v4.17: DEBUG EXTRA PARA VENDAS
-   if(mtf.direction == TRADE_DIRECTION_SELL)
+   // Calcular pontuação do setup
+   SetupScore score = CalculateSetupScore(_Symbol, assetClass, mtf.direction, mtf.m30Aligned);
+   
+   // ═══════════════════════════════════════════════════════════════
+   // ETAPA 3: EXECUTAR ORDEM (se setup válido)
+   // ═══════════════════════════════════════════════════════════════
+   
+   // Verificar se setup é válido (PREMIUM ou GOOD)
+   if(score.classification != SETUP_PREMIUM && score.classification != SETUP_GOOD)
    {
-      PrintFormat("  🔍 FILTROS VENDA:");
-      PrintFormat("     RSI OMA: Pontos=%d", score.rsiomaPoints);
-      PrintFormat("     WAE: Pontos=%d", score.waePoints);
-      PrintFormat("     Currency Strength: Pontos=%d", score.currencyStrengthPoints);
-      PrintFormat("     TOTAL: %d/%d pontos", score.totalPoints, score.requiredPoints);
+      return; // Setup rejeitado
    }
-
-   // ETAPA 4: Validar classificação do setup
-   if(score.classification == SETUP_REJECT)
-     {
-      // Não atingiu confluência mínima
-      PrintFormat("❌ DEBUG ETAPA 4: Setup REJEITADO - Pontos insuficientes (%d/%d)", 
-                  score.totalPoints, score.requiredPoints);
-      return;
-     }
    
-   // 🔥 v4.15: FILTRO PREMIUM - Operar apenas setups PREMIUM (3/3 filtros)
-   if(!AllowGoodSetups && score.classification != SETUP_PREMIUM)
-     {
-      PrintFormat("⚠️ DEBUG ETAPA 4: Setup GOOD rejeitado - Apenas PREMIUM permitido (AllowGoodSetups=false)");
-      PrintFormat("   📊 Pontos: %d/%d | Para operar GOOD, altere AllowGoodSetups=true", 
-                  score.totalPoints, score.requiredPoints);
-      return;
-     }
+   // Determinar direção
+   bool isBuy = (mtf.direction == TRADE_DIRECTION_BUY);
    
-   PrintFormat("✅ DEBUG ETAPA 4: Setup APROVADO - %s", 
-               (score.classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
-
-   // ETAPA 5: Validar condições de mercado (spread, ATR, etc)
-   if(!ValidateMarketConditions(_Symbol, g_currentAssetClass))
-     {
-      PrintFormat("❌ DEBUG ETAPA 5: Condições de mercado INVÁLIDAS - Spread ou ATR fora do range");
-      return;
-     }
-   PrintFormat("✅ DEBUG ETAPA 5: Condições de mercado VÁLIDAS");
-
-   // ETAPA 6: CONTROLE DE POSIÇÕES - Verificar modo configurado
-   int openPositions = CountOpenTrades();
-   PrintFormat("🔢 DEBUG ETAPA 6: Posições abertas: %d | Modo: %s | Limite: %d",
-               openPositions, 
-               (PositionControlMode == POSITION_MODE_SINGLE) ? "SINGLE" :
-               (PositionControlMode == POSITION_MODE_MULTIPLE) ? "MULTIPLE" : "PROTECTED",
-               MaxSimultaneousTrades);
+   PrintFormat("\n%s SETUP %s DETECTADO:",
+      isBuy ? "🔵" : "🔴",
+      (score.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
+   PrintFormat("   Pontos: %d/%d", score.totalPoints, score.requiredPoints);
    
-   switch(PositionControlMode)
+   // Executar ordem
+   string comment = StringFormat("Nexus_%s_%s", 
+      isBuy ? "BUY" : "SELL",
+      (score.classification == SETUP_PREMIUM ? "PREMIUM" : "GOOD"));
+   
+   bool success = ExecuteSimpleTrade(
+      _Symbol,
+      isBuy,
+      FixedLotSize,
+      SL_Points,
+      TP_Points,
+      EA_MAGIC_NUMBER,
+      comment
+   );
+   
+   if(success)
    {
-      case POSITION_MODE_SINGLE:
-         // ✅ Apenas 1 posição por vez
-         if(openPositions > 0)
-         {
-            PrintFormat("❌ DEBUG ETAPA 6: Modo SINGLE bloqueou - %d posição(ões) aberta(s)", openPositions);
-            PrintFormat("⏸️ Modo SINGLE: Já existe %d posição(ões) aberta(s), aguardando fechamento", openPositions);
-            return;
-         }
-         break;
-         
-      case POSITION_MODE_MULTIPLE:
-         // ✅ Múltiplas posições até limite máximo
-         if(openPositions >= MaxSimultaneousTrades)
-         {
-            PrintFormat("❌ DEBUG ETAPA 6: Modo MULTIPLE bloqueou - Limite %d atingido", MaxSimultaneousTrades);
-            PrintFormat("⏸️ Modo MULTIPLE: Limite de %d posições atingido", MaxSimultaneousTrades);
-            return;
-         }
-         break;
-         
-      case POSITION_MODE_PROTECTED:
-         // ✅ Múltiplas posições até limite configurado
-         if(openPositions >= MaxSimultaneousTrades)
-         {
-            PrintFormat("❌ DEBUG ETAPA 6: Modo PROTECTED bloqueou - Limite %d atingido", MaxSimultaneousTrades);
-            PrintFormat("⏸️ Modo PROTECTED: Limite de %d posições atingido", MaxSimultaneousTrades);
-            return;
-         }
-         break;
+      PrintFormat("✅ Ordem executada com sucesso!\n");
    }
-   PrintFormat("✅ DEBUG ETAPA 6: Controle de posições OK - Pode abrir nova posição");
-
-   // ETAPA 7: Calcular risco e tamanho da posição
-   RiskCalculation risk = CalculateRiskPosition(_Symbol, score, mtf.direction, g_currentAssetClass);
-   if(!risk.isValid)
-     {
-      if(risk.errorMessage != "")
-         PrintFormat("❌ DEBUG ETAPA 7: Risco INVÁLIDO - %s", risk.errorMessage);
-      else
-         PrintFormat("❌ DEBUG ETAPA 7: Risco INVÁLIDO - Sem mensagem de erro");
-      return;
-     }
-   PrintFormat("✅ DEBUG ETAPA 7: Risco CALCULADO - Lote: %.2f | SL: %.5f | Risco: %.2f", 
-               risk.positionSize, risk.stopLoss, risk.riskAmount);
-
-   // ETAPA 8: Executar trade
-   // 🔥 v4.33: LOG CONSOLIDADO DE ENTRADA (auditoria pós-backtest)
-   PrintFormat("\n");
-   PrintFormat("╔══════════════════════════════════════════════════════════════╗");
-   PrintFormat("║          🎯 DECISÃO DE ENTRADA - TODAS VALIDAÇÕES OK        ║");
-   PrintFormat("╚══════════════════════════════════════════════════════════════╝");
-   PrintFormat("");
-   PrintFormat("📌 CONTEXTO:");
-   PrintFormat("   Símbolo: %s | Timeframe: %s", _Symbol, EnumToString(Period()));
-   PrintFormat("   Data/Hora: %s", TimeToString(TimeCurrent(), TIME_DATE|TIME_MINUTES|TIME_SECONDS));
-   PrintFormat("   Classificação: %s", (score.classification == SETUP_PREMIUM) ? "🏆 PREMIUM" : "⭐ GOOD");
-   PrintFormat("");
-   PrintFormat("📊 MULTI-TIMEFRAME (GG TrendBar):");
-   PrintFormat("   ✅ MACRO-1 (%s): ALINHADO %s", EnumToString(g_tfMacro1), 
-               (mtf.direction == TRADE_DIRECTION_BUY) ? "VERDE (BUY)" : "VERMELHO (SELL)");
-   PrintFormat("   ✅ MACRO-2 (%s): ALINHADO %s", EnumToString(g_tfMacro2),
-               (mtf.direction == TRADE_DIRECTION_BUY) ? "VERDE (BUY)" : "VERMELHO (SELL)");
-   if(g_numNiveisMacro >= 3) {
-      PrintFormat("   %s MACRO-3 (%s): %s %s", 
-                  mtf.m30Aligned ? "✅" : "⚠️",
-                  EnumToString(g_tfMacro3),
-                  mtf.m30Aligned ? "ALINHADO" : "DIVERGENTE",
-                  (mtf.direction == TRADE_DIRECTION_BUY) ? "(BUY)" : "(SELL)");
+   else
+   {
+      PrintFormat("❌ Falha ao executar ordem\n");
    }
-   PrintFormat("");
-   PrintFormat("🔍 FILTROS MICRO (Timeframe Operacional %s):", EnumToString(g_tfOperacional));
-   PrintFormat("   ✅ Supertrend: ALINHADO (obrigatório)");
-   PrintFormat("   %s WAE: %s (%d pt)", 
-               score.waePoints > 0 ? "✅" : "❌",
-               score.waePoints > 0 ? "ALINHADO" : "DIVERGENTE",
-               score.waePoints);
-   PrintFormat("   %s RSI OMA: %s (%d pt)", 
-               score.rsiomaPoints > 0 ? "✅" : "❌",
-               score.rsiomaPoints > 0 ? "ALINHADO" : "DIVERGENTE",
-               score.rsiomaPoints);
-   if(g_currentAssetClass != ASSET_CLASS_INDEX_B3 && 
-      g_currentAssetClass != ASSET_CLASS_INDEX_US &&
-      g_currentAssetClass != ASSET_CLASS_INDEX_EU) {
-      PrintFormat("   %s Currency Strength: %s (%d pt)", 
-                  score.currencyStrengthPoints > 0 ? "✅" : "❌",
-                  score.currencyStrengthPoints > 0 ? "ALINHADO" : "DIVERGENTE",
-                  score.currencyStrengthPoints);
-   }
-   PrintFormat("   📈 TOTAL: %d/%d pontos (mínimo: %d)", 
-               score.totalPoints, score.requiredPoints, score.requiredPoints);
-   PrintFormat("");
-   PrintFormat("💰 GESTÃO DE RISCO:");
-   PrintFormat("   Direção: %s", (mtf.direction == TRADE_DIRECTION_BUY) ? "📈 COMPRA" : "📉 VENDA");
-   PrintFormat("   Risco: %.2f%% da conta (R$ %.2f)", 
-               (score.classification == SETUP_PREMIUM) ? MaxRiskPremium : AccountRiskPercent,
-               risk.riskAmount);
-   PrintFormat("   Lote: %.2f", risk.positionSize);
-   PrintFormat("   SL: %.5f (distância: %.1f pontos)", risk.stopLoss, risk.slDistance / _Point);
-   PrintFormat("   TP1: %.5f (Potencial: R$ %.2f)", risk.takeProfit1, risk.potentialProfit1);
-   PrintFormat("   TP2: %.5f (Potencial: R$ %.2f)", risk.takeProfit2, risk.potentialProfit2);
-   PrintFormat("   TP3: %.5f (Potencial: R$ %.2f)", risk.takeProfit3, risk.potentialProfit3);
-   PrintFormat("");
-   PrintFormat("╔══════════════════════════════════════════════════════════════╗");
-   PrintFormat("║              🚀 EXECUTANDO ORDEM DE %s                    ║", 
-               (mtf.direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA ");
-   PrintFormat("╚══════════════════════════════════════════════════════════════╝");
-   PrintFormat("");
-
-   ExecuteTrade(_Symbol, mtf.direction, risk, score.classification);
-  }
-
+}
 
 //+------------------------------------------------------------------+
-//| Verifica se o timeframe é suportado                             |
+//| Valida se é dia permitido para trading                          |
 //+------------------------------------------------------------------+
-bool IsSupportedTimeframe(ENUM_TIMEFRAMES tf)
-  {
-   return (tf == PERIOD_M1 || tf == PERIOD_M5 || tf == PERIOD_M15 ||
-           tf == PERIOD_M30 || tf == PERIOD_H1 || tf == PERIOD_H4);
-  }
+bool IsValidTradingDay()
+{
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   switch(dt.day_of_week)
+   {
+      case 1: return TradeOnMonday;
+      case 2: return TradeOnTuesday;
+      case 3: return TradeOnWednesday;
+      case 4: return TradeOnThursday;
+      case 5: return TradeOnFriday;
+      case 6: return TradeOnSaturday;
+      case 0: return TradeOnSunday;
+   }
+   
+   return false;
+}
+
+//+------------------------------------------------------------------+
+//| Valida se está no horário permitido                             |
+//+------------------------------------------------------------------+
+bool IsValidTradingHour()
+{
+   if(!UseCustomTradingHours)
+      return true; // Sem restrição de horário
+   
+   MqlDateTime dt;
+   TimeToStruct(TimeCurrent(), dt);
+   
+   int currentMinutes = dt.hour * 60 + dt.min;
+   int startMinutes = CustomStartHour * 60 + CustomStartMinute;
+   int endMinutes = CustomEndHour * 60 + CustomEndMinute;
+   
+   return (currentMinutes >= startMinutes && currentMinutes <= endMinutes);
+}
+
+//+------------------------------------------------------------------+
+//| Verifica se já tem posição aberta                               |
+//+------------------------------------------------------------------+
+bool HasOpenPosition()
+{
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      if(PositionSelectByIndex(i))
+      {
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
+            PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
+         {
+            return true;
+         }
+      }
+   }
+   
+   return false;
+}
 
 //+------------------------------------------------------------------+
 //| Classifica o ativo atual                                        |
 //+------------------------------------------------------------------+
 ASSET_CLASS ClassifyAsset(const string symbol)
-  {
+{
    string sym = symbol;
    StringToUpper(sym);
 
@@ -566,9 +287,9 @@ ASSET_CLASS ClassifyAsset(const string symbol)
 
    // Forex
    if(StringLen(sym) >= 6)
-     {
+   {
       if(StringFind(sym,"USD") >= 0)
-        {
+      {
          if(sym == "EURUSD" || sym == "GBPUSD" || sym == "USDJPY" ||
             sym == "AUDUSD" || sym == "NZDUSD" || sym == "USDCHF" || sym == "USDCAD")
             return ASSET_CLASS_FOREX_MAJOR;
@@ -577,1286 +298,34 @@ ASSET_CLASS ClassifyAsset(const string symbol)
             return ASSET_CLASS_FOREX_EXOTIC;
 
          return ASSET_CLASS_FOREX_MINOR;
-        }
+      }
       else
-        {
+      {
          return ASSET_CLASS_FOREX_MINOR;
-        }
-     }
+      }
+   }
 
    return ASSET_CLASS_UNKNOWN;
-  }
-
-//+------------------------------------------------------------------+
-//| Converter classe de ativo para string                           |
-//+------------------------------------------------------------------+
-string AssetClassToString(ASSET_CLASS cls)
-  {
-   switch(cls)
-     {
-      case ASSET_CLASS_FOREX_MAJOR: return "Forex Major";
-      case ASSET_CLASS_FOREX_MINOR: return "Forex Minor";
-      case ASSET_CLASS_FOREX_EXOTIC: return "Forex Exotic";
-      case ASSET_CLASS_CURRENCY_B3: return "WDO (Mini Dólar B3)";
-      case ASSET_CLASS_INDEX_B3: return "WIN (Mini Índice B3)";
-      case ASSET_CLASS_INDEX_US: return "Índice US";
-      case ASSET_CLASS_INDEX_EU: return "Índice Europa";
-      case ASSET_CLASS_METALS: return "Metais (Ouro/Prata)";
-      case ASSET_CLASS_CRYPTO: return "Criptomoedas";
-      default: return "Desconhecido";
-     }
-  }
-
-
-//+------------------------------------------------------------------+
-//| 🔥 v4.17: Validação de Drawdown REFORÇADA (Crítico!)           |
-//+------------------------------------------------------------------+
-bool ValidateDrawdownLimits()
-  {
-   double equity = AccountInfoDouble(ACCOUNT_EQUITY);
-   double balance = AccountInfoDouble(ACCOUNT_BALANCE);
-   
-   // PROTEÇÃO 1: Drawdown Diário
-   if(g_dailyStartBalance > 0)
-     {
-      double dailyDD = ((g_dailyStartBalance - equity) / g_dailyStartBalance) * 100.0;
-      if(dailyDD >= MaxDailyDrawdown)
-        {
-         PrintFormat("🔴 DRAWDOWN DIÁRIO ATINGIDO: %.2f%% >= %.2f%%", dailyDD, MaxDailyDrawdown);
-         PrintFormat("   Balance início dia: $%.2f", g_dailyStartBalance);
-         PrintFormat("   Equity atual: $%.2f", equity);
-         PrintFormat("   Perda: $%.2f", g_dailyStartBalance - equity);
-
-         // 🔥 v4.25: USAR CalculatePauseTime() - MÁXIMO 12H (não até meia-noite!)
-         int pauseSeconds = CalculatePauseTime(Period());
-         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
-         g_dailyDrawdownHit = true;
-
-         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
-                     pauseSeconds, pauseSeconds/3600.0,
-                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-
-         if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: DD diário %.1f%% por %.1fh", dailyDD, pauseSeconds/3600.0));
-         
-         return false;
-        }
-     }
-   
-   // PROTEÇÃO 2: Drawdown Semanal
-   if(g_weeklyStartBalance > 0)
-     {
-      double weeklyDD = ((g_weeklyStartBalance - equity) / g_weeklyStartBalance) * 100.0;
-      if(weeklyDD >= MaxWeeklyDrawdown)
-        {
-         PrintFormat("🔴 DRAWDOWN SEMANAL ATINGIDO: %.2f%% >= %.2f%%", weeklyDD, MaxWeeklyDrawdown);
-         PrintFormat("   Balance início semana: $%.2f", g_weeklyStartBalance);
-         PrintFormat("   Equity atual: $%.2f", equity);
-         PrintFormat("   Perda: $%.2f", g_weeklyStartBalance - equity);
-
-         // 🔥 v4.25: USAR CalculatePauseTime() - MÁXIMO 12H (NÃO até segunda-feira!)
-         int pauseSeconds = CalculatePauseTime(Period());
-         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
-         g_weeklyDrawdownHit = true;
-
-         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
-                     pauseSeconds, pauseSeconds/3600.0,
-                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-
-         if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: DD semanal %.1f%% por %.1fh", weeklyDD, pauseSeconds/3600.0));
-         
-         return false;
-        }
-     }
-   
-   // PROTEÇÃO 3: Perdas Consecutivas
-   if(g_consecutiveLosses >= MaxConsecutiveLosses)
-     {
-      PrintFormat("🔴 PERDAS CONSECUTIVAS ATINGIDAS: %d >= %d", g_consecutiveLosses, MaxConsecutiveLosses);
-
-      // 🔥 v4.25: USAR CalculatePauseTime() ao invés de 24h hardcoded!
-      if(g_pauseUntilTime == 0)
-        {
-         int pauseSeconds = CalculatePauseTime(Period()); // 🔥 MÁXIMO 12H!
-         g_pauseUntilTime = TimeCurrent() + pauseSeconds;
-
-         PrintFormat("⏸️ PAUSANDO por %d segundos (%.1f horas) até: %s",
-                     pauseSeconds, pauseSeconds/3600.0,
-                     TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-
-         if(SendAlerts)
-            SendNotification(StringFormat("Nexus PAUSADO: %d perdas consecutivas por %.1fh",
-                                          g_consecutiveLosses, pauseSeconds/3600.0));
-        }
-
-      return false;
-     }
-   
-   return true; // Tudo OK
-  }
-
-//+------------------------------------------------------------------+
-//| 🔥 v4.34: Valida se hora atual está em blacklist                |
-//| Análise identificou 10 piores horas com Performance Factor < 0  |
-//+------------------------------------------------------------------+
-bool ValidateHourlyBlacklist()
-  {
-   // Parse do input HourBlacklist (formato: "0,3,7,9,12,16,18,19,20,21")
-   if(HourBlacklist == "") return true; // Blacklist desabilitado
-   
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   int currentHour = dt.hour;
-   
-   // Verificar se hora atual está na blacklist
-   string hours[];
-   int count = StringSplit(HourBlacklist, ',', hours);
-   
-   for(int i = 0; i < count; i++)
-     {
-      int blockedHour = (int)StringToInteger(hours[i]);
-      if(currentHour == blockedHour)
-        {
-         PrintFormat("⏰ HORA ATUAL EM BLACKLIST: %02d:00 (PF < 0 em análise histórica)", currentHour);
-         PrintFormat("   Blacklist configurada: %s", HourBlacklist);
-         return false;
-        }
-     }
-   
-   return true; // Hora OK para operar
-  }
-
-//+------------------------------------------------------------------+
-//| Validações básicas antes de cada tick                           |
-//+------------------------------------------------------------------+
-//+------------------------------------------------------------------+
-//| 🔥 NOVO v4.30: FILTRO DE HORAS RUINS (BLACKLIST)                |
-//| Bloqueia horários com baixa performance comprovada               |
-//|                                                                  |
-//| IMPACTO ESTIMADO: +3% Win Rate, +0.015 Sharpe Ratio             |
-//|                                                                  |
-//| HORÁRIOS BLOQUEADOS (horário do broker):                        |
-//| - 00:00-01:59: Baixa liquidez pós-NY close                      |
-//| - 15:00-15:59: Overlap B3/NY causando whipsaws                  |
-//| - 18:00-18:59: Final NY, movimentos erráticos                   |
-//| - 21:00-23:59: Sessão asiática início (baixa volatilidade)     |
-//|                                                                  |
-//| RETORNO: true se hora está bloqueada                            |
-//+------------------------------------------------------------------+
-bool IsBlacklistedHour()
-{
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   int currentHour = dt.hour;
-   
-   // Horas proibidas baseadas na análise de performance
-   int blacklistedHours[] = {0, 1, 15, 18, 21, 22, 23};
-   
-   for(int i = 0; i < ArraySize(blacklistedHours); i++)
-   {
-      if(currentHour == blacklistedHours[i])
-      {
-         PrintFormat("⏰ HORA BLOQUEADA: %02d:00 está na blacklist (baixa performance histórica)", currentHour);
-         return true;
-      }
-   }
-   
-   return false;
 }
 
 //+------------------------------------------------------------------+
-//| FUNÇÃO: ValidateBasicConditions                                 |
-//| Valida condições básicas para operar                            |
+//| Retorna texto do motivo de desinicialização                     |
 //+------------------------------------------------------------------+
-bool ValidateBasicConditions()
-  {
-   // 🔥 v4.30: NOVA VALIDAÇÃO - Filtro de horas ruins
-   if(IsBlacklistedHour())
-     {
-      PrintFormat("🛡️ VALIDAÇÃO FALHOU: Horário bloqueado (blacklist)");
-      return false;
-     }
-   
-   // 🔥 v4.15: NOVA VALIDAÇÃO - Proteção de Drawdown
-   if(!ValidateDrawdownProtection())
-     {
-      PrintFormat("🛡️ VALIDAÇÃO FALHOU: Proteção de drawdown ativa");
-      return false;
-     }
-   
-   // 1. Verificar se trading está habilitado
-   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
-     {
-      PrintFormat("❌ VALIDAÇÃO FALHOU: Trading não permitido no terminal");
-      return false;
-     }
-
-   // 2. Verificar conexão
-   if(!TerminalInfoInteger(TERMINAL_CONNECTED))
-     {
-      PrintFormat("❌ VALIDAÇÃO FALHOU: Terminal desconectado");
-      return false;
-     }
-
-   // 3. Verificar se está em horário de trading
-   if(!IsValidTradingTime())
-     {
-      PrintFormat("⏰ VALIDAÇÃO FALHOU: Fora do horário de trading");
-      return false;
-     }
-
-   PrintFormat("✅ Validações básicas OK");
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| 🔥 v4.15: NOVA - Validar proteção de drawdown                   |
-//+------------------------------------------------------------------+
-bool ValidateDrawdownProtection()
-  {
-   static int lastDay = -1;      // Último dia processado
-   static int lastWeek = -1;     // Última semana processada
-   
-   double currentBalance = AccountInfoDouble(ACCOUNT_BALANCE);
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   
-   // ════════════════════════════════════════════════════════════════
-   // 🔥 v4.24: RESET AUTOMÁTICO NO INÍCIO DO PREGÃO (NÃO MEIA-NOITE!)
-   // ════════════════════════════════════════════════════════════════
-
-   // Detectar início do pregão (baseado em CustomStartHour ou 09:00 padrão)
-   int sessionStartHour = UseCustomTradingHours ? CustomStartHour : 9;
-   int sessionStartMinute = UseCustomTradingHours ? CustomStartMinute : 0;
-
-   // Verificar se mudou de dia OU se passou pelo horário de início
-   bool isNewTradingDay = false;
-
-   if(lastDay != dt.day)
-   {
-      isNewTradingDay = true;
-      lastDay = dt.day;
-   }
-   // OU se passou pelo horário de início do pregão hoje
-   else if(dt.hour == sessionStartHour && dt.min <= sessionStartMinute + 15)
-   {
-      // Dentro da janela de 15 minutos após o início
-      static bool resetDoneToday = false;
-      static int lastResetDay = -1;
-
-      if(!resetDoneToday || lastResetDay != dt.day)
-      {
-         isNewTradingDay = true;
-         resetDoneToday = true;
-         lastResetDay = dt.day;
-      }
-   }
-
-   if(isNewTradingDay)
-     {
-      // 🔥 RESET COMPLETO - INÍCIO DO PREGÃO
-      if(lastDay != -1) // Não resetar na primeira execução
-        {
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         PrintFormat("🌅 INÍCIO DO PREGÃO DETECTADO: %02d/%02d/%04d %02d:%02d",
-                     dt.day, dt.mon, dt.year, dt.hour, dt.min);
-         PrintFormat("════════════════════════════════════════════════════════════════");
-
-         // Resetar drawdown diário
-         g_dailyStartBalance = currentBalance;
-         g_dailyDrawdownHit = false;
-
-         // 🔥 v4.24: FORÇAR DESBLOQUEIO TOTAL (não importa quanto tempo falta)
-         if(g_pauseUntilTime > 0 || g_consecutiveLosses > 0)
-           {
-            PrintFormat("🔓 DESBLOQUEIO TOTAL: Novo pregão - Todos contadores resetados!");
-            PrintFormat("   Perdas consecutivas: %d → 0", g_consecutiveLosses);
-            if(g_pauseUntilTime > 0)
-               PrintFormat("   Pausa cancelada (era até: %s)", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-
-            g_consecutiveLosses = 0;
-            g_pauseUntilTime = 0;
-           }
-
-         PrintFormat("   💰 Balance inicial pregão: $%.2f", g_dailyStartBalance);
-         PrintFormat("   ✅ Sistema LIBERADO para operar!");
-         PrintFormat("════════════════════════════════════════════════════════════════");
-        }
-      else
-        {
-         // Primeira execução - inicializar
-         g_dailyStartBalance = currentBalance;
-         g_weeklyStartBalance = currentBalance;
-        }
-     }
-   
-   // ════════════════════════════════════════════════════════════════
-   // RESET AUTOMÁTICO SEMANAL (Segunda-feira)
-   // ════════════════════════════════════════════════════════════════
-   int currentWeek = dt.day_of_year / 7; // Semana do ano
-   if(dt.day_of_week == 1 && lastWeek != currentWeek)
-     {
-      if(lastWeek != -1)
-        {
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         PrintFormat("📅 NOVA SEMANA DETECTADA: Semana %d de %04d", currentWeek, dt.year);
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         
-         g_weeklyStartBalance = currentBalance;
-         g_weeklyDrawdownHit = false;
-         g_consecutiveLosses = 0; // Reset semanal também
-         g_pauseUntilTime = 0;    // Garantir desbloqueio
-         
-         PrintFormat("   💰 Balance inicial semana: $%.2f", g_weeklyStartBalance);
-         PrintFormat("   🔄 Contadores zerados para nova semana");
-         PrintFormat("════════════════════════════════════════════════════════════════");
-        }
-      
-      lastWeek = currentWeek;
-     }
-   
-   // ════════════════════════════════════════════════════════════════
-   // 🔥 v4.24: VERIFICAR SE ESTÁ PAUSADO + FORÇAR DESBLOQUEIO 12H
-   // ════════════════════════════════════════════════════════════════
-   if(TimeCurrent() < g_pauseUntilTime)
-     {
-      int secondsRemaining = (int)(g_pauseUntilTime - TimeCurrent());
-
-      // 🔥 v4.24: PROTEÇÃO - Forçar desbloqueio se mais de 12 horas
-      if(secondsRemaining > 43200)
-        {
-         PrintFormat("🔓 DESBLOQUEIO FORÇADO: Pausa de %d segundos excede 12h!", secondsRemaining);
-         PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
-         g_pauseUntilTime = 0;
-         g_consecutiveLosses = 0;
-         return true; // Liberar para continuar validações
-        }
-
-      // Mostrar tempo restante de forma clara
-      int minutesRemaining = secondsRemaining / 60;
-      int hoursRemaining = minutesRemaining / 60;
-      int minsOnly = minutesRemaining % 60;
-
-      // Não logar a cada tick, apenas a cada 15 minutos
-      static datetime lastWarningLog = 0;
-      if(TimeCurrent() - lastWarningLog > 900) // 15 minutos
-        {
-         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
-         PrintFormat("⏸️ EA PAUSADO POR PERDAS CONSECUTIVAS");
-         PrintFormat("⏸️ Perdas: %d (limite: %d)", g_consecutiveLosses, MaxConsecutiveLosses);
-         PrintFormat("⏸️ Tempo restante: %dh%02dm", hoursRemaining, minsOnly);
-         PrintFormat("⏸️ Liberação em: %s", TimeToString(g_pauseUntilTime, TIME_DATE|TIME_MINUTES));
-         PrintFormat("⏸️ Reset automático no início do próximo pregão (%02d:%02d)",
-                     sessionStartHour, sessionStartMinute);
-         PrintFormat("⏸️ ═══════════════════════════════════════════════════════════");
-         lastWarningLog = TimeCurrent();
-        }
-
-      return false;
-     }
-
-   // Se tempo de pausa expirou, liberar
-   if(g_pauseUntilTime > 0 && TimeCurrent() >= g_pauseUntilTime)
-     {
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      PrintFormat("🔓 DESBLOQUEIO: Tempo de pausa expirou");
-      PrintFormat("   Perdas consecutivas resetadas: %d → 0", g_consecutiveLosses);
-      PrintFormat("   Sistema LIBERADO para operar!");
-      PrintFormat("════════════════════════════════════════════════════════════════");
-      g_pauseUntilTime = 0;
-      g_consecutiveLosses = 0;
-     }
-   
-   // Inicializar se primeira execução
-   if(g_dailyStartBalance == 0.0) g_dailyStartBalance = currentBalance;
-   if(g_weeklyStartBalance == 0.0) g_weeklyStartBalance = currentBalance;
-   
-   // Calcular drawdowns
-   double dailyDD = ((g_dailyStartBalance - currentBalance) / g_dailyStartBalance) * 100.0;
-   double weeklyDD = ((g_weeklyStartBalance - currentBalance) / g_weeklyStartBalance) * 100.0;
-   
-   // Verificar drawdown diário
-   if(dailyDD >= MaxDailyDrawdown)
-     {
-      if(!g_dailyDrawdownHit)
-        {
-         g_dailyDrawdownHit = true;
-         string msg = StringFormat("🚨 DRAWDOWN DIÁRIO ATINGIDO: %.2f%% (limite: %.2f%%) - Trading PAUSADO até amanhã!",
-                                   dailyDD, MaxDailyDrawdown);
-         PrintFormat("%s", msg);
-         if(SendAlerts) SendNotification(msg);
-        }
-      return false;
-     }
-   
-   // Verificar drawdown semanal
-   if(weeklyDD >= MaxWeeklyDrawdown)
-     {
-      if(!g_weeklyDrawdownHit)
-        {
-         g_weeklyDrawdownHit = true;
-         string msg = StringFormat("🚨 DRAWDOWN SEMANAL ATINGIDO: %.2f%% (limite: %.2f%%) - Trading PAUSADO até segunda!",
-                                   weeklyDD, MaxWeeklyDrawdown);
-         PrintFormat("%s", msg);
-         if(SendAlerts) SendNotification(msg);
-        }
-      return false;
-     }
-   
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| Verifica se está em horário de trading                          |
-//+------------------------------------------------------------------+
-bool IsValidTradingTime()
-  {
-   // Verificar dia da semana
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   
-   PrintFormat("🕐 Verificando horário: %02d/%02d/%04d %02d:%02d (dia da semana: %d)", 
-               dt.day, dt.mon, dt.year, dt.hour, dt.min, dt.day_of_week);
-
-   switch(dt.day_of_week)
-     {
-      case 1: 
-         if(!TradeOnMonday) 
-           {
-            PrintFormat("   ❌ Segunda-feira desabilitada");
-            return false;
-           }
-         break;
-      case 2: 
-         if(!TradeOnTuesday) 
-           {
-            PrintFormat("   ❌ Terça-feira desabilitada");
-            return false;
-           }
-         break;
-      case 3: 
-         if(!TradeOnWednesday) 
-           {
-            PrintFormat("   ❌ Quarta-feira desabilitada");
-            return false;
-           }
-         break;
-      case 4: 
-         if(!TradeOnThursday) 
-           {
-            PrintFormat("   ❌ Quinta-feira desabilitada");
-            return false;
-           }
-         break;
-      case 5: 
-         if(!TradeOnFriday) 
-           {
-            PrintFormat("   ❌ Sexta-feira desabilitada");
-            return false;
-           }
-         break;
-      case 6: 
-         if(!TradeOnSaturday) 
-           {
-            PrintFormat("   ❌ Sábado desabilitado");
-            return false;
-           }
-         break;
-      case 0: 
-         if(!TradeOnSunday) 
-           {
-            PrintFormat("   ❌ Domingo desabilitado");
-            return false;
-           }
-         break;
-     }
-   
-   PrintFormat("   ✅ Dia da semana OK");
-
-   // Se usar horários customizados
-   if(UseCustomTradingHours)
-     {
-      int currentMinutes = dt.hour * 60 + dt.min;
-      int startMinutes = CustomStartHour * 60 + CustomStartMinute;
-      int endMinutes = CustomEndHour * 60 + CustomEndMinute;
-      
-      PrintFormat("   🕐 Horário customizado ATIVO:");
-      PrintFormat("      Início: %02d:%02d (%d min)", CustomStartHour, CustomStartMinute, startMinutes);
-      PrintFormat("      Fim: %02d:%02d (%d min)", CustomEndHour, CustomEndMinute, endMinutes);
-      PrintFormat("      Atual: %02d:%02d (%d min)", dt.hour, dt.min, currentMinutes);
-      
-      // ✅ CORREÇÃO CRÍTICA: Suportar horários que cruzam meia-noite
-      bool isValid = false;
-      
-      if(endMinutes >= startMinutes)
-        {
-         // Caso normal: 09:00 - 17:00
-         isValid = (currentMinutes >= startMinutes && currentMinutes <= endMinutes);
-        }
-      else
-        {
-         // Caso especial: 22:00 - 21:00 (próximo dia)
-         // Válido se: >= 22:00 OU <= 21:00
-         isValid = (currentMinutes >= startMinutes || currentMinutes <= endMinutes);
-        }
-      
-      if(!isValid)
-        {
-         PrintFormat("   ❌ Fora do horário customizado");
-         return false;
-        }
-      
-      PrintFormat("   ✅ Dentro do horário customizado");
-      return true;
-     }
-
-   PrintFormat("   ✅ Horário customizado desabilitado, qualquer horário OK");
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| Valida condições de mercado (spread, ATR, etc)                  |
-//+------------------------------------------------------------------+
-bool ValidateMarketConditions(const string symbol, ASSET_CLASS assetClass)
-  {
-   // Verificar spread com multiplicador configurável
-   double spread = SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
-   double baseMaxSpread = GetMaxSpread(assetClass);
-   double maxSpread = baseMaxSpread * MaxSpreadMultiplier; // Aplicar multiplicador
-
-   if(spread > maxSpread)
-     {
-      PrintFormat("⚠️ Spread muito alto: %.5f > %.5f (base: %.5f x multiplicador: %.1f)", 
-                  spread, maxSpread, baseMaxSpread, MaxSpreadMultiplier);
-      return false;
-     }
-   
-   PrintFormat("   ✅ Spread OK: %.5f <= %.5f", spread, maxSpread);
-
-   // ✅ CORREÇÃO CRÍTICA v4.3: Validar ATR (volatilidade)
-   if(ValidateATRRange)
-     {
-      if(!ValidateATR(symbol, assetClass))
-        {
-         return false; // ATR fora do range ideal
-        }
-     }
-
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| Valida ATR (Average True Range) por classe de ativo             |
-//+------------------------------------------------------------------+
-bool ValidateATR(const string symbol, ASSET_CLASS assetClass)
-  {
-   // 🔥 v4.28: Usar função genérica que suporta ATR ou Rogers-Satchell
-   double currentVolatility = GetVolatilityValue(symbol, Period(), 0);
-   
-   if(currentVolatility == 0)
-     {
-      PrintFormat("⚠️ Erro ao obter valor de volatilidade");
-      return true; // Se erro, permite (fail-safe)
-     }
-   
-   double currentATR = currentVolatility; // Manter nome para compatibilidade
-   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   
-   // Definir ranges ideais por classe de ativo (em pips/pontos)
-   double minATR = 0, maxATR = 0;
-   
-   // 🔥 v4.23 CORREÇÃO: Ajustes específicos para pares JPY
-   // USDJPY tem ATR menor que EUR/USD (ex: 50-60 pips vs 80-100 pips)
-   // Detectar se é par JPY analisando o símbolo
-   bool isJPYPair = (StringFind(symbol, "JPY") >= 0);
-
-   // 🔥 CORREÇÃO CRÍTICA #3: Ajustar range ATR baseado em DADOS REAIS do backtest
-   // Análise log 21 meses USDJPY M15: ATR(5) range 0.05-0.56, média 0.117
-   // P10=0.062, P25=0.078, P50=0.104, P75=0.137, P90=0.178
-   // Regime baixo: <0.07 (17%), médio: 0.07-0.15 (65%), alto: >0.15 (18%)
-   // Objetivo: eliminar 17% volatilidade baixa + 18% alta = filtrar 35% extremos
-   
-   switch(assetClass)
-     {
-      case ASSET_CLASS_FOREX_MAJOR:
-         if(isJPYPair)
-         {
-            // 🔥 USDJPY: Dados reais 0.062-0.178 (P10-P90)
-            minATR = 7 * point * 10;    // 7 pips (elimina <P10, mercado morto)
-            maxATR = 20 * point * 10;   // 20 pips (elimina >P90, volatilidade extrema)
-         }
-         else
-         {
-            minATR = 10 * point * 10;   // 10 pips
-            maxATR = 40 * point * 10;   // 40 pips (reduzido de 100 para filtrar extremos)
-         }
-         break;
-
-      case ASSET_CLASS_FOREX_MINOR:
-         if(isJPYPair)
-         {
-            minATR = 8 * point * 10;    // 8 pips
-            maxATR = 25 * point * 10;   // 25 pips (reduzido de 120)
-         }
-         else
-         {
-            minATR = 15 * point * 10;   // 15 pips
-            maxATR = 50 * point * 10;   // 50 pips (reduzido de 150)
-         }
-         break;
-
-      case ASSET_CLASS_FOREX_EXOTIC:
-         minATR = 30 * point * 10;   // 30 pips
-         maxATR = 100 * point * 10;  // 100 pips (reduzido de 300)
-         break;
-         
-      case ASSET_CLASS_INDEX_B3:
-         minATR = 200 * point;       // 200 pontos WIN
-         maxATR = 2000 * point;      // 2000 pontos WIN
-         break;
-         
-      case ASSET_CLASS_CURRENCY_B3:
-         minATR = 10 * point;        // 10 pontos WDO
-         maxATR = 100 * point;       // 100 pontos WDO
-         break;
-         
-      case ASSET_CLASS_METALS:
-         minATR = 2 * point;         // $2 ouro
-         maxATR = 20 * point;        // $20 ouro
-         break;
-         
-      case ASSET_CLASS_INDEX_US:
-      case ASSET_CLASS_INDEX_EU:
-         minATR = 10 * point;        // 10 pontos índice
-         maxATR = 200 * point;       // 200 pontos índice
-         break;
-         
-      default:
-         return true; // Classe desconhecida, permite
-     }
-   
-   // Validar se ATR está dentro do range
-   if(currentATR < minATR)
-     {
-      PrintFormat("⚠️ ATR muito baixo: %.5f < %.5f (mercado morto)", currentATR, minATR);
-      return false;
-     }
-   
-   if(currentATR > maxATR)
-     {
-      PrintFormat("⚠️ ATR muito alto: %.5f > %.5f (volatilidade extrema)", currentATR, maxATR);
-      return false;
-     }
-   
-   PrintFormat("   ✅ ATR OK: %.5f (range: %.5f - %.5f)", currentATR, minATR, maxATR);
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| 🔥 v4.28: FUNÇÃO ROBUSTA - Obter Volatilidade (ATR ou RS)       |
-//| CRÍTICO: Dinheiro REAL - validações múltiplas + fallback ATR    |
-//+------------------------------------------------------------------+
-double GetVolatilityValue(string symbol, ENUM_TIMEFRAMES timeframe, int shift = 0)
+string GetUninitReasonText(int reason)
 {
-   double volatility = 0.0;
-   
-   // ═══════════════════════════════════════════════════════════════
-   // VALIDAÇÕES DE SEGURANÇA CRÍTICAS
-   // ═══════════════════════════════════════════════════════════════
-   if(symbol == NULL || symbol == "")
-   {
-      PrintFormat("❌ ERRO CRÍTICO GetVolatilityValue: Símbolo inválido!");
-      return 0.0;
-   }
-   
-   if(shift < 0)
-   {
-      PrintFormat("❌ ERRO CRÍTICO GetVolatilityValue: Shift negativo (%d)", shift);
-      return 0.0;
-   }
-   
-   // ═══════════════════════════════════════════════════════════════
-   // SELEÇÃO DE MÉTRICA COM FALLBACK AUTOMÁTICO
-   // ═══════════════════════════════════════════════════════════════
-   
-   if(UseVolatilityMetric == VOLATILITY_ATR)
-   {
-      // ────────────────────────────────────────────────────────────
-      // MÉTODO 1: ATR TRADICIONAL (PADRÃO MT5)
-      // ────────────────────────────────────────────────────────────
-      int atrHandle = iATR(symbol, timeframe, ATR_Period);
-      
-      if(atrHandle == INVALID_HANDLE)
-      {
-         PrintFormat("❌ ERRO CRÍTICO: Falha ao criar handle ATR para %s", symbol);
-         return 0.0;
-      }
-      
-      double atr_buffer[]; // Buffer dinâmico para compatibilidade com ArraySetAsSeries
-      ArrayResize(atr_buffer, 3);
-      ArraySetAsSeries(atr_buffer, true);
-      
-      int copied = CopyBuffer(atrHandle, 0, shift, 3, atr_buffer);
-      IndicatorRelease(atrHandle);
-      
-      if(copied != 3)
-      {
-         PrintFormat("❌ ERRO CRÍTICO: Falha ao copiar ATR (copied=%d, expected=3)", copied);
-         return 0.0;
-      }
-      
-      // VALIDAÇÃO: ATR deve ser positivo e razoável
-      if(atr_buffer[0] <= 0.0)
-      {
-         PrintFormat("❌ ERRO CRÍTICO: ATR inválido (%.8f <= 0)", atr_buffer[0]);
-         return 0.0;
-      }
-      
-      // VALIDAÇÃO: ATR não deve variar mais de 300% entre candles consecutivos
-      if(atr_buffer[1] > 0.0)
-      {
-         double variation = MathAbs(atr_buffer[0] - atr_buffer[1]) / atr_buffer[1];
-         if(variation > 3.0) // Variação > 300% = anomalia
-         {
-            PrintFormat("⚠️ AVISO: ATR com variação suspeita %.1f%% (%.8f → %.8f)", 
-                        variation * 100, atr_buffer[1], atr_buffer[0]);
-            // Usar média dos 3 últimos para suavizar
-            volatility = (atr_buffer[0] + atr_buffer[1] + atr_buffer[2]) / 3.0;
-            PrintFormat("   → Usando média ATR: %.8f", volatility);
-            return volatility;
-         }
-      }
-      
-      volatility = atr_buffer[0];
-      
-      PrintFormat("   📊 ATR(%d): %.8f [OK]", ATR_Period, volatility);
-      return volatility;
-   }
-   else if(UseVolatilityMetric == VOLATILITY_ROGERS_SATCHELL)
-   {
-      // ────────────────────────────────────────────────────────────
-      // MÉTODO 2: ROGERS-SATCHELL (ALTERNATIVA AVANÇADA)
-      // ────────────────────────────────────────────────────────────
-      
-      // TENTATIVA 1: Calcular RS
-      volatility = CalculateRogersSatchell(symbol, timeframe, RS_Period, shift);
-      
-      bool needFallback = false; // Flag para controlar fallback
-      
-      if(volatility > 0.0)
-      {
-         // VALIDAÇÃO: RS deve estar em range razoável
-         double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-         double volatility_pips = volatility / (point * 10.0);
-         
-         // Para USDJPY: esperado 6-17 pips
-         // Limites de segurança: 1-50 pips
-         if(volatility_pips < 1.0 || volatility_pips > 50.0)
-         {
-            PrintFormat("⚠️ AVISO: RS fora do range seguro (%.2f pips)", volatility_pips);
-            PrintFormat("   → FALLBACK para ATR");
-            needFallback = true;
-         }
-         else
-         {
-            PrintFormat("   📊 Rogers-Satchell(%d): %.8f (%.2f pips) [OK]", 
-                        RS_Period, volatility, volatility_pips);
-            return volatility;
-         }
-      }
-      else
-      {
-         PrintFormat("⚠️ AVISO: Rogers-Satchell retornou zero");
-         PrintFormat("   → FALLBACK para ATR");
-         needFallback = true;
-      }
-      
-      // Se chegou aqui, precisa de fallback
-      if(needFallback)
-      {
-         // Executar fallback ATR
-         PrintFormat("🔄 EXECUTANDO FALLBACK ATR...");
-         
-         int atrHandle_fallback = iATR(symbol, timeframe, 14); // ATR(14) padrão
-         
-         if(atrHandle_fallback == INVALID_HANDLE)
-         {
-            PrintFormat("❌ ERRO CRÍTICO: FALLBACK ATR também falhou!");
-            PrintFormat("❌ IMPOSSÍVEL CALCULAR VOLATILIDADE - ABORTANDO");
-            return 0.0;
-         }
-         
-         double atr_fallback[1];
-         int copied_fallback = CopyBuffer(atrHandle_fallback, 0, shift, 1, atr_fallback);
-         IndicatorRelease(atrHandle_fallback);
-         
-         if(copied_fallback == 1 && atr_fallback[0] > 0.0)
-         {
-            volatility = atr_fallback[0];
-            PrintFormat("   ✅ FALLBACK ATR(14): %.8f [RECUPERADO]", volatility);
-            return volatility;
-         }
-      }
-   }
-   else if(UseVolatilityMetric == VOLATILITY_SATR_BLEND)
-   {
-      // ────────────────────────────────────────────────────────────
-      // MÉTODO 3: SATR BLEND (NÃO IMPLEMENTADO)
-      // ────────────────────────────────────────────────────────────
-      PrintFormat("⚠️ AVISO: SATR Blend não implementado");
-      PrintFormat("   → FALLBACK para ATR");
-      
-      // Executar fallback ATR
-      PrintFormat("🔄 EXECUTANDO FALLBACK ATR...");
-      
-      int atrHandle_fallback = iATR(symbol, timeframe, 14); // ATR(14) padrão
-      
-      if(atrHandle_fallback == INVALID_HANDLE)
-      {
-         PrintFormat("❌ ERRO CRÍTICO: FALLBACK ATR também falhou!");
-         PrintFormat("❌ IMPOSSÍVEL CALCULAR VOLATILIDADE - ABORTANDO");
-         return 0.0;
-      }
-      
-      double atr_fallback[1];
-      int copied_fallback = CopyBuffer(atrHandle_fallback, 0, shift, 1, atr_fallback);
-      IndicatorRelease(atrHandle_fallback);
-      
-      if(copied_fallback == 1 && atr_fallback[0] > 0.0)
-      {
-         volatility = atr_fallback[0];
-         PrintFormat("   ✅ FALLBACK ATR(14): %.8f [RECUPERADO]", volatility);
-         return volatility;
-      }
-   }
-   
-   // ═══════════════════════════════════════════════════════════════
-   // ÚLTIMA LINHA DE DEFESA: ERRO TOTAL
-   // ═══════════════════════════════════════════════════════════════
-   PrintFormat("❌❌❌ FALHA TOTAL: Nenhum método de volatilidade funcionou!");
-   PrintFormat("❌❌❌ RETORNANDO ZERO - TRADE SERÁ REJEITADO");
-   
-   return 0.0;
-}
-
-//+------------------------------------------------------------------+
-//| Retorna spread máximo permitido por classe                      |
-//+------------------------------------------------------------------+
-double GetMaxSpread(ASSET_CLASS assetClass)
-  {
-   double point = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
-
-   switch(assetClass)
-     {
-      case ASSET_CLASS_FOREX_MAJOR: return 2.0 * point * 10;    // 2 pips
-      case ASSET_CLASS_FOREX_MINOR: return 3.0 * point * 10;    // 3 pips
-      case ASSET_CLASS_FOREX_EXOTIC: return 15.0 * point * 10;  // 15 pips
-      case ASSET_CLASS_INDEX_B3: return 15.0 * point;           // 15 pontos
-      case ASSET_CLASS_CURRENCY_B3: return 3.0 * point;         // 3 pontos
-      case ASSET_CLASS_METALS: return 1.0 * point;              // $1
-      default: return 5.0 * point * 10;
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Conta trades abertos do EA                                      |
-//+------------------------------------------------------------------+
-int CountOpenTrades()
-  {
-   int count = 0;
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-     {
-      if(PositionGetSymbol(i) == _Symbol)
-        {
-         if(PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
-            count++;
-        }
-     }
-   return count;
-  }
-
-//+------------------------------------------------------------------+
-//| Calcula risco e tamanho da posição                              |
-//+------------------------------------------------------------------+
-RiskCalculation CalculateRiskPosition(string symbol, const SetupScore &score, TRADE_DIRECTION direction, ASSET_CLASS assetClass)
-  {
-   // USAR NOVO MÓDULO DE GESTÃO DE RISCO
-   RiskCalculation result = CalculatePositionSize(symbol, direction, score.classification);
-   
-   if(!result.isValid)
-   {
-      return result;
-   }
-   
-   // Validar cálculo
-   if(!ValidateRiskCalculation(result, symbol))
-   {
-      result.isValid = false;
-      result.errorMessage = "Validação de risco falhou";
-      return result;
-   }
-   
-   return result;
-  }
-
-//+------------------------------------------------------------------+
-//| Executa trade                                                    |
-//+------------------------------------------------------------------+
-void ExecuteTrade(string symbol, TRADE_DIRECTION direction, const RiskCalculation &risk, SETUP_CLASS classification)
-  {
-   MqlTradeRequest request;
-   MqlTradeResult result;
-
-   ZeroMemory(request);
-
-   request.action = TRADE_ACTION_DEAL;
-   request.symbol = symbol;
-   request.volume = risk.positionSize;
-   request.type = (direction == TRADE_DIRECTION_BUY) ? ORDER_TYPE_BUY : ORDER_TYPE_SELL;
-   request.price = (direction == TRADE_DIRECTION_BUY) ?
-                   SymbolInfoDouble(symbol, SYMBOL_ASK) :
-                   SymbolInfoDouble(symbol, SYMBOL_BID);
-   request.sl = risk.stopLoss;       // ✅ Usar SL calculado
-   request.tp = risk.takeProfit1;    // ✅ Usar TP1 inicialmente
-   request.deviation = MaxSlippagePoints;
-   request.magic = EA_MAGIC_NUMBER;
-   request.comment = StringFormat("Nexus_%s_%s",
-                                   (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL",
-                                   (classification == SETUP_PREMIUM) ? "PREMIUM" : "GOOD");
-
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("📤 ENVIANDO ORDEM AO MERCADO");
-   PrintFormat("   Tipo: %s", (direction == TRADE_DIRECTION_BUY) ? "BUY" : "SELL");
-   PrintFormat("   Volume: %.2f lotes", request.volume);
-   PrintFormat("   Preço: %.5f", request.price);
-   PrintFormat("   Stop Loss: %.5f", request.sl);
-   PrintFormat("   Take Profit: %.5f", request.tp);
-   PrintFormat("════════════════════════════════════════════════════════════════");
-
-   if(!OrderSend(request, result))
-     {
-      PrintFormat("❌ Erro ao abrir trade: %d - %s", result.retcode, result.comment);
-      PrintFormat("   Detalhes do erro:");
-      PrintFormat("   - Retcode: %d", result.retcode);
-      PrintFormat("   - Deal: %I64u", result.deal);
-      PrintFormat("   - Order: %I64u", result.order);
-      PrintFormat("   - Volume: %.2f", result.volume);
-      PrintFormat("   - Price: %.5f", result.price);
-      PrintFormat("   - Bid: %.5f", result.bid);
-      PrintFormat("   - Ask: %.5f", result.ask);
-      return;
-     }
-
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("✅ TRADE ABERTO COM SUCESSO!");
-   PrintFormat("   🏷️ CONFIG_SET: %s", ConfigSetName); // 🔥 v4.34: CRÍTICO para análise separada!
-   PrintFormat("   Ticket: %I64u", result.order);
-   PrintFormat("   Deal: %I64u", result.deal);
-   PrintFormat("   Volume: %.2f lotes", result.volume);
-   PrintFormat("   Preço executado: %.5f", result.price);
-   PrintFormat("   Classificação: %s", (classification == SETUP_PREMIUM) ? "🏆 PREMIUM" : "⭐ GOOD");
-   PrintFormat("════════════════════════════════════════════════════════════════");
-
-   if(SendAlerts)
-     {
-      SendNotification(StringFormat("Nexus: %s %s aberto em %.5f (Ticket: %I64u)",
-                                     (direction == TRADE_DIRECTION_BUY) ? "COMPRA" : "VENDA",
-                                     symbol,
-                                     result.price,
-                                     result.order));
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Validar parâmetros de entrada                                   |
-//+------------------------------------------------------------------+
-bool ValidateInputParameters()
-  {
-   // 🔥 v4.36: ZERO HARDCODES - Todos os limites são inputs configuráveis!
-   
-   // Validar riscos básicos
-   if(AccountRiskPercent <= 0 || AccountRiskPercent > MaxAccountRiskPercent)
-     {
-      PrintFormat("❌ AccountRiskPercent inválido: %.2f (deve ser 0.1-%.1f%%)", 
-                  AccountRiskPercent, MaxAccountRiskPercent);
-      return false;
-     }
-
-   if(MaxRiskPremium <= 0 || MaxRiskPremium > MaxRiskPremiumLimit)
-     {
-      PrintFormat("❌ MaxRiskPremium inválido: %.2f (deve ser 0.1-%.1f%%)", 
-                  MaxRiskPremium, MaxRiskPremiumLimit);
-      return false;
-     }
-
-   if(MaxSimultaneousTrades <= 0 || MaxSimultaneousTrades > MaxSimultaneousTradesLimit)
-     {
-      PrintFormat("❌ MaxSimultaneousTrades inválido: %d (deve ser 1-%d)", 
-                  MaxSimultaneousTrades, MaxSimultaneousTradesLimit);
-      return false;
-     }
-   
-   // Stop Loss
-   if(SL_BufferPoints < 0 || SL_BufferPoints > MaxSL_BufferPoints)
-     {
-      PrintFormat("❌ SL_BufferPoints inválido: %.1f (deve ser 0-%.1f)", 
-                  SL_BufferPoints, MaxSL_BufferPoints);
-      return false;
-     }
-   
-   if(SL_FallbackPercent < 0.1 || SL_FallbackPercent > MaxSL_FallbackPercent)
-     {
-      PrintFormat("❌ SL_FallbackPercent inválido: %.2f (deve ser 0.1-%.1f%%)", 
-                  SL_FallbackPercent, MaxSL_FallbackPercent);
-      return false;
-     }
-   
-   if(SL_MinDistancePoints < 0 || SL_MinDistancePoints > MaxSL_DistancePoints)
-     {
-      PrintFormat("❌ SL_MinDistancePoints inválido: %.1f (deve ser 0-%.1f)", 
-                  SL_MinDistancePoints, MaxSL_DistancePoints);
-      return false;
-     }
-   
-   if(SL_MaxDistancePoints > MaxSL_MaxDistanceLimit)
-     {
-      PrintFormat("❌ SL_MaxDistancePoints inválido: %.1f (deve ser <= %.1f)", 
-                  SL_MaxDistancePoints, MaxSL_MaxDistanceLimit);
-      return false;
-     }
-   
-   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO se SL_Max < SL_Min
-   if(SL_MaxDistancePoints < SL_MinDistancePoints)
-     {
-      PrintFormat("⚠️ AVISO: SL_Max (%.1f) < SL_Min (%.1f) - configuração invertida, mas permitida", 
-                  SL_MaxDistancePoints, SL_MinDistancePoints);
-     }
-   
-   // Take Profit - 🔥 v4.37: VALIDAÇÃO FLEXÍVEL - permite otimização genética!
-   if(TP1_RR < MinTP_RR || TP1_RR > MaxTP_RR)
-     {
-      PrintFormat("❌ TP1_RR inválido: %.2f (deve ser %.1f-%.1f)", 
-                  TP1_RR, MinTP_RR, MaxTP_RR);
-      return false;
-     }
-   
-   if(TP2_RR < MinTP_RR || TP2_RR > MaxTP_RR)
-     {
-      PrintFormat("❌ TP2_RR inválido: %.2f (deve ser %.1f-%.1f)", 
-                  TP2_RR, MinTP_RR, MaxTP_RR);
-      return false;
-     }
-   
-   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO para ordem não crescente
-   if(TP2_RR < TP1_RR)
-     {
-      PrintFormat("⚠️ AVISO: TP2 (%.2f) < TP1 (%.2f) - configuração incomum, mas permitida", 
-                  TP2_RR, TP1_RR);
-     }
-   
-   if(UseTP3)
-     {
-      if(TP3_RR < MinTP_RR || TP3_RR > MaxTP_RR)
-        {
-         PrintFormat("❌ TP3_RR inválido: %.2f (deve ser %.1f-%.1f)", 
-                     TP3_RR, MinTP_RR, MaxTP_RR);
-         return false;
-        }
-      
-      // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO
-      if(TP3_RR < TP2_RR)
-        {
-         PrintFormat("⚠️ AVISO: TP3 (%.2f) < TP2 (%.2f) - configuração incomum, mas permitida", 
-                     TP3_RR, TP2_RR);
-        }
-     }
-   
-   // Validar percentuais individuais
-   if(EnablePartialTP)
-     {
-      if(TP1_ClosePercent < 0 || TP1_ClosePercent > MaxTP_ClosePercent)
-        {
-         PrintFormat("❌ TP1_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
-                     TP1_ClosePercent, MaxTP_ClosePercent);
-         return false;
-        }
-      
-      if(TP2_ClosePercent < 0 || TP2_ClosePercent > MaxTP_ClosePercent)
-        {
-         PrintFormat("❌ TP2_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
-                     TP2_ClosePercent, MaxTP_ClosePercent);
-         return false;
-        }
-      
-      if(UseTP3 && (TP3_ClosePercent < 0 || TP3_ClosePercent > MaxTP_ClosePercent))
-        {
-         PrintFormat("❌ TP3_ClosePercent inválido: %.1f%% (deve ser 0-%.1f%%)", 
-                     TP3_ClosePercent, MaxTP_ClosePercent);
-         return false;
-        }
-      
-      // Avisar se soma não é ~100%, mas permitir (pode ser estratégia intencional)
-      double totalClosePercent = TP1_ClosePercent + TP2_ClosePercent;
-      if(UseTP3)
-         totalClosePercent += TP3_ClosePercent;
-      
-      if(totalClosePercent < 95 || totalClosePercent > 105)
-        {
-         PrintFormat("⚠️ AVISO: Soma dos TP ClosePercent: %.1f%% (recomendado ~100%%)", totalClosePercent);
-         PrintFormat("   TP1: %.1f%%, TP2: %.1f%%, TP3: %.1f%%", 
-                     TP1_ClosePercent, TP2_ClosePercent, TP3_ClosePercent);
-        }
-     }
-   
-   // Trailing Stop - 🔥 v4.36: SEM HARDCODES
-   if(TrailingDistancePoints < 0 || TrailingDistancePoints > MaxTrailingDistancePoints)
-     {
-      PrintFormat("❌ TrailingDistancePoints inválido: %.1f (deve ser 0-%.1f)", 
-                  TrailingDistancePoints, MaxTrailingDistancePoints);
-      return false;
-     }
-   
-   if(TrailingStepPoints < 0)
-     {
-      PrintFormat("❌ TrailingStepPoints inválido: %.1f (deve ser >= 0)", 
-                  TrailingStepPoints);
-      return false;
-     }
-   
-   // ⚠️ v4.37: AVISO ao invés de REJEIÇÃO se Step > Distance
-   if(TrailingStepPoints > TrailingDistancePoints)
-     {
-      PrintFormat("⚠️ AVISO: TrailingStep (%.1f) > TrailingDistance (%.1f) - configuração incomum", 
-                  TrailingStepPoints, TrailingDistancePoints);
-     }
-   
-   if(TrailingActivationRR < 0 || TrailingActivationRR > MaxTrailingActivationRR)
-     {
-      PrintFormat("❌ TrailingActivationRR inválido: %.2f (deve ser 0-%.1f)", 
-                  TrailingActivationRR, MaxTrailingActivationRR);
-      return false;
-     }
-   
-   if(TrailingUseATR && (TrailingATRMultiplier < MinTrailingATRMultiplier || 
-                          TrailingATRMultiplier > MaxTrailingATRMultiplier))
-     {
-      PrintFormat("❌ TrailingATRMultiplier inválido: %.2f (deve ser %.1f-%.1f)", 
-                  TrailingATRMultiplier, MinTrailingATRMultiplier, MaxTrailingATRMultiplier);
-      return false;
-     }
-   
-   // Horários customizados
-   if(UseCustomTradingHours)
-     {
-      if(CustomStartHour < 0 || CustomStartHour > 23)
-        {
-         PrintFormat("❌ CustomStartHour inválido: %d (deve ser 0-23)", CustomStartHour);
-         return false;
-        }
-      
-      if(CustomStartMinute < 0 || CustomStartMinute > 59)
-        {
-         PrintFormat("❌ CustomStartMinute inválido: %d (deve ser 0-59)", CustomStartMinute);
-         return false;
-        }
-      
-      if(CustomEndHour < 0 || CustomEndHour > 23)
-        {
-         PrintFormat("❌ CustomEndHour inválido: %d (deve ser 0-23)", CustomEndHour);
-         return false;
-        }
-      
-      if(CustomEndMinute < 0 || CustomEndMinute > 59)
-        {
-         PrintFormat("❌ CustomEndMinute inválido: %d (deve ser 0-59)", CustomEndMinute);
-         return false;
-        }
-     }
-   
-   PrintFormat("✅ Todos os parâmetros validados com sucesso");
-   PrintFormat("   Limites configuráveis via inputs (ZERO hardcodes!)");
-   return true;
-  }
-
-//+------------------------------------------------------------------+
-//| Exibir configuração final                                       |
-//+------------------------------------------------------------------+
-void PrintConfiguration()
-  {
-   PrintFormat("📋 Configuração do EA:");
-   PrintFormat("   Risco padrão: %.2f%%", AccountRiskPercent);
-   PrintFormat("   Risco Premium: %.2f%%", MaxRiskPremium);
-   PrintFormat("   Trades simultâneos: %d", MaxSimultaneousTrades);
-   PrintFormat("   Modo posições: %s", 
-               (PositionControlMode == POSITION_MODE_SINGLE) ? "SINGLE" :
-               (PositionControlMode == POSITION_MODE_MULTIPLE) ? "MULTIPLE" : "PROTECTED");
-   PrintFormat("   Lote fixo: %.2f (0 = auto)", FixedLotSize);
-   PrintFormat("   Alertas: %s", SendAlerts ? "SIM" : "NÃO");
-   PrintFormat("   TP parcial: %s", EnablePartialTP ? "SIM" : "NÃO");
-   PrintFormat("   Trailing: %s", EnableTrailing ? "SIM" : "NÃO");
-  }
-
-//+------------------------------------------------------------------+
-//| Retorna texto descritivo da razão de deinit                     |
-//+------------------------------------------------------------------+
-string GetDeinitReasonText(int reason)
-  {
    switch(reason)
-     {
-      case REASON_PROGRAM: return "EA foi parado manualmente";
-      case REASON_REMOVE: return "EA foi removido do gráfico";
-      case REASON_RECOMPILE: return "EA foi recompilado";
-      case REASON_CHARTCHANGE: return "Símbolo ou período mudou";
-      case REASON_CHARTCLOSE: return "Gráfico foi fechado";
-      case REASON_PARAMETERS: return "Parâmetros foram alterados";
-      case REASON_ACCOUNT: return "Conta foi alterada";
-      case REASON_TEMPLATE: return "Template foi aplicado";
-      case REASON_INITFAILED: return "OnInit() retornou erro";
-      case REASON_CLOSE: return "Terminal foi fechado";
-      default: return StringFormat("Razão desconhecida (%d)", reason);
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Expert timer function (executado a cada hora)                   |
-//+------------------------------------------------------------------+
-void OnTimer()
-  {
-   // Obter data/hora atual
-   MqlDateTime dt;
-   TimeToStruct(TimeCurrent(), dt);
-   
-   // Verificação de integridade do sistema
-   ValidateSystemIntegrity();
-   
-   // Log periódico de status
-   if(dt.min == 0) // A cada hora cheia
-     {
-      PrintFormat("⏰ Status horário: %02d:00 | Posições abertas: %d | Saldo: %.2f",
-                  dt.hour,
-                  CountOpenTrades(),
-                  AccountInfoDouble(ACCOUNT_BALANCE));
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Limpeza de logs antigos                                         |
-//+------------------------------------------------------------------+
-void CleanupOldLogs()
-  {
-   // TODO: Implementar limpeza de logs antigos quando necessário
-   // Por enquanto, apenas placeholder para futuras implementações
-  }
-
-//+------------------------------------------------------------------+
-//| Validação de integridade do sistema                             |
-//+------------------------------------------------------------------+
-void ValidateSystemIntegrity()
-  {
-   // Verificar se indicadores ainda estão válidos
-   // Reconectar se necessário
-   // Por enquanto, apenas placeholder para futuras implementações
-  }
-
+   {
+      case REASON_PROGRAM:     return "Expert removido do gráfico";
+      case REASON_REMOVE:      return "Expert removido";
+      case REASON_RECOMPILE:   return "Expert recompilado";
+      case REASON_CHARTCHANGE: return "Símbolo ou timeframe alterado";
+      case REASON_CHARTCLOSE:  return "Gráfico fechado";
+      case REASON_PARAMETERS:  return "Parâmetros alterados";
+      case REASON_ACCOUNT:     return "Conta alterada";
+      case REASON_TEMPLATE:    return "Template aplicado";
+      case REASON_INITFAILED:  return "Inicialização falhou";
+      case REASON_CLOSE:       return "Terminal fechado";
+      default:                 return "Motivo desconhecido";
+   }
+}
 //+------------------------------------------------------------------+

@@ -240,7 +240,9 @@ bool IsValidTradingHour()
 //+------------------------------------------------------------------+
 bool HasOpenPosition()
 {
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   int total = PositionsTotal();
+   
+   for(int i = total - 1; i >= 0; i--)
    {
       if(PositionSelectByIndex(i))
       {

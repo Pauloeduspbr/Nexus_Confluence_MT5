@@ -1009,6 +1009,14 @@ GGTrendBarSignal GetGGTrendBarSignal()
 //+------------------------------------------------------------------+
 MultiTFResult AnalyzeMultiTimeframeAlignment()
 {
+   // 🔥 CORREÇÃO v4.40: Garantir que os timeframes macro sejam definidos
+   // Se g_tfOperacional não foi definido, significa que DefineMultiTimeframes não foi chamado.
+   if(g_tfOperacional != _Period)
+   {
+      PrintFormat("⚠️ AVISO: Timeframes não inicializados. Executando DefineMultiTimeframes() automaticamente.");
+      DefineMultiTimeframes(_Period, g_tfMacro1, g_tfMacro2, g_tfMacro3, g_numNiveisMacro);
+   }
+
    MultiTFResult result;
    result.isValid = false;
    result.direction = TRADE_DIRECTION_NONE;

@@ -148,9 +148,17 @@ class TradeReconstructor:
     
     def __init__(self, log_file: str):
         self.log_file = Path(log_file)
-        self.trades: Dict[int, Trade] = {}
-        self.open_positions: Dict[int, Trade] = {}
+        self.trades: Dict[str, Trade] = {}  # 🔥 v4.34 FIX: Chave = "CONFIG_ticket" para evitar sobrescrita
+        self.open_positions: Dict[str, Trade] = {}  # 🔥 v4.34 FIX: Chave = "CONFIG_ticket"
         self.current_config_set: Optional[str] = None  # 🔥 v4.34: Rastreia CONFIG_SET atual
+    
+    def _get_trade_key(self, ticket: int) -> str:
+        """
+        🔥 v4.34 FIX: Gera chave única para trade baseada em CONFIG_SET + ticket
+        Isso evita que trades com mesmo ticket de diferentes backtests se sobrescrevam
+        """
+        config = self.current_config_set or 'UNKNOWN'
+        return f"{config}_{ticket}"
         
         # Regex patterns
         self.patterns = {
@@ -281,6 +289,18 @@ class TradeReconstructor:
         print(f"  Total trades: {len(self.trades):,}")
         print(f"  Open positions: {len(self.open_positions):,}")
         
+        # 🔥 v4.34: Mostrar distribuição por CONFIG_SET
+        config_set_dist = {}
+        for trade in self.trades.values():
+            config = trade.config_set_name or 'UNKNOWN'
+            config_set_dist[config] = config_set_dist.get(config, 0) + 1
+        
+        if config_set_dist:
+            print(f"\n  📊 Distribuição por CONFIG_SET:")
+            for config_name, count in sorted(config_set_dist.items()):
+                pct = (count / len(self.trades) * 100) if self.trades else 0
+                print(f"     - {config_name}: {count:,} trades ({pct:.1f}%)")
+        
         return list(self.trades.values())
     
     def _process_line(self, line: str):
@@ -335,8 +355,14 @@ class TradeReconstructor:
         match = self.patterns['config_set_param'].search(line)
         if match:
             config_set_name = match.group(1)
+            old_config = self.current_config_set
             self.current_config_set = config_set_name
-            print(f"  🏷️  Detectado CONFIG_SET: {config_set_name}")
+            
+            # Debug: Mostrar mudança de contexto
+            if old_config != config_set_name:
+                print(f"  🏷️  Detectado CONFIG_SET: {config_set_name} (anterior: {old_config or 'None'})")
+                print(f"      Trades até agora: {len(self.trades)}")
+            
             return
         
         # 🔥 v4.34: CONFIG_SET no log do trade (formato alternativo)
@@ -387,8 +413,10 @@ class TradeReconstructor:
             config_set_name=self.current_config_set  # 🔥 v4.34: Aplicar CONFIG_SET atual
         )
         
-        self.open_positions[ticket] = trade
-        self.trades[ticket] = trade
+        # 🔥 v4.34 FIX: Usar chave única config_ticket
+        trade_key = self._get_trade_key(ticket)
+        self.open_positions[trade_key] = trade
+        self.trades[trade_key] = trade
     
     def _handle_order_modify(self, match):
         """Trata modificação de ordem"""
@@ -396,8 +424,9 @@ class TradeReconstructor:
         ticket = int(match.group(2))
         new_sl = float(match.group(3))
         
-        if ticket in self.open_positions:
-            trade = self.open_positions[ticket]
+        trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+        if trade_key in self.open_positions:
+            trade = self.open_positions[trade_key]
             trade.current_sl = new_sl
             trade.modifications.append({
                 'time': timestamp_str,
@@ -411,8 +440,9 @@ class TradeReconstructor:
         close_price = float(match.group(3))
         profit = float(match.group(4))
         
-        if ticket in self.open_positions:
-            trade = self.open_positions[ticket]
+        trade_key = self._get_trade_key(ticket)  # 🔥 v4.34 FIX
+        if trade_key in self.open_positions:
+            trade = self.open_positions[trade_key]
             trade.close_time = datetime.strptime(timestamp_str, '%Y.%m.%d %H:%M:%S')
             trade.close_price = close_price
             trade.profit = profit
@@ -444,7 +474,7 @@ class TradeReconstructor:
                 trade.close_reason = 'MANUAL'
             
             # Remover de posições abertas
-            del self.open_positions[ticket]
+            del self.open_positions[trade_key]  # 🔥 v4.34 FIX
     
     def _handle_deal_backtest(self, match):
         """Trata deal de backtest MT5 (abertura/fechamento de posição)"""
@@ -507,6 +537,10 @@ class TradeReconstructor:
             initial_sl=0.0,  # Backtest não mostra SL nos deals
             config_set_name=self.current_config_set  # 🔥 v4.34: Aplicar CONFIG_SET atual
         )
+        
+        # 🔥 DEBUG v4.34: Log do primeiro trade de cada CONFIG_SET
+        if self.current_config_set and len([t for t in self.trades.values() if t.config_set_name == self.current_config_set]) == 0:
+            print(f"      📍 Primeiro trade do CONFIG_SET '{self.current_config_set}': Ticket #{ticket}")
         
         self.open_positions[ticket] = new_trade
         self.trades[ticket] = new_trade

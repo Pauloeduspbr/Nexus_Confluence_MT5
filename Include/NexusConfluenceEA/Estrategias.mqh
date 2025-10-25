@@ -1242,10 +1242,8 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    // VALIDAÇÃO 2: TF operacional DEVE alinhar com direção dos macros
    bool operationalBullish = (operationalValue > 0);
    bool operationalBearish = (operationalValue < 0);
-   bool macro1Bullish = (macro1Value > 0);
-   bool macro2Bullish = (macro2Value > 0);
-   bool macro1Bearish = (macro1Value < 0);
-   bool macro2Bearish = (macro2Value < 0);
+   // 🔥 v4.44: Reutilizar variáveis já declaradas (linhas 1169-1172)
+   // macro1Bullish, macro2Bullish, macro1Bearish, macro2Bearish já existem!
    
    // Verificar alinhamento: operacional DEVE estar na mesma direção dos macros
    if(!((operationalBullish && macro1Bullish && macro2Bullish) ||

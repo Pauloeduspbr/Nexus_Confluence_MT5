@@ -301,13 +301,13 @@ input group "=== 🔧 CONFIGURAÇÕES AVANÇADAS (ANTI-HARDCODE) ==="
 input int    MaxSlippagePoints            = 30;          // 🔧 Slippage Máximo (pontos)
 input ENUM_ORDER_TYPE_FILLING OrderFillingMode = ORDER_FILLING_FOK;  // 🔧 Modo de Preenchimento
 
-// Controle de Qualidade de Setups (✅ v4.40.1: RESTAURADO)
+// 🔥 v4.44: Controle de Qualidade de Setups
 input bool   AllowGoodSetups              = true;        // 🎯 Permitir setups GOOD (se false: apenas PREMIUM)
 input bool   UseStrictFilters             = false;       // 🎯 Exigir TODOS filtros alinhados (3/3 ou 2/2)
 input bool   RequireSupertrend            = false;       // 🎯 Exigir Supertrend alinhado obrigatoriamente
 input int    MinConfluenceScore           = 70;          // 🎯 Score mínimo de confluência (0-100)
 
-// Lógica de Score e Classificação
+// 🔥 v4.44: Lógica de Score e Classificação (ANTI-HARDCODE)
 input int    MinMacroSignalsForAlignment  = 2;           // 🔧 Mín Sinais Macro Alinhados (de 3)
 input int    MinScoreForexGood            = 2;           // 🔧 Score Mín FOREX GOOD (de 3)
 input int    MinScoreForexPremium         = 3;           // 🔧 Score Mín FOREX PREMIUM (de 3)
@@ -315,7 +315,7 @@ input int    MinScoreIndexGood            = 2;           // 🔧 Score Mín ÍND
 input int    MinScoreIndexPremium         = 2;           // 🔧 Score Mín ÍNDICE PREMIUM (de 2)
 input bool   RequireM30ForPremium         = true;        // 🔧 Exigir M30 alinhado para PREMIUM?
 
-// Robustez e Logging
+// 🔥 v4.44: Robustez e Logging
 input int    MaxConsecutiveIndicatorErrors = 10;         // 🔧 Máx Erros Consecutivos de Indicadores
 input int    LogWarningIntervalCount       = 100;        // 🔧 Intervalo de Avisos no Log (contagem)
 

@@ -296,28 +296,21 @@ input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
 input group "=== 🔐 IDENTIFICAÇÃO ==="
 input int    EA_MAGIC_NUMBER          = 20241024; // 🔐 Magic Number (único por instância!)
 
-input group "=== 🔧 CONFIGURAÇÕES AVANÇADAS (ANTI-HARDCODE) ==="
-// Execução de Ordens
+input group "=== 🔧 CONFIGURAÇÕES AVANÇADAS ==="
 input int    MaxSlippagePoints            = 30;          // 🔧 Slippage Máximo (pontos)
 input ENUM_ORDER_TYPE_FILLING OrderFillingMode = ORDER_FILLING_FOK;  // 🔧 Modo de Preenchimento
-
-// 🔥 v4.44: Controle de Qualidade de Setups
-input bool   AllowGoodSetups              = true;        // 🎯 Permitir setups GOOD (se false: apenas PREMIUM)
-input bool   UseStrictFilters             = false;       // 🎯 Exigir TODOS filtros alinhados (3/3 ou 2/2)
-input bool   RequireSupertrend            = false;       // 🎯 Exigir Supertrend alinhado obrigatoriamente
-input int    MinConfluenceScore           = 70;          // 🎯 Score mínimo de confluência (0-100)
-
-// 🔥 v4.44: Lógica de Score e Classificação (ANTI-HARDCODE)
-input int    MinMacroSignalsForAlignment  = 2;           // 🔧 Mín Sinais Macro Alinhados (de 3)
+input bool   AllowGoodSetups              = true;        // 🎯 Permitir setups GOOD
+input bool   UseStrictFilters             = false;       // 🎯 Exigir TODOS filtros (3/3 ou 2/2)
+input bool   RequireSupertrend            = false;       // 🎯 Supertrend obrigatório
+input int    MinConfluenceScore           = 70;          // 🎯 Score mínimo confluência (0-100)
+input int    MinMacroSignalsForAlignment  = 2;           // 🔧 Mín Sinais Macro (de 3)
 input int    MinScoreForexGood            = 2;           // 🔧 Score Mín FOREX GOOD (de 3)
 input int    MinScoreForexPremium         = 3;           // 🔧 Score Mín FOREX PREMIUM (de 3)
 input int    MinScoreIndexGood            = 2;           // 🔧 Score Mín ÍNDICE GOOD (de 2)
 input int    MinScoreIndexPremium         = 2;           // 🔧 Score Mín ÍNDICE PREMIUM (de 2)
-input bool   RequireM30ForPremium         = true;        // 🔧 Exigir M30 alinhado para PREMIUM?
-
-// 🔥 v4.44: Robustez e Logging
-input int    MaxConsecutiveIndicatorErrors = 10;         // 🔧 Máx Erros Consecutivos de Indicadores
-input int    LogWarningIntervalCount       = 100;        // 🔧 Intervalo de Avisos no Log (contagem)
+input bool   RequireM30ForPremium         = true;        // 🔧 Exigir M30 para PREMIUM
+input int    MaxConsecutiveIndicatorErrors = 10;         // 🔧 Máx Erros Consecutivos
+input int    LogWarningIntervalCount       = 100;        // 🔧 Intervalo Avisos Log
 
 input group "════════════════════════════════════════════════════════"
 input group "          ✅ FIM DOS PARÂMETROS SIMPLIFICADOS           "
@@ -326,8 +319,8 @@ input group "══════════════════════�
 //+------------------------------------------------------------------+
 //| CONSTANTES GLOBAIS                                               |
 //+------------------------------------------------------------------+
-const string EA_VERSION = "4.40";    // 🔥 v4.40: SIMPLIFICAÇÃO RADICAL
-const string EA_NAME    = "Nexus Confluence Basic";
+const string EA_VERSION = "4.44";    // 🔥 v4.44: CORREÇÃO CRÍTICA TF OPERACIONAL
+const string EA_NAME    = "Nexus Confluence EA";
 
 //+------------------------------------------------------------------+
 //| NOTA: Variáveis globais g_handles e g_tfOperacional             |

@@ -297,8 +297,37 @@ input ENUM_APPLIED_PRICE GG_ADX_Price  = PRICE_CLOSE;  // Price Type
 input double             GG_Step_Psar  = 0.02;         // PSAR Step
 input double             GG_Max_Psar   = 0.20;         // PSAR Maximum
 
-input group "=== �🔐 IDENTIFICAÇÃO ==="
+input group "=== 🔐 IDENTIFICAÇÃO ==="
 input int    EA_MAGIC_NUMBER          = 20241024; // 🔐 Magic Number (único por instância!)
+
+input group "=== 🔧 CONFIGURAÇÕES AVANÇADAS (ANTI-HARDCODE) ==="
+// Execução de Ordens
+input int    MaxSlippagePoints            = 30;          // 🔧 Slippage Máximo (pontos)
+input ENUM_ORDER_TYPE_FILLING OrderFillingMode = ORDER_FILLING_FOK;  // 🔧 Modo de Preenchimento
+
+// Lógica de Score e Classificação
+input int    MinMacroSignalsForAlignment  = 2;           // 🔧 Mín Sinais Macro Alinhados (de 3)
+input int    MinScoreForexGood            = 2;           // 🔧 Score Mín FOREX GOOD (de 3)
+input int    MinScoreForexPremium         = 3;           // 🔧 Score Mín FOREX PREMIUM (de 3)
+input int    MinScoreIndexGood            = 2;           // 🔧 Score Mín ÍNDICE GOOD (de 2)
+input int    MinScoreIndexPremium         = 2;           // 🔧 Score Mín ÍNDICE PREMIUM (de 2)
+input bool   RequireM30ForPremium         = true;        // 🔧 Exigir M30 alinhado para PREMIUM?
+
+// Robustez e Logging
+input int    MaxConsecutiveIndicatorErrors = 10;         // 🔧 Máx Erros Consecutivos de Indicadores
+input int    LogWarningIntervalCount       = 100;        // 🔧 Intervalo de Avisos no Log (contagem)
+
+// Validações Rogers-Satchell (Avançado)
+input int    MaxRSPeriod                  = 500;         // 🔧 Período Máx Rogers-Satchell
+input int    MaxRSShift                   = 1000;        // 🔧 Shift Máx Rogers-Satchell
+input int    MinValidSamples              = 10;          // 🔧 Amostras Mín para Cálculo RS
+input double MaxRatioLimit                = 10.0;        // 🔧 Limite Máx de Ratio H/C
+input double MinRatioLimit                = 0.1;         // 🔧 Limite Mín de Ratio H/C
+input double MaxRSNormalized              = 10.0;        // 🔧 Valor Máx RS Normalizado (✅ v4.42)
+input double MinRSNormalized              = 0.0001;      // 🔧 Valor Mín RS Normalizado (✅ v4.42)
+input int    MaxEMAPeriod                 = 100;         // 🔧 Período Máx EMA Suavização (✅ v4.42)
+input int    MinPeriod                    = 2;           // 🔧 Período Mín Universal (✅ v4.42)
+input double MinValidBarsPercent          = 0.70;        // 🔧 % Mín Candles Válidos (0.70 = 70%) (✅ v4.42)
 
 input group "════════════════════════════════════════════════════════"
 input group "          ✅ FIM DOS PARÂMETROS SIMPLIFICADOS           "

@@ -72,15 +72,15 @@ double CalculateRogersSatchell(string symbol, ENUM_TIMEFRAMES timeframe, int per
       return 0.0;
    }
    
-   if(period < 2 || period > 500)
+   if(period < 2 || period > MaxRSPeriod)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("❌ RS CRÍTICO: Período inválido (%d) - deve estar entre 2-500", period);
+      PrintFormat("❌ RS CRÍTICO: Período inválido (%d) - deve estar entre 2-%d", period, MaxRSPeriod);
       return 0.0;
    }
    
-   if(shift < 0 || shift > 1000)
+   if(shift < 0 || shift > MaxRSShift)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("❌ RS CRÍTICO: Shift inválido (%d) - deve estar entre 0-1000", shift);
+      PrintFormat("❌ RS CRÍTICO: Shift inválido (%d) - deve estar entre 0-%d", shift, MaxRSShift);
       return 0.0;
    }
    
@@ -185,7 +185,9 @@ double CalculateRogersSatchell(string symbol, ENUM_TIMEFRAMES timeframe, int per
       }
       
       // VALIDAÇÃO 6: Ratios devem estar em range razoável (proteção overflow)
-      if(ratio_hc > 10.0 || ratio_lc > 10.0 || ratio_hc < 0.1 || ratio_lc < 0.1)
+      // ✅ v4.42: ANTI-HARDCODE
+      if(ratio_hc > MaxRatioLimit || ratio_lc > MaxRatioLimit || 
+         ratio_hc < MinRatioLimit || ratio_lc < MinRatioLimit)
       {
          PrintFormat("⚠️ RS: Ratios extremos no candle %d (HC:%.8f, LC:%.8f) - possível anomalia",
                      i, ratio_hc, ratio_lc);
@@ -220,15 +222,16 @@ double CalculateRogersSatchell(string symbol, ENUM_TIMEFRAMES timeframe, int per
    }
    
    // ═══════════════════════════════════════════════════════════════
-   // VALIDAÇÃO FINAL: Mínimo 70% de candles válidos
+   // VALIDAÇÃO FINAL: Mínimo configurável de candles válidos
    // ═══════════════════════════════════════════════════════════════
    
    double valid_ratio = (double)valid_bars / period;
+   int required_valid = (int)(period * MinValidBarsPercent);  // ✅ v4.42: ANTI-HARDCODE
    
-   if(valid_bars < (period * 7 / 10)) // Precisa 70%+ candles válidos
+   if(valid_bars < required_valid)  // Usa % configurável
    {
-      PrintFormat("❌ RS CRÍTICO: Candles válidos insuficientes (%d de %d = %.1f%% < 70%%)",
-                  valid_bars, period, valid_ratio * 100.0);
+      PrintFormat("❌ RS CRÍTICO: Candles válidos insuficientes (%d de %d = %.1f%% < %.0f%%)",
+                  valid_bars, period, valid_ratio * 100.0, MinValidBarsPercent * 100.0);
       PrintFormat("❌ RS CRÍTICO: Candles inválidos: %d (%.1f%%)", 
                   invalid_bars, (double)invalid_bars / period * 100.0);
       return 0.0;
@@ -265,10 +268,11 @@ double CalculateRogersSatchell(string symbol, ENUM_TIMEFRAMES timeframe, int per
       return 0.0;
    }
    
-   // VALIDAÇÃO FINAL: Range de sanidade (0.0001 a 10.0 para USDJPY)
-   if(rs_normalized < 0.0001 || rs_normalized > 10.0)
+   // VALIDAÇÃO FINAL: Range de sanidade
+   if(rs_normalized < MinRSNormalized || rs_normalized > MaxRSNormalized)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("⚠️ RS: rs_normalized fora do range esperado (%.8f)", rs_normalized);
+      PrintFormat("⚠️ RS: rs_normalized fora do range esperado (%.8f, limites: %.4f-%.4f)", 
+                  rs_normalized, MinRSNormalized, MaxRSNormalized);
       // NÃO retorna 0, mas alerta - pode ser movimento extremo real
    }
    
@@ -307,19 +311,21 @@ double CalculateRogersSatchellEMA(string symbol, ENUM_TIMEFRAMES timeframe, int 
       return 0.0;
    }
    
-   if(period < 2 || period > 500)
+   if(period < MinPeriod || period > MaxRSPeriod)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("❌ RS-EMA CRÍTICO: Período RS inválido (%d)", period);
+      PrintFormat("❌ RS-EMA CRÍTICO: Período RS inválido (%d, limites: %d-%d)", 
+                  period, MinPeriod, MaxRSPeriod);
       return 0.0;
    }
    
-   if(ema_period < 2 || ema_period > 100)
+   if(ema_period < MinPeriod || ema_period > MaxEMAPeriod)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("❌ RS-EMA CRÍTICO: Período EMA inválido (%d)", ema_period);
+      PrintFormat("❌ RS-EMA CRÍTICO: Período EMA inválido (%d, limites: %d-%d)", 
+                  ema_period, MinPeriod, MaxEMAPeriod);
       return 0.0;
    }
    
-   if(shift < 0 || shift > 1000)
+   if(shift < 0 || shift > MaxRSShift)  // ✅ v4.42: Já usa MaxRSShift
    {
       PrintFormat("❌ RS-EMA CRÍTICO: Shift inválido (%d)", shift);
       return 0.0;
@@ -407,9 +413,10 @@ double CalculateRogersSatchellEMA(string symbol, ENUM_TIMEFRAMES timeframe, int 
    }
    
    // VALIDAÇÃO FINAL: EMA deve estar em range razoável
-   if(ema < 0.0001 || ema > 10.0)
+   if(ema < MinRSNormalized || ema > MaxRSNormalized)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("⚠️ RS-EMA: Resultado fora do range esperado (%.8f)", ema);
+      PrintFormat("⚠️ RS-EMA: Resultado fora do range esperado (%.8f, limites: %.4f-%.4f)", 
+                  ema, MinRSNormalized, MaxRSNormalized);
       // NÃO retorna 0 - pode ser movimento extremo real
    }
    
@@ -579,9 +586,9 @@ void CompareRSvsATR(string symbol, ENUM_TIMEFRAMES timeframe, int bars = 100)
    
    IndicatorRelease(atr_handle);
    
-   if(valid_samples < 10)
+   if(valid_samples < MinValidSamples)  // ✅ v4.42: ANTI-HARDCODE
    {
-      PrintFormat("❌ Amostras insuficientes (%d)", valid_samples);
+      PrintFormat("❌ Amostras insuficientes (%d < %d)", valid_samples, MinValidSamples);
       return;
    }
    

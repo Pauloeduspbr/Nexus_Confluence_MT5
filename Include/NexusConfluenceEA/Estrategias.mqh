@@ -277,7 +277,7 @@ bool UpdateBufferCache()
     if(!success)
     {
         consecutiveErrors++;
-        if(consecutiveErrors >= 10)
+        if(consecutiveErrors >= MaxConsecutiveIndicatorErrors)  // ✅ v4.42: ANTI-HARDCODE
         {
             PrintFormat("🔴 CRÍTICO: Buffer Cache com %d erros consecutivos!", consecutiveErrors);
             consecutiveErrors = 0;
@@ -910,15 +910,15 @@ GGTrendBarSignal GetGGTrendBarSignal()
       // 🔥 DEBUG v4.40.3: Log erro handle
       static int handleErrorCount = 0;
       handleErrorCount++;
-      if(handleErrorCount % 100 == 0)
+      if(handleErrorCount % LogWarningIntervalCount == 0)  // ✅ v4.42: ANTI-HARDCODE
       {
          PrintFormat("🔴 [DEBUG] Handle GG TrendBar INVÁLIDO - erro #%d", handleErrorCount);
       }
       return result;
    }
    
-   // 🔥 DEBUG v4.40.3: Log a cada 200 chamadas
-   if(callCount % 200 == 0)
+   // 🔥 DEBUG v4.40.3: Log a cada N chamadas
+   if(callCount % (LogWarningIntervalCount * 2) == 0)  // ✅ v4.42: ANTI-HARDCODE (2x do intervalo)
    {
       PrintFormat("🔍 [DEBUG] GetGGTrendBarSignal() chamado %d vezes", callCount);
    }
@@ -932,7 +932,7 @@ GGTrendBarSignal GetGGTrendBarSignal()
       // 🔥 DEBUG v4.40.3: Contador de cache inválido
       static int cacheInvalidCount = 0;
       cacheInvalidCount++;
-      if(cacheInvalidCount % 50 == 0)
+      if(cacheInvalidCount % (LogWarningIntervalCount / 2) == 0)  // ✅ v4.42: ANTI-HARDCODE (metade do intervalo)
       {
          PrintFormat("⚠️ [DEBUG] Cache inválido detectado %d vezes", cacheInvalidCount);
       }
@@ -1043,11 +1043,11 @@ GGTrendBarSignal GetGGTrendBarSignal()
    
    // Determinar direção geral (pode ser usado como confirmação)
    int sumSignals = result.h4Value + result.h1Value + result.m30Value + result.m15Value;
-   if(sumSignals >= 2)
+   if(sumSignals >= MinMacroSignalsForAlignment)  // ✅ v4.42: ANTI-HARDCODE
    {
       result.overallDirection = TRADE_DIRECTION_BUY;
    }
-   else if(sumSignals <= -2)
+   else if(sumSignals <= -MinMacroSignalsForAlignment)  // ✅ v4.42: ANTI-HARDCODE
    {
       result.overallDirection = TRADE_DIRECTION_SELL;
    }
@@ -1456,18 +1456,18 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
       
       score.totalPoints = score.waePoints + score.rsiomaPoints + score.currencyStrengthPoints;
       
-      // Classificação (agora exige 3/3)
-      if(score.totalPoints >= 3 && m30Aligned)
+      // ✅ v4.42: ANTI-HARDCODE - Classificação configurável
+      if(score.totalPoints >= MinScoreForexPremium && (m30Aligned || !RequireM30ForPremium))
       {
-         score.classification = SETUP_PREMIUM; // 3/3 + MACRO-3 alinhado
+         score.classification = SETUP_PREMIUM; // Score mínimo PREMIUM + M30 (se exigido)
       }
-      else if(score.totalPoints >= 3)
+      else if(score.totalPoints >= MinScoreForexGood)
       {
-         score.classification = SETUP_GOOD; // 3/3 mas MACRO-3 não alinhado
+         score.classification = SETUP_GOOD; // Score mínimo GOOD
       }
       else
       {
-         score.classification = SETUP_REJECT; // <3
+         score.classification = SETUP_REJECT; // Abaixo do mínimo
       }
    }
    else
@@ -1532,18 +1532,18 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
       
       score.totalPoints = score.waePoints + score.rsiomaPoints;
       
-      // Classificação (agora exige 2/2)
-      if(score.totalPoints >= 2 && m30Aligned)
+      // ✅ v4.42: ANTI-HARDCODE - Classificação configurável para Índices
+      if(score.totalPoints >= MinScoreIndexPremium && (m30Aligned || !RequireM30ForPremium))
       {
-         score.classification = SETUP_PREMIUM; // 2/2 + MACRO-3 alinhado
+         score.classification = SETUP_PREMIUM; // Score mínimo PREMIUM + M30 (se exigido)
       }
-      else if(score.totalPoints >= 2)
+      else if(score.totalPoints >= MinScoreIndexGood)
       {
-         score.classification = SETUP_GOOD; // 2/2 mas MACRO-3 não alinhado
+         score.classification = SETUP_GOOD; // Score mínimo GOOD
       }
       else
       {
-         score.classification = SETUP_REJECT; // <2
+         score.classification = SETUP_REJECT; // Abaixo do mínimo
       }
    }
    

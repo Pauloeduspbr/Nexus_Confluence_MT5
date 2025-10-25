@@ -70,8 +70,8 @@ bool ExecuteSimpleTrade(
 {
    CTrade trade;
    trade.SetExpertMagicNumber(magicNumber);
-   trade.SetDeviationInPoints(30);
-   trade.SetTypeFilling(ORDER_FILLING_FOK);
+   trade.SetDeviationInPoints(MaxSlippagePoints);  // ✅ v4.42: ANTI-HARDCODE
+   trade.SetTypeFilling(OrderFillingMode);          // ✅ v4.42: ANTI-HARDCODE
    
    // Normalizar lote
    lotSize = NormalizeLot(symbol, lotSize);

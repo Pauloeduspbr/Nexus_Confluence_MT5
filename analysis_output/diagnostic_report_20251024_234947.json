@@ -1,0 +1,40 @@
+{
+  "timestamp": "2025-10-24T23:49:47.062739",
+  "analysis": {
+    "total_trades": 1007,
+    "trades_after_tp": 354,
+    "trades_normal": 653,
+    "win_rates": {
+      "overall": 36.64349553128103,
+      "after_tp": 100.0,
+      "normal": 2.2970903522205206,
+      "difference": 97.70290964777948
+    },
+    "avg_profits": {
+      "overall": 75.0744786494434,
+      "after_tp": 6999.35028248586,
+      "normal": -3678.667687595719
+    },
+    "temporal_patterns": {
+      "avg_time_to_next_entry_minutes": 40.923913168387685,
+      "median_time_minutes": 30.000000083333337,
+      "fast_reentries": 140,
+      "same_candle_entries": 0
+    },
+    "parameters": {
+      "tp_points": 800,
+      "sl_points": 250,
+      "rr_ratio": 3.2
+    }
+  },
+  "recommendations": [
+    "⚠️  PADRÃO DETECTADO: 140 entradas < 30 min após TP",
+    "   → AÇÃO: Implementar 'MinTimeAfterTP' = 30-60 minutos",
+    "   → AÇÃO: Verificar se preço já reverteu ou ainda está em tendência",
+    "⚠️  TP PODE ESTAR CURTO: Tempo médio até próxima entrada = 41 min",
+    "   → AÇÃO: Considerar aumentar TP de 800 para 1200-1600 pontos",
+    "   → AÇÃO: Ou implementar trailing stop para capturar tendências longas",
+    "⚠️  Win Rate geral baixo: 2.3%",
+    "   → AÇÃO: Revisar critérios de entrada (score mínimo, filtros)"
+  ]
+}

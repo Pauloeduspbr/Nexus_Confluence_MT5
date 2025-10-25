@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.27 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.41 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -36,15 +36,33 @@
 //|      - IMPACTO: TODOS indicadores sincronizados!                |
 //|      - GG/WAE/RSI/CS/SUPERTREND = todos leem [1]                |
 //|                                                                   |
+//| 🔥 CRÍTICO v4.41: WAE AGORA É OBRIGATÓRIO (CORREÇÃO LÓGICA)     |
+//|   ✅ PROBLEMA IDENTIFICADO:                                     |
+//|      - Sistema aceitava 2/3 (RSI + CS) SEM WAE                 |
+//|      - Trades executados com 0% alinhamento WAE!                |
+//|      - WAE mede FORÇA DA TENDÊNCIA via histograma               |
+//|      - Sem WAE = entradas em momentum fraco                     |
+//|                                                                  |
+//|   ✅ CORREÇÃO IMPLEMENTADA:                                     |
+//|      - WAE agora é OBRIGATÓRIO (como Supertrend e RSI)          |
+//|      - Se !wae.isValid ou !wae.isAligned → REJECT imediato     |
+//|      - FOREX: Exige WAE + RSI + CS (3/3 obrigatório)           |
+//|      - ÍNDICES: Exige WAE + RSI (2/2 obrigatório)              |
+//|                                                                  |
+//|   ✅ IMPACTO ESPERADO:                                          |
+//|      - Win Rate: +5-10% (entradas em momentum forte)           |
+//|      - Drawdown: -10-15% (menos entradas fracas)               |
+//|      - Número de trades: Redução esperada ~30%                 |
+//|                                                                  |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
-//| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.27 - Simplificação RSI OMA (Entradas Mais Rápidas)   |
+//| DATA: Janeiro 2025                                               |
+//| VERSÃO: 4.41 - WAE Obrigatório (Momentum Crítico)              |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.27"
-#property version   "4.27"
+#property copyright "Nexus Confluence EA v4.41"
+#property version   "4.41"
 
 #include "Parametros.mqh"
 
@@ -1350,34 +1368,47 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
    
    if(useCS)
    {
-      // Sistema 3 filtros: WAE + RSI + CS (precisa 2 de 3)
-      // ✅ CORREÇÃO v4.12: Ordem otimizada - WAE primeiro (momentum crítico)
-      score.requiredPoints = 2;
+      // 🔥 v4.41 CORREÇÃO CRÍTICA: WAE É OBRIGATÓRIO!
+      // Sistema 3 filtros: WAE + RSI + CS (TODOS OBRIGATÓRIOS)
+      // WAE mede a FORÇA DA TENDÊNCIA através do histograma (explosão de momentum)
+      // Sem WAE = sem confirmação de força = setup fraco
+      score.requiredPoints = 3;  // ✅ MUDADO: 2 → 3 (todos obrigatórios)
       
       PrintFormat("────────────────────────────────────────────────────────────────");
-      PrintFormat("📊 Analisando Filtros Micro (ORDEM OTIMIZADA):");
+      PrintFormat("📊 Analisando Filtros Micro (TODOS OBRIGATÓRIOS):");
       
-      // 1️⃣ WAE - MOMENTUM (prioridade máxima)
-      PrintFormat("1️⃣ WAE (Momentum/Explosão)...");
+      // 1️⃣ WAE - MOMENTUM/FORÇA (OBRIGATÓRIO!)
+      PrintFormat("1️⃣ WAE (Momentum/Explosão - OBRIGATÓRIO)...");
       WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
-      if(wae.isValid && wae.isAligned)
+      
+      // 🔥 v4.41 CRÍTICO: WAE OBRIGATÓRIO!
+      if(!wae.isValid)
       {
-         score.waePoints = 1;
-         PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
-                     wae.strength, wae.isExpanding ? "SIM" : "NÃO");
+         PrintFormat("   ❌ WAE INVÁLIDO - REJEITANDO SETUP COMPLETO!");
+         PrintFormat("   Razão: WAE não retornou sinal válido");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
-      else
+      
+      if(!wae.isAligned)
       {
-         PrintFormat("   ❌ WAE não alinhado (0 pontos)");
+         PrintFormat("   ❌ WAE NÃO ALINHADO - REJEITANDO SETUP COMPLETO!");
+         PrintFormat("   Razão: Falta FORÇA/MOMENTUM na tendência (histograma não confirma)");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
+      
+      score.waePoints = 1;
+      PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
+                  wae.strength, wae.isExpanding ? "SIM" : "NÃO");
       
       // 2️⃣ RSI OMA - FORÇA RELATIVA (OBRIGATÓRIO!)
       PrintFormat("2️⃣ RSI OMA (Força Relativa - OBRIGATÓRIO)...");
       RSISignal rsi = GetRSIOMASignal(g_handles.rsi_oper, direction, g_tfOperacional);
       
       // 🔥 v4.22 CORREÇÃO CRÍTICA: RSI OMA OBRIGATÓRIO!
-      // BUG v4.21: Se rsi.isValid=false, continuava sem RSI
-      // Evidência: Imagem 6 mostrou RSI bullish mas EA vendeu!
       if(!rsi.isValid)
       {
          PrintFormat("   ❌ RSI OMA INVÁLIDO - REJEITANDO SETUP COMPLETO!");
@@ -1386,68 +1417,93 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
          return score;
       }
       
-      if(rsi.isAligned)
+      if(!rsi.isAligned)
       {
-         score.rsiomaPoints = 1;
-         PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
-                     rsi.strength, rsi.slope);
-      }
-      else
-      {
-         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos) - Mas VÁLIDO");
+         PrintFormat("   ❌ RSI OMA NÃO ALINHADO - REJEITANDO SETUP COMPLETO!");
+         PrintFormat("   Razão: Força relativa não confirma direção");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
       
-      // 3️⃣ CURRENCY STRENGTH - CONTEXTO
-      PrintFormat("3️⃣ Currency Strength (Contexto Moedas)...");
+      score.rsiomaPoints = 1;
+      PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
+                  rsi.strength, rsi.slope);
+      
+      // 3️⃣ CURRENCY STRENGTH - CONTEXTO (OBRIGATÓRIO!)
+      PrintFormat("3️⃣ Currency Strength (Contexto Moedas - OBRIGATÓRIO)...");
       CSSignal cs = GetCurrencyStrengthSignal(symbol, direction, assetClass);
-      if(cs.isValid && cs.isAligned)
+      
+      if(!cs.isValid)
       {
-         score.currencyStrengthPoints = 1;
-         PrintFormat("   ✅ Currency Strength alinhado (+1 ponto) - Separação: %.2f", cs.strength);
+         PrintFormat("   ❌ CURRENCY STRENGTH INVÁLIDO - REJEITANDO SETUP COMPLETO!");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
-      else
+      
+      if(!cs.isAligned)
       {
-         PrintFormat("   ❌ Currency Strength não alinhado (0 pontos)");
+         PrintFormat("   ❌ CURRENCY STRENGTH NÃO ALINHADO - REJEITANDO SETUP COMPLETO!");
+         PrintFormat("   Razão: Contexto de moedas não favorece direção");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
+      
+      score.currencyStrengthPoints = 1;
+      PrintFormat("   ✅ Currency Strength alinhado (+1 ponto) - Separação: %.2f", cs.strength);
       
       score.totalPoints = score.waePoints + score.rsiomaPoints + score.currencyStrengthPoints;
       
-      // Classificação
+      // Classificação (agora exige 3/3)
       if(score.totalPoints >= 3 && m30Aligned)
       {
          score.classification = SETUP_PREMIUM; // 3/3 + MACRO-3 alinhado
       }
-      else if(score.totalPoints >= 2)
+      else if(score.totalPoints >= 3)
       {
-         score.classification = SETUP_GOOD; // 2/3
+         score.classification = SETUP_GOOD; // 3/3 mas MACRO-3 não alinhado
       }
       else
       {
-         score.classification = SETUP_REJECT; // <2
+         score.classification = SETUP_REJECT; // <3
       }
    }
    else
    {
-      // Sistema 2 filtros: WAE + RSI (precisa 2 de 2) - ÍNDICES
-      // ✅ CORREÇÃO v4.12: Ordem otimizada - WAE primeiro
+      // 🔥 v4.41 CORREÇÃO CRÍTICA: WAE É OBRIGATÓRIO!
+      // Sistema 2 filtros: WAE + RSI (AMBOS OBRIGATÓRIOS) - ÍNDICES
+      // Não usa CS para índices (WIN, US30, etc)
       score.requiredPoints = 2;
       
       PrintFormat("────────────────────────────────────────────────────────────────");
-      PrintFormat("📊 Analisando Filtros Micro - ÍNDICES (ORDEM OTIMIZADA):");
+      PrintFormat("📊 Analisando Filtros Micro - ÍNDICES (TODOS OBRIGATÓRIOS):");
       
-      // 1️⃣ WAE - MOMENTUM
-      PrintFormat("1️⃣ WAE (Momentum/Explosão)...");
+      // 1️⃣ WAE - MOMENTUM (OBRIGATÓRIO!)
+      PrintFormat("1️⃣ WAE (Momentum/Explosão - OBRIGATÓRIO)...");
       WAESignal wae = GetWAESignal(g_handles.wae_oper, direction, g_tfOperacional);
-      if(wae.isValid && wae.isAligned)
+      
+      if(!wae.isValid)
       {
-         score.waePoints = 1;
-         PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
-                     wae.strength, wae.isExpanding ? "SIM" : "NÃO");
+         PrintFormat("   ❌ WAE INVÁLIDO - REJEITANDO SETUP COMPLETO!");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
-      else
+      
+      if(!wae.isAligned)
       {
-         PrintFormat("   ❌ WAE não alinhado (0 pontos)");
+         PrintFormat("   ❌ WAE NÃO ALINHADO - REJEITANDO SETUP COMPLETO!");
+         PrintFormat("   Razão: Falta FORÇA/MOMENTUM (histograma não confirma)");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
+      
+      score.waePoints = 1;
+      PrintFormat("   ✅ WAE alinhado (+1 ponto) - Força: %.2f | Expandindo: %s", 
+                  wae.strength, wae.isExpanding ? "SIM" : "NÃO");
       
       // 2️⃣ RSI OMA - FORÇA RELATIVA (OBRIGATÓRIO!)
       PrintFormat("2️⃣ RSI OMA (Força Relativa - OBRIGATÓRIO)...");
@@ -1462,20 +1518,21 @@ SetupScore CalculateSetupScore(string symbol, ASSET_CLASS assetClass, TRADE_DIRE
          return score;
       }
       
-      if(rsi.isAligned)
+      if(!rsi.isAligned)
       {
-         score.rsiomaPoints = 1;
-         PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
-                     rsi.strength, rsi.slope);
+         PrintFormat("   ❌ RSI OMA NÃO ALINHADO - REJEITANDO SETUP COMPLETO!");
+         score.classification = SETUP_REJECT;
+         score.totalPoints = 0;
+         return score;
       }
-      else
-      {
-         PrintFormat("   ❌ RSI OMA não alinhado (0 pontos) - Mas VÁLIDO");
-      }
+      
+      score.rsiomaPoints = 1;
+      PrintFormat("   ✅ RSI OMA alinhado (+1 ponto) - Separação: %.2f | Inclinação: %.2f", 
+                  rsi.strength, rsi.slope);
       
       score.totalPoints = score.waePoints + score.rsiomaPoints;
       
-      // Classificação (mais rigorosa para índices)
+      // Classificação (agora exige 2/2)
       if(score.totalPoints >= 2 && m30Aligned)
       {
          score.classification = SETUP_PREMIUM; // 2/2 + MACRO-3 alinhado

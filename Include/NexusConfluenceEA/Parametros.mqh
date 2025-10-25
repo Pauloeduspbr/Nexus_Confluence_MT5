@@ -317,18 +317,6 @@ input bool   RequireM30ForPremium         = true;        // 🔧 Exigir M30 alin
 input int    MaxConsecutiveIndicatorErrors = 10;         // 🔧 Máx Erros Consecutivos de Indicadores
 input int    LogWarningIntervalCount       = 100;        // 🔧 Intervalo de Avisos no Log (contagem)
 
-// Validações Rogers-Satchell (Avançado)
-input int    MaxRSPeriod                  = 500;         // 🔧 Período Máx Rogers-Satchell
-input int    MaxRSShift                   = 1000;        // 🔧 Shift Máx Rogers-Satchell
-input int    MinValidSamples              = 10;          // 🔧 Amostras Mín para Cálculo RS
-input double MaxRatioLimit                = 10.0;        // 🔧 Limite Máx de Ratio H/C
-input double MinRatioLimit                = 0.1;         // 🔧 Limite Mín de Ratio H/C
-input double MaxRSNormalized              = 10.0;        // 🔧 Valor Máx RS Normalizado (✅ v4.42)
-input double MinRSNormalized              = 0.0001;      // 🔧 Valor Mín RS Normalizado (✅ v4.42)
-input int    MaxEMAPeriod                 = 100;         // 🔧 Período Máx EMA Suavização (✅ v4.42)
-input int    MinPeriod                    = 2;           // 🔧 Período Mín Universal (✅ v4.42)
-input double MinValidBarsPercent          = 0.70;        // 🔧 % Mín Candles Válidos (0.70 = 70%) (✅ v4.42)
-
 input group "════════════════════════════════════════════════════════"
 input group "          ✅ FIM DOS PARÂMETROS SIMPLIFICADOS           "
 input group "════════════════════════════════════════════════════════"

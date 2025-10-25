@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.41 - Sistema Multi-Timeframe Universal    |
+//| Nexus Confluence EA v4.43 - Sistema Multi-Timeframe Universal    |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
@@ -54,15 +54,35 @@
 //|      - Drawdown: -10-15% (menos entradas fracas)               |
 //|      - Número de trades: Redução esperada ~30%                 |
 //|                                                                  |
+//| 🔥 CRÍTICO v4.43: VALIDAÇÃO MACRO CORRIGIDA (25/01/2025)        |
+//|   ❌ BUG GRAVE IDENTIFICADO:                                    |
+//|      - EA abria trades com apenas 1 timeframe macro definido!  |
+//|      - EXEMPLO: H4 bullish + H1 neutro = APROVAVA BUY ❌       |
+//|      - Violação da regra fundamental do Sistema Universal      |
+//|      - GG TrendBar é FILTRO MESTRE - exige alinhamento total   |
+//|                                                                  |
+//|   ✅ CORREÇÃO IMPLEMENTADA:                                     |
+//|      - REMOVIDO: Modo fallback (aceitava 1 TF definido)        |
+//|      - NOVA REGRA: AMBOS MACRO-1 E MACRO-2 devem estar !=0     |
+//|      - NOVA REGRA: AMBOS devem estar NA MESMA DIREÇÃO          |
+//|      - Se algum neutro (=0) → REJEITA IMEDIATAMENTE            |
+//|      - Se direções opostas → REJEITA IMEDIATAMENTE             |
+//|                                                                  |
+//|   ✅ IMPACTO ESPERADO:                                          |
+//|      - Win Rate: +10-15% (apenas trades alinhados)             |
+//|      - Drawdown: -20-30% (elimina setups fracos)               |
+//|      - Número de trades: Redução ~40-50% (mais seletivo)      |
+//|      - Profit Factor: +0.3-0.5 (qualidade > quantidade)        |
+//|                                                                  |
 //| DEPENDÊNCIAS:                                                    |
 //|   - Parametros.mqh (enums, structs, inputs)                     |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Janeiro 2025                                               |
-//| VERSÃO: 4.41 - WAE Obrigatório (Momentum Crítico)              |
+//| VERSÃO: 4.43 - CORREÇÃO CRÍTICA: Alinhamento Macro Obrigatório |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.41"
-#property version   "4.41"
+#property copyright "Nexus Confluence EA v4.43"
+#property version   "4.43"
 
 #include "Parametros.mqh"
 
@@ -1164,69 +1184,58 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    }
    PrintFormat("────────────────────────────────────────────────────────────────");
 
-   // ✅ VALIDAÇÃO 1: Pelo menos UM dos MACRO deve estar DEFINIDO (não neutro)
-   if(macro1Value == 0 && macro2Value == 0)
+   // 🔥 v4.43 CORREÇÃO CRÍTICA: EXIGIR AMBOS MACRO-1 E MACRO-2 DEFINIDOS E ALINHADOS!
+   // ❌ BUG v4.41: Aceitava modo fallback com apenas 1 TF definido
+   // ❌ PROBLEMA: EA abria BUY com H4 bullish mas H1 neutro (violação da regra fundamental)
+   // ✅ CORREÇÃO: AMBOS timeframes macro devem estar DEFINIDOS (!=0) E NA MESMA DIREÇÃO
+   
+   // ✅ VALIDAÇÃO 1: AMBOS MACRO-1 E MACRO-2 DEVEM ESTAR DEFINIDOS (NÃO NEUTROS)
+   if(macro1Value == 0 || macro2Value == 0)
    {
-      PrintFormat("❌ REJEIÇÃO ETAPA 1: MACRO-1 e MACRO-2 AMBOS NEUTROS");
-      PrintFormat("   Aguardando definição de tendência nos timeframes macro");
+      PrintFormat("❌ REJEIÇÃO ETAPA 1: MACRO-1 ou MACRO-2 NEUTRO - ALINHAMENTO INSUFICIENTE");
+      PrintFormat("   MACRO-1 (%s): %+d %s",
+                  TimeframeToString(g_tfMacro1), macro1Value,
+                  (macro1Value > 0) ? "🟢 BULLISH" : (macro1Value < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+      PrintFormat("   MACRO-2 (%s): %+d %s",
+                  TimeframeToString(g_tfMacro2), macro2Value,
+                  (macro2Value > 0) ? "🟢 BULLISH" : (macro2Value < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+      PrintFormat("   ⚠️ REGRA: AMBOS timeframes macro DEVEM estar DEFINIDOS para trade válido!");
+      PrintFormat("   Aguardando ambos timeframes definirem direção clara");
       PrintFormat("════════════════════════════════════════════════════════════════");
       return result;
    }
    
-   // ✅ VALIDAÇÃO 2: Se ambos definidos, devem estar na MESMA DIREÇÃO
-   if(macro1Value != 0 && macro2Value != 0)
+   // ✅ VALIDAÇÃO 2: AMBOS DEFINIDOS - DEVEM ESTAR NA MESMA DIREÇÃO
+   bool macro1Bullish = (macro1Value > 0);
+   bool macro2Bullish = (macro2Value > 0);
+   bool macro1Bearish = (macro1Value < 0);
+   bool macro2Bearish = (macro2Value < 0);
+   
+   // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
+   if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
    {
-      // Ambos definidos - verificar se mesma direção
-      bool macro1Bullish = (macro1Value > 0);
-      bool macro2Bullish = (macro2Value > 0);
-      bool macro1Bearish = (macro1Value < 0);
-      bool macro2Bearish = (macro2Value < 0);
-      
-      // Verificar se estão na MESMA DIREÇÃO (ambos positivos OU ambos negativos)
-      if(!((macro1Bullish && macro2Bullish) || (macro1Bearish && macro2Bearish)))
-      {
-         PrintFormat("❌ REJEIÇÃO ETAPA 2: TIMEFRAMES EM DIREÇÕES OPOSTAS");
-         PrintFormat("   MACRO-1 (%s): %s", TimeframeToString(g_tfMacro1),
-                     macro1Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
-         PrintFormat("   MACRO-2 (%s): %s", TimeframeToString(g_tfMacro2),
-                     macro2Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
-         PrintFormat("   Aguardando alinhamento entre os timeframes macro");
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         return result;
-      }
-      
-      // ✅ MACRO-1 e MACRO-2 ALINHADOS NA MESMA DIREÇÃO!
-      result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
-      result.h4Aligned = true;
-      result.h1Aligned = true;
-      
-      // Calcular força do alinhamento (ambos +2/-2 = máximo)
-      int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
-      
-      PrintFormat("✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
-                  (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
-                  macro1Value, macro2Value, alignmentStrength);
+      PrintFormat("❌ REJEIÇÃO ETAPA 2: TIMEFRAMES EM DIREÇÕES OPOSTAS - SEM ALINHAMENTO");
+      PrintFormat("   MACRO-1 (%s): %s", TimeframeToString(g_tfMacro1),
+                  macro1Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
+      PrintFormat("   MACRO-2 (%s): %s", TimeframeToString(g_tfMacro2),
+                  macro2Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
+      PrintFormat("   ⚠️ REGRA: MACRO-1 e MACRO-2 devem estar na MESMA direção!");
+      PrintFormat("   Aguardando alinhamento entre os timeframes macro");
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      return result;
    }
-   else
-   {
-      // ✅ APENAS UM DEFINIDO - usar esse como direção (modo fallback)
-      if(macro1Value != 0)
-      {
-         result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
-         result.h4Aligned = true;
-         result.h1Aligned = false;  // H1 neutro
-         PrintFormat("⚠️ FALLBACK: Apenas MACRO-1(%+d) definido, MACRO-2 neutro - usando MACRO-1 como direção",
-                     macro1Value);
-      }
-      else  // macro2Value != 0
-      {
-         result.direction = (macro2Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
-         result.h4Aligned = false;  // H4 neutro
-         result.h1Aligned = true;
-         PrintFormat("⚠️ FALLBACK: Apenas MACRO-2(%+d) definido, MACRO-1 neutro - usando MACRO-2 como direção",
-                     macro2Value);
-      }
-   }
+   
+   // ✅✅✅ VALIDAÇÃO PASSOU: AMBOS DEFINIDOS E NA MESMA DIREÇÃO!
+   result.direction = (macro1Value > 0) ? TRADE_DIRECTION_BUY : TRADE_DIRECTION_SELL;
+   result.h4Aligned = true;
+   result.h1Aligned = true;
+   
+   // Calcular força do alinhamento (ambos +2/-2 = máximo)
+   int alignmentStrength = MathMin(MathAbs(macro1Value), MathAbs(macro2Value));
+   
+   PrintFormat("✅✅✅ MACRO-1 + MACRO-2 ALINHADOS: %s (Forças: %+d/%+d, Alinhamento: %d/2)", 
+               (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH",
+               macro1Value, macro2Value, alignmentStrength);
    
    // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)

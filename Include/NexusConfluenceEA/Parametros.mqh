@@ -305,6 +305,12 @@ input group "=== 🔧 CONFIGURAÇÕES AVANÇADAS (ANTI-HARDCODE) ==="
 input int    MaxSlippagePoints            = 30;          // 🔧 Slippage Máximo (pontos)
 input ENUM_ORDER_TYPE_FILLING OrderFillingMode = ORDER_FILLING_FOK;  // 🔧 Modo de Preenchimento
 
+// Controle de Qualidade de Setups (✅ v4.40.1: RESTAURADO)
+input bool   AllowGoodSetups              = true;        // 🎯 Permitir setups GOOD (se false: apenas PREMIUM)
+input bool   UseStrictFilters             = false;       // 🎯 Exigir TODOS filtros alinhados (3/3 ou 2/2)
+input bool   RequireSupertrend            = false;       // 🎯 Exigir Supertrend alinhado obrigatoriamente
+input int    MinConfluenceScore           = 70;          // 🎯 Score mínimo de confluência (0-100)
+
 // Lógica de Score e Classificação
 input int    MinMacroSignalsForAlignment  = 2;           // 🔧 Mín Sinais Macro Alinhados (de 3)
 input int    MinScoreForexGood            = 2;           // 🔧 Score Mín FOREX GOOD (de 3)

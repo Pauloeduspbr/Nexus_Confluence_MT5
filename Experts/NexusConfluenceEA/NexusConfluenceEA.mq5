@@ -259,16 +259,63 @@ void OnTick()
    // ETAPA 3: EXECUTAR ORDEM (se setup válido)
    // ═══════════════════════════════════════════════════════════════
    
-   // Verificar se setup é válido (PREMIUM ou GOOD)
-   if(score.classification != SETUP_PREMIUM && score.classification != SETUP_GOOD)
+   // Verificar se setup é válido (PREMIUM ou GOOD) - ✅ v4.40.1: LÓGICA APRIMORADA
+   bool setupApproved = false;
+   string rejectReason = "";
+   
+   // 1. Verificar classificação base
+   if(score.classification == SETUP_REJECT)
+   {
+      setupApproved = false;
+      rejectReason = "Setup REJEITADO por pontuação insuficiente";
+   }
+   else if(score.classification == SETUP_GOOD && !AllowGoodSetups)
+   {
+      setupApproved = false;
+      rejectReason = "Setup GOOD rejeitado (AllowGoodSetups=false, apenas PREMIUM permitido)";
+   }
+   else
+   {
+      // Setup PREMIUM ou GOOD (se permitido)
+      setupApproved = true;
+      
+      // 2. Verificar UseStrictFilters (exige TODOS filtros alinhados)
+      if(UseStrictFilters && score.totalPoints < score.requiredPoints)
+      {
+         setupApproved = false;
+         rejectReason = StringFormat("UseStrictFilters=true exige %d/%d pontos (obteve %d/%d)", 
+                                    score.requiredPoints, score.requiredPoints, 
+                                    score.totalPoints, score.requiredPoints);
+      }
+      
+      // 3. Verificar MinConfluenceScore (score percentual)
+      if(setupApproved)
+      {
+         int scorePercent = (int)((double)score.totalPoints / score.requiredPoints * 100.0);
+         if(scorePercent < MinConfluenceScore)
+         {
+            setupApproved = false;
+            rejectReason = StringFormat("Score confluência %d%% < mínimo %d%%", scorePercent, MinConfluenceScore);
+         }
+      }
+   }
+   
+   if(!setupApproved)
    {
       // � v4.40.5: Log APENAS primeira rejeição
       static bool scoreRejectLogged = false;
       if(!scoreRejectLogged)
       {
-         PrintFormat("\n⛔ [BLOQUEIO] Setup REJEITADO por pontuação!");
-         PrintFormat("   Classification: %d (precisa ser GOOD=1 ou PREMIUM=2)", score.classification);
-         PrintFormat("   Points: %d/%d", score.totalPoints, score.requiredPoints);
+         PrintFormat("\n⛔ [BLOQUEIO] %s", rejectReason!");
+         PrintFormat("   Classification: %s", 
+                    (score.classification == SETUP_PREMIUM) ? "PREMIUM" :
+                    (score.classification == SETUP_GOOD) ? "GOOD" : "REJECT");
+         PrintFormat("   Points: %d/%d (%.0f%%)", score.totalPoints, score.requiredPoints, 
+                    (double)score.totalPoints / score.requiredPoints * 100.0);
+         PrintFormat("   AllowGoodSetups: %s | UseStrictFilters: %s | MinConfluenceScore: %d%%", 
+                    AllowGoodSetups ? "true" : "false",
+                    UseStrictFilters ? "true" : "false",
+                    MinConfluenceScore);
          PrintFormat("   (Esse log aparece apenas 1 vez)\n");
          scoreRejectLogged = true;
       }

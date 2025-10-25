@@ -306,7 +306,7 @@ void OnTick()
       static bool scoreRejectLogged = false;
       if(!scoreRejectLogged)
       {
-         PrintFormat("\n⛔ [BLOQUEIO] %s", rejectReason!");
+         PrintFormat("\n⛔ [BLOQUEIO] %s", rejectReason);
          PrintFormat("   Classification: %s", 
                     (score.classification == SETUP_PREMIUM) ? "PREMIUM" :
                     (score.classification == SETUP_GOOD) ? "GOOD" : "REJECT");

@@ -1,27 +1,21 @@
 //+------------------------------------------------------------------+
 //| Parametros.mqh - VERSÃO SIMPLIFICADA                             |
-//| Nexus Confluence EA v4.40 - Sistema Básico Simplificado         |
+//| Nexus Confluence EA v4.44 - Sistema Básico Corrigido            |
 //|                                                                   |
 //| PROPÓSITO: Inputs básicos - sem gestão de risco complexa        |
 //|                                                                   |
-//| 🔥 v4.40: SIMPLIFICAÇÃO RADICAL                                  |
-//|   - Removido: Gestão de risco automática, ATR, Breakeven, Trailing |
-//|   - Mantido: Filtro semanal, horários, TP/SL fixos, lote fixo  |
-//|                                                                   |
-//| INPUTS:                                                          |
-//|   - Filtro semanal (dias da semana)                             |
-//|   - Horário início/fim                                           |
-//|   - TP simples (em pontos/pips)                                 |
-//|   - SL simples (em pontos/pips)                                 |
-//|   - Lote fixo (compatível Forex e B3)                           |
-//|   - Magic Number                                                 |
+//| 🔥 v4.44: CORREÇÃO CRÍTICA - VALIDAÇÃO TF OPERACIONAL            |
+//|   - PROBLEMA: M15 operacional nunca validado no macro           |
+//|   - CORREÇÃO: Adicionado campo operationalAligned na struct     |
+//|   - CORREÇÃO: Adicionado campo classification na struct         |
+//|   - IMPACTO: EA não abrirá mais trades contra TF operacional    |
 //|                                                                   |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.40 - SIMPLIFICADO                                     |
+//| VERSÃO: 4.44 - CORREÇÃO CRÍTICA                                 |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.40"
-#property version   "4.40"
+#property copyright "Nexus Confluence EA v4.44"
+#property version   "4.44"
 
 //+------------------------------------------------------------------+
 //| SEÇÃO 1: ENUMERAÇÕES (ENUMS)                                     |
@@ -130,12 +124,14 @@ struct GGTrendBarSignal
 //--- Resultado análise multi-timeframe
 struct MultiTFResult
 {
-   bool            isValid;         // Análise válida?
-   TRADE_DIRECTION direction;       // Direção do alinhamento
-   bool            h4Aligned;       // MACRO-1 alinhado (representação abstrata)
-   bool            h1Aligned;       // MACRO-2 alinhado
-   bool            m30Aligned;      // MACRO-3 alinhado (se aplicável)
-   bool            structureValid;  // Estrutura de preços válida?
+   bool            isValid;             // Análise válida?
+   TRADE_DIRECTION direction;           // Direção do alinhamento
+   bool            h4Aligned;           // MACRO-1 alinhado (representação abstrata)
+   bool            h1Aligned;           // MACRO-2 alinhado
+   bool            m30Aligned;          // MACRO-3 alinhado (se aplicável)
+   bool            operationalAligned;  // 🔥 v4.44: TF OPERACIONAL alinhado (CRÍTICO!)
+   bool            structureValid;      // Estrutura de preços válida?
+   SETUP_CLASS     classification;      // 🔥 v4.44: Classificação (PREMIUM/GOOD) definida aqui
 };
 
 //--- Pontuação do setup

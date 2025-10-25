@@ -105,12 +105,20 @@ bool ExecuteSimpleTrade(
       sl = entryPrice - (slPoints * point);
       tp = entryPrice + (tpPoints * point);
       
-      PrintFormat("🔵 BUY %s | Lote: %.2f | Entry: %.5f | SL: %.5f (%.0f pts) | TP: %.5f (%.0f pts)",
-         symbol, lotSize, entryPrice, sl, slPoints, tp, tpPoints);
+      PrintFormat("\n══════════════════════════════════════════════════════════════");
+      PrintFormat("🔵 ABERTURA DE COMPRA (BUY)");
+      PrintFormat("══════════════════════════════════════════════════════════════");
+      PrintFormat("📊 Símbolo: %s", symbol);
+      PrintFormat("💰 Lote: %.2f", lotSize);
+      PrintFormat("📈 Preço Entrada: %.5f", entryPrice);
+      PrintFormat("🛑 Stop Loss: %.5f (%.0f pontos / %.2f pips)", sl, slPoints, slPoints/10);
+      PrintFormat("🎯 Take Profit: %.5f (%.0f pontos / %.2f pips)", tp, tpPoints, tpPoints/10);
+      PrintFormat("💬 Comentário: %s", comment);
+      PrintFormat("══════════════════════════════════════════════════════════════\n");
       
       if(!trade.Buy(lotSize, symbol, entryPrice, sl, tp, comment))
       {
-         PrintFormat("❌ Erro ao executar BUY: %d - %s", 
+         PrintFormat("❌ ERRO ao executar COMPRA: %d - %s", 
             GetLastError(), trade.ResultRetcodeDescription());
          return false;
       }
@@ -121,19 +129,137 @@ bool ExecuteSimpleTrade(
       sl = entryPrice + (slPoints * point);
       tp = entryPrice - (tpPoints * point);
       
-      PrintFormat("🔴 SELL %s | Lote: %.2f | Entry: %.5f | SL: %.5f (%.0f pts) | TP: %.5f (%.0f pts)",
-         symbol, lotSize, entryPrice, sl, slPoints, tp, tpPoints);
+      PrintFormat("\n══════════════════════════════════════════════════════════════");
+      PrintFormat("🔴 ABERTURA DE VENDA (SELL)");
+      PrintFormat("══════════════════════════════════════════════════════════════");
+      PrintFormat("📊 Símbolo: %s", symbol);
+      PrintFormat("💰 Lote: %.2f", lotSize);
+      PrintFormat("📉 Preço Entrada: %.5f", entryPrice);
+      PrintFormat("🛑 Stop Loss: %.5f (%.0f pontos / %.2f pips)", sl, slPoints, slPoints/10);
+      PrintFormat("🎯 Take Profit: %.5f (%.0f pontos / %.2f pips)", tp, tpPoints, tpPoints/10);
+      PrintFormat("💬 Comentário: %s", comment);
+      PrintFormat("══════════════════════════════════════════════════════════════\n");
       
       if(!trade.Sell(lotSize, symbol, entryPrice, sl, tp, comment))
       {
-         PrintFormat("❌ Erro ao executar SELL: %d - %s", 
+         PrintFormat("❌ ERRO ao executar VENDA: %d - %s", 
             GetLastError(), trade.ResultRetcodeDescription());
          return false;
       }
    }
    
-   PrintFormat("✅ Ordem executada com sucesso! Ticket: %d", trade.ResultOrder());
+   ulong ticket = trade.ResultOrder();
+   PrintFormat("✅ Ordem executada com sucesso! Ticket: %I64u", ticket);
+   PrintFormat("⏰ Horário: %s\n", TimeToString(TimeCurrent(), TIME_DATE|TIME_SECONDS));
+   
    return true;
+}
+
+//+------------------------------------------------------------------+
+//| Monitora fechamento de posições e registra resultado            |
+//+------------------------------------------------------------------+
+void CheckClosedPositions(ulong &lastTicket, double &lastOpenPrice, string &lastType)
+{
+   // Verificar se tinha posição aberta
+   if(lastTicket == 0)
+      return;
+   
+   // Verificar se posição ainda existe
+   bool positionExists = false;
+   for(int i = 0; i < PositionsTotal(); i++)
+   {
+      ulong ticket = PositionGetTicket(i);
+      if(ticket == lastTicket)
+      {
+         positionExists = true;
+         break;
+      }
+   }
+   
+   // Se posição não existe mais, foi fechada
+   if(!positionExists)
+   {
+      // Buscar dados da posição fechada no histórico
+      HistorySelect(0, TimeCurrent());
+      
+      for(int i = HistoryDealsTotal() - 1; i >= 0; i--)
+      {
+         ulong dealTicket = HistoryDealGetTicket(i);
+         if(dealTicket == 0) continue;
+         
+         long dealEntry = HistoryDealGetInteger(dealTicket, DEAL_ENTRY);
+         ulong dealPosition = HistoryDealGetInteger(dealTicket, DEAL_POSITION_ID);
+         
+         // Se é deal de saída e corresponde à nossa posição
+         if(dealEntry == DEAL_ENTRY_OUT && dealPosition == lastTicket)
+         {
+            double closePrice = HistoryDealGetDouble(dealTicket, DEAL_PRICE);
+            double profit = HistoryDealGetDouble(dealTicket, DEAL_PROFIT);
+            double volume = HistoryDealGetDouble(dealTicket, DEAL_VOLUME);
+            string symbol = HistoryDealGetString(dealTicket, DEAL_SYMBOL);
+            datetime closeTime = (datetime)HistoryDealGetInteger(dealTicket, DEAL_TIME);
+            
+            // Calcular pips
+            double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+            double priceDiff = 0;
+            
+            if(lastType == "BUY")
+               priceDiff = closePrice - lastOpenPrice;
+            else
+               priceDiff = lastOpenPrice - closePrice;
+            
+            double pips = (priceDiff / point) / 10; // Converter para pips
+            
+            // Determinar motivo do fechamento
+            string closeReason = "Manual";
+            if(profit > 0)
+               closeReason = "Take Profit";
+            else if(profit < 0)
+               closeReason = "Stop Loss";
+            
+            // Log detalhado
+            PrintFormat("\n══════════════════════════════════════════════════════════════");
+            PrintFormat("%s FECHAMENTO DE %s", 
+               profit > 0 ? "💚" : "❌", 
+               lastType);
+            PrintFormat("══════════════════════════════════════════════════════════════");
+            PrintFormat("🎫 Ticket: %I64u", lastTicket);
+            PrintFormat("📊 Símbolo: %s", symbol);
+            PrintFormat("💰 Volume: %.2f", volume);
+            PrintFormat("📈 Preço Abertura: %.5f", lastOpenPrice);
+            PrintFormat("📉 Preço Fechamento: %.5f", closePrice);
+            PrintFormat("📏 Diferença: %.1f pips (%s%.5f)", 
+               MathAbs(pips), 
+               priceDiff >= 0 ? "+" : "", 
+               priceDiff);
+            PrintFormat("💵 Resultado: %s%.2f USD", 
+               profit >= 0 ? "+" : "", 
+               profit);
+            PrintFormat("🏁 Motivo: %s", closeReason);
+            PrintFormat("⏰ Horário: %s", TimeToString(closeTime, TIME_DATE|TIME_SECONDS));
+            
+            if(profit > 0)
+            {
+               PrintFormat("══════════════════════════════════════════════════════════════");
+               PrintFormat("✅ TRADE VENCEDOR! 🎉");
+               PrintFormat("══════════════════════════════════════════════════════════════\n");
+            }
+            else
+            {
+               PrintFormat("══════════════════════════════════════════════════════════════");
+               PrintFormat("⚠️  TRADE PERDEDOR");
+               PrintFormat("══════════════════════════════════════════════════════════════\n");
+            }
+            
+            // Resetar variáveis de controle
+            lastTicket = 0;
+            lastOpenPrice = 0;
+            lastType = "";
+            
+            break;
+         }
+      }
+   }
 }
 
 //+------------------------------------------------------------------+

@@ -42,6 +42,9 @@
 
 //--- Variáveis globais
 datetime g_lastCandleTime = 0;
+ulong g_lastPositionTicket = 0;      // Rastrear última posição aberta
+double g_lastPositionOpenPrice = 0;  // Preço de abertura
+string g_lastPositionType = "";      // "BUY" ou "SELL"
 
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
@@ -115,6 +118,9 @@ void OnDeinit(const int reason)
 //+------------------------------------------------------------------+
 void OnTick()
 {
+   // Monitorar fechamento de posições (verifica a cada tick)
+   CheckClosedPositions(g_lastPositionTicket, g_lastPositionOpenPrice, g_lastPositionType);
+   
    // Verificar novo candle
    datetime currentCandleTime = iTime(_Symbol, _Period, 0);
    
@@ -350,6 +356,22 @@ void OnTick()
    
    if(success)
    {
+      // Salvar dados da posição aberta para monitoramento
+      for(int i = 0; i < PositionsTotal(); i++)
+      {
+         ulong ticket = PositionGetTicket(i);
+         if(ticket <= 0) continue;
+         
+         if(PositionGetString(POSITION_SYMBOL) == _Symbol && 
+            PositionGetInteger(POSITION_MAGIC) == EA_MAGIC_NUMBER)
+         {
+            g_lastPositionTicket = ticket;
+            g_lastPositionOpenPrice = PositionGetDouble(POSITION_PRICE_OPEN);
+            g_lastPositionType = isBuy ? "BUY" : "SELL";
+            break;
+         }
+      }
+      
       PrintFormat("✅ Ordem executada com sucesso!\n");
    }
    else

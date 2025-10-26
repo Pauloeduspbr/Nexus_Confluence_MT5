@@ -350,6 +350,7 @@ BufferCache g_bufferCache;
 
 // 🔥 Arrays temporários GLOBAIS para UpdateBufferCache (workaround compilador MQL5)
 // ✅ v4.55: Arrays DINÂMICOS (sem tamanho fixo) para permitir ArraySetAsSeries
+// Arrays dinâmicos [] podem ter indexação alterada, arrays estáticos [N] não podem
 double g_temp_wae_up[];
 double g_temp_wae_down[];
 double g_temp_wae_exp[];
@@ -383,6 +384,26 @@ bool UpdateBufferCache()
     {
         return true;
     }
+    
+    // 🔥 v4.55 FIX CRÍTICO: Redimensionar arrays dinâmicos ANTES de usar
+    ArrayResize(g_temp_wae_up, 3);
+    ArrayResize(g_temp_wae_down, 3);
+    ArrayResize(g_temp_wae_exp, 1);
+    ArrayResize(g_temp_rsi_red, 3);
+    ArrayResize(g_temp_rsi_blue, 3);
+    ArrayResize(g_temp_cs_base, 1);
+    ArrayResize(g_temp_cs_quote, 1);
+    ArrayResize(g_temp_supertrend_up, 3);
+    ArrayResize(g_temp_supertrend_down, 3);
+    ArrayResize(g_temp_gg_m1, 2);
+    ArrayResize(g_temp_gg_m5, 2);
+    ArrayResize(g_temp_gg_m15, 2);
+    ArrayResize(g_temp_gg_m30, 2);
+    ArrayResize(g_temp_gg_h1, 2);
+    ArrayResize(g_temp_gg_h4, 2);
+    ArrayResize(g_temp_gg_d1, 2);
+    ArrayResize(g_temp_gg_w1, 2);
+    ArrayResize(g_temp_gg_mn1, 2);
     
     // 🔥 v4.55 FIX CRÍTICO: Definir TODOS arrays temporários como SERIES!
     // Isso garante que [0] = candle ATUAL, [1] = candle ANTERIOR

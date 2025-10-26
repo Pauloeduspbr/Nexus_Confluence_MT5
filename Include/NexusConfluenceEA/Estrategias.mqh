@@ -424,9 +424,9 @@ double g_temp_gg_mn1[];
 double ConvertColorToTrend(double colorIndex)
 {
     // GG_TrendBar usa sistema de cores:
-    // 0 = Verde (Bullish)  → +1
-    // 1 = Vermelho (Bearish) → -1  
-    // 2 = Amarelo (Neutro) → 0
+    // 0 = Verde (Bullish)  = +1
+    // 1 = Vermelho (Bearish) = -1  
+    // 2 = Amarelo (Neutro) = 0
     
     int color = (int)MathRound(colorIndex);
     
@@ -436,7 +436,7 @@ double ConvertColorToTrend(double colorIndex)
         case 1: return -1.0;  // Vermelho = Bearish
         case 2: return 0.0;   // Amarelo = Neutro
         default: 
-            PrintFormat("⚠️ WARNING: Unknown color index: %.0f (esperado 0,1 ou 2)", colorIndex);
+            PrintFormat("WARNING: Unknown color index: %.0f (esperado 0,1 ou 2)", colorIndex);
             return 0.0;
     }
 }

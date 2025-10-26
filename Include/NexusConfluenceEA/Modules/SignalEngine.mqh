@@ -202,32 +202,47 @@ public:
             m_signal_direction = SIGNAL_DIR_SELL;
         }
         
-        // PASSO 3: Analisar M30 e M15 para classificar PREMIUM vs GOOD
+        // PASSO 3A: CRÍTICO - Verificar se M30 ou M15 estão OPOSTOS aos macros
+        // Se TF operacional está contra a tendência macro → REJEITAR
+        bool m30_opposite = (h4_h1_bullish && gg_m30 == -1) || (h4_h1_bearish && gg_m30 == 1);
+        bool m15_opposite = (h4_h1_bullish && gg_m15 == -1) || (h4_h1_bearish && gg_m15 == 1);
+        
+        if(m30_opposite || m15_opposite)
+        {
+            // REJECT: TF operacional contra a tendência macro
+            m_signal_class = SIGNAL_REJECT;
+            m_signal_direction = SIGNAL_DIR_NONE;
+            
+            m_gate_results[2] = false;
+            m_gate_messages[2] = StringFormat("G2✗ TF operacional oposto");
+            
+            string opposite_tf = m30_opposite ? "M30" : "M15";
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: %s oposto aos macros | H4:%+d H1:%+d M30:%+d M15:%+d",
+                              opposite_tf, gg_h4, gg_h1, gg_m30, gg_m15));
+            return false;
+        }
+        
+        // PASSO 3B: Analisar M30 e M15 para classificar PREMIUM vs GOOD
+        // Neutros (0) são ACEITOS nesta etapa
         bool m30_aligned = (h4_h1_bullish && gg_m30 == 1) || (h4_h1_bearish && gg_m30 == -1);
         bool m15_aligned = (h4_h1_bullish && gg_m15 == 1) || (h4_h1_bearish && gg_m15 == -1);
         
         if(m30_aligned && m15_aligned)
         {
-            // PREMIUM: Todos 4 timeframes alinhados
+            // PREMIUM: Todos 4 timeframes alinhados (H4+H1+M30+M15 mesma cor)
             m_signal_class = SIGNAL_PREMIUM;
         }
         else if(m30_aligned || m15_aligned)
         {
-            // GOOD: H4+H1 alinhados + pelo menos 1 dos operacionais (M30 ou M15)
+            // GOOD: H4+H1 alinhados + pelo menos 1 operacional alinhado
+            // Neutros (0) são aceitos como GOOD
             m_signal_class = SIGNAL_GOOD;
         }
         else
         {
-            // REJECT: H4+H1 alinhados mas NENHUM M30/M15 alinhado
-            m_signal_class = SIGNAL_REJECT;
-            m_signal_direction = SIGNAL_DIR_NONE;
-            
-            m_gate_results[2] = false;
-            m_gate_messages[2] = StringFormat("G2✗ M30/M15 não alinhados");
-            
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: M30/M15 não alinhados com H4/H1 | H4:%+d H1:%+d M30:%+d M15:%+d",
-                              gg_h4, gg_h1, gg_m30, gg_m15));
-            return false;
+            // GOOD: Ambos M30 e M15 neutros (0) mas H4+H1 alinhados
+            // Aceita pois não há oposição (foi validado no PASSO 3A)
+            m_signal_class = SIGNAL_GOOD;
         }
         
         // PASSO 4: PASSED - Log com ordem hierárquica (H4 → H1 → M30 → M15)

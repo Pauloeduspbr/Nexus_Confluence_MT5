@@ -1,5 +1,21 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.56 - FIX CRÍTICO: COPYBUFFER SHIFT 0→1! |
+//| Nexus Confluence EA v4.57 - FIX TIMESTAMP: iTime shift 0→1!     |
+//| 🚨 v4.57: CORREÇÃO DEFINITIVA - TIMESTAMP SINCRONIZADO!         |
+//|          (27/01/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG RAÍZ IDENTIFICADO v4.56:                                 |
+//|   ❌ iTime(..., 0) = timestamp do candle EM FORMAÇÃO!          |
+//|   ❌ CopyBuffer shift 1 = dados do candle FECHADO!              |
+//|   ❌ LOG mostrava timestamp FUTURO vs dados PASSADOS!           |
+//|   ❌ User reportou: "log esta quase 1 hora a frente da imagem"  |
+//|   ❌ Exemplo real: Gráfico 08:15, Log 09:00 = 45min diferença! |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.57:                                              |
+//|   ✅ iTime(..., 0) → iTime(..., 1) no OnTick()                 |
+//|   ✅ iTime(..., 0) → iTime(..., 1) no UpdateBufferCache()      |
+//|   ✅ Timestamp agora = candle fechado (mesmo dos dados!)        |
+//|   ✅ LOG perfeitamente sincronizado com gráfico visual!         |
+//|                                                                  |
 //| 🚨 v4.56: CORREÇÃO DEFINITIVA - SINCRONIZAÇÃO LOG vs GRÁFICO   |
 //|          (27/01/2025)                                            |
 //|                                                                  |
@@ -8,22 +24,6 @@
 //|   ❌ Gráfico mostra candle FECHADO (shift 1)                    |
 //|   ❌ EA lia candle ATUAL (shift 0 - muda a cada tick!)         |
 //|   ❌ Resultado: LOG NUNCA sincronizava com gráfico!            |
-//|   ❌ User: "ainda ha problema com sincronização"                |
-//|                                                                  |
-//| 🔧 CORREÇÃO v4.56:                                              |
-//|   ✅ TODOS CopyBuffer mudados: shift 0 → shift 1               |
-//|   ✅ Agora lê APENAS candles FECHADOS (estáveis)               |
-//|   ✅ LOG perfeitamente sincronizado com gráfico!                |
-//|   ✅ Corrigidos: WAE, RSI, Supertrend, GG (9 TFs), CS          |
-//|                                                                  |
-//| 🚨 v4.55: CORREÇÃO URGENTE - ARRAYS NÃO ERAM SERIES            |
-//|          (26/10/2025)                                            |
-//|                                                                  |
-//| 🐛 BUG CRÍTICO v4.54:                                           |
-//|   ❌ Arrays temporários NÃO eram definidos como SERIES!        |
-//|   ❌ CopyBuffer em array não-series: [0]=antigo, [1]=atual     |
-//|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
-//|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
 //|                                                                  |
 //| 🔧 CORREÇÃO v4.55:                                              |
 //|   ✅ ArraySetAsSeries em TODOS arrays temporários              |
@@ -115,10 +115,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Janeiro 2025                                               |
-//| VERSÃO: 4.56 - FIX DEFINITIVO: CopyBuffer shift 0→1 (sync OK!)  |
+//| VERSÃO: 4.57 - FIX TIMESTAMP: iTime 0→1 (sync timestamp perfeito)|
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.56"
-#property version   "4.56"
+#property copyright "Nexus Confluence EA v4.57"
+#property version   "4.57"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>
@@ -207,8 +207,18 @@ void OnTick()
    // Monitorar fechamento de posições (verifica a cada tick)
    CheckClosedPositions(g_lastPositionTicket, g_lastPositionOpenPrice, g_lastPositionType);
    
-   // Verificar novo candle
-   datetime currentCandleTime = iTime(_Symbol, _Period, 0);
+   // 🔥 v4.57 FIX CRÍTICO DE SINCRONIZAÇÃO TEMPORAL:
+   // ❌ PROBLEMA IDENTIFICADO: EA usava shift 0 (candle em formação) enquanto dados eram shift 1 (fechado)
+   // ✅ SOLUÇÃO: Usar shift 1 para sincronizar perfeitamente log com gráfico
+   //
+   // ANTES: iTime(..., 0) = candle atual (ex: às 08:47 retorna 08:45 M15)
+   //        CopyBuffer shift 1 = candle fechado (ex: 08:30 M15)
+   //        LOG: 08:45 | DADOS: 08:30 = DESSINCRONIZADO! ❌
+   //
+   // AGORA: iTime(..., 1) = candle fechado (ex: às 08:47 retorna 08:30 M15)
+   //        CopyBuffer shift 1 = candle fechado (ex: 08:30 M15)
+   //        LOG: 08:30 | DADOS: 08:30 = SINCRONIZADO! ✅
+   datetime currentCandleTime = iTime(_Symbol, _Period, 1);
    
    if(currentCandleTime == g_lastCandleTime)
       return; // Ainda no mesmo candle

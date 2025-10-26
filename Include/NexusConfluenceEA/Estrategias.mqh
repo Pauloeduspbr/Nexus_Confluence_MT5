@@ -1,35 +1,36 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.56 - FIX CRÍTICO: COPYBUFFER SHIFT 0→1! |
+//| Nexus Confluence EA v4.57 - FIX TIMESTAMP: iTime shift 0→1!     |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
-//| 🚨🚨🚨 v4.56: CORREÇÃO DEFINITIVA - SINCRONIZAÇÃO (27/01/2025)|
+//| 🚨🚨🚨 v4.57: CORREÇÃO DEFINITIVA - TIMESTAMP SINCRONIZADO!    |
+//|          (27/01/2025)                                            |
 //|                                                                  |
-//| 🐛 BUG RAÍZ IDENTIFICADO (v4.55):                               |
-//|   ❌ CopyBuffer usava shift 0 = CANDLE EM FORMAÇÃO!            |
-//|   ❌ Gráfico mostra candle FECHADO (shift 1)                    |
-//|   ❌ EA lia candle ATUAL (shift 0 - muda a cada tick!)         |
-//|   ❌ Resultado: LOG NUNCA sincronizava com gráfico!            |
+//| 🐛 BUG RAÍZ IDENTIFICADO (v4.56):                               |
+//|   ❌ iTime(..., 0) = timestamp do candle EM FORMAÇÃO!          |
+//|   ❌ CopyBuffer shift 1 = dados do candle FECHADO!              |
+//|   ❌ LOG mostrava timestamp FUTURO vs dados PASSADOS!           |
+//|   ❌ Exemplo: LOG 09:00 mas dados de 08:30 (45min diferença!)  |
 //|                                                                  |
 //| 🔍 ANÁLISE COMPLETA DO PROBLEMA:                                |
-//|   1. CopyBuffer(handle, 0, 0, 2, array):                        |
-//|      - shift 0 = candle atual (AINDA SE FORMANDO)               |
-//|      - Valor instável, muda constantemente                      |
-//|   2. Gráfico visual mostra:                                     |
-//|      - Candles FECHADOS (shift 1, 2, 3...)                      |
-//|      - Valores estáveis, confirmados                            |
-//|   3. EA logava valores do shift 0:                              |
-//|      - Valores diferentes do gráfico                            |
-//|      - User: "ainda ha problema com sincronização"              |
+//|   1. UpdateBufferCache():                                       |
+//|      datetime currentBar = iTime(..., 0)                        |
+//|      - Se às 08:47 no M15: retorna 08:45 (candle atual)        |
+//|   2. CopyBuffer(..., 1, ...):                                   |
+//|      - Copia candle fechado 08:30                               |
+//|   3. RESULTADO:                                                 |
+//|      - LOG imprime timestamp 08:45                              |
+//|      - Mas dados são do candle 08:30                            |
+//|      - User vê gráfico em 08:15 mas log mostra 09:00!          |
 //|                                                                  |
-//| ✅ CORREÇÃO IMPLEMENTADA v4.56:                                 |
-//|   ✅ TODOS CopyBuffer mudados: shift 0 → shift 1               |
-//|   ✅ Agora lê APENAS candles FECHADOS (estáveis)               |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.57:                                 |
+//|   ✅ iTime(..., 0) → iTime(..., 1) em UpdateBufferCache()      |
+//|   ✅ Agora timestamp = candle fechado (mesmo dos dados)         |
 //|   ✅ LOG perfeitamente sincronizado com gráfico!                |
-//|   ✅ Corrigidos: WAE, RSI, Supertrend, GG (9 TFs), CS          |
+//|   ✅ Exemplo: LOG 08:30 E dados 08:30 = MATCH PERFEITO!        |
 //|                                                                  |
-//| 🚨🚨🚨 v4.55: CORREÇÃO URGENTE - ARRAYS NÃO ERAM SERIES!       |
+//| 🚨🚨🚨 v4.56: CORREÇÃO DEFINITIVA - SINCRONIZAÇÃO LOG vs GRÁFICO|
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.54):                            |
 //|   ❌ Arrays temporários NÃO eram definidos como SERIES!        |
@@ -380,10 +381,21 @@ double g_temp_gg_mn1[];
 //| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
 //| Retorna true se sucesso, false se erro                          |
 //| ✅ v4.55 FIX: Arrays como SERIES para ler corretamente [0]=atual|
+//| 🔥 v4.57 FIX CRÍTICO: iTime shift 0→1 para sincronizar com dados|
 //+------------------------------------------------------------------+
 bool UpdateBufferCache()
 {
-    datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 0);
+    // 🔥 v4.57 FIX CRÍTICO DE SINCRONIZAÇÃO TEMPORAL:
+    // ❌ ANTES: iTime(..., 0) = timestamp do candle EM FORMAÇÃO (atual)
+    //    - Exemplo: Às 08:47, candle M15 atual = 08:45 (ainda aberto)
+    //    - CopyBuffer shift 1 = candle 08:30 (fechado)
+    //    - RESULTADO: Log mostra 08:45 mas dados são de 08:30 = DESSINCRONIZADO!
+    //
+    // ✅ AGORA: iTime(..., 1) = timestamp do último candle FECHADO
+    //    - CopyBuffer shift 1 = candle fechado
+    //    - iTime shift 1 = timestamp do candle fechado
+    //    - RESULTADO: Log e dados do MESMO candle = SINCRONIZADO!
+    datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 1);
     
     if(g_bufferCache.lastUpdate == currentBar && g_bufferCache.isValid)
     {

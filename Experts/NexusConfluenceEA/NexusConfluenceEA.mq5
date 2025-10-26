@@ -1,9 +1,35 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.44 - CORREÇÃO CRÍTICA TF OPERACIONAL     |
-//| 🔥 v4.44: CORREÇÃO BUG GRAVÍSSIMO - VALIDAÇÃO TF OPERACIONAL    |
+//| Nexus Confluence EA v4.47 - CLASSIFICAÇÃO INTELIGENTE           |
+//| 🔥 v4.47: ACEITA M15 FRACO/NEUTRO PARA SETUPS GOOD             |
 //|          (25/10/2025)                                            |
 //|                                                                  |
-//| ❌ BUG GRAVÍSSIMO CORRIGIDO:                                     |
+//| 🎯 NOVO v4.47: LÓGICA BASEADA EM INTENSIDADE DE SINAL          |
+//|   ✅ PREMIUM: Exige TODOS TFs FORTES (±2) e alinhados          |
+//|      - H4 = ±2, H1 = ±2, M30 = ±2, M15 = ±2                   |
+//|                                                                  |
+//|   ✅ GOOD: Macros FORTES (±2), M15 pode ser FRACO/NEUTRO       |
+//|      - H4 = ±2, H1 = ±2 (OBRIGATÓRIO)                          |
+//|      - M15 = ±1 ou 0 (ACEITA FRACO/NEUTRO!)                    |
+//|      - Bloqueia M15 = ±2 OPOSTO aos macros                     |
+//|                                                                  |
+//|   ❌ REJECT: H4 ou H1 fracos (±1)                              |
+//|                                                                  |
+//| 🔥 v4.46: GG TRENDBAR v2.10 COM INTENSIDADE +2/-2              |
+//|   ✅ GG TrendBar v2.10 agora retorna:                           |
+//|      +2 = Bullish FORTE (PADX-NADX >= 10)                      |
+//|      +1 = Bullish fraco (PADX > NADX, diferença < 10)         |
+//|       0 = Neutro (amarelo)                                      |
+//|      -1 = Bearish fraco (NADX > PADX, diferença < 10)         |
+//|      -2 = Bearish FORTE (NADX-PADX >= 10)                      |
+//|                                                                  |
+//|   ✅ EA v4.45 já compatível (usa > 0 e < 0)                    |
+//|   ✅ Logs mostram intensidade (FORTE vs fraco)                 |
+//|                                                                  |
+//| 🔥 v4.45: CORREÇÃO BUG DETECÇÃO SINAIS                         |
+//|   ❌ BUG: Comparava == 1, ignorava +2 (verde forte)            |
+//|   ✅ FIX: Mudado para > 0 (bullish) e < 0 (bearish)            |
+//|                                                                  |
+//| 🔥 v4.44: CORREÇÃO BUG VALIDAÇÃO TF OPERACIONAL                |
 //|   - EA NUNCA validava timeframe operacional (M15, M30, H1)!    |
 //|   - RESULTADO: Abria BUY com H4+H1 GREEN mas M15 RED ❌        |
 //|   - Violava ABSOLUTAMENTE o Sistema Universal                   |
@@ -32,10 +58,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.44 - CORREÇÃO CRÍTICA: Validação TF Operacional      |
+//| VERSÃO: 4.47 - CLASSIFICAÇÃO INTELIGENTE (M15 flexível)        |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.44"
-#property version   "4.44"
+#property copyright "Nexus Confluence EA v4.47"
+#property version   "4.47"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

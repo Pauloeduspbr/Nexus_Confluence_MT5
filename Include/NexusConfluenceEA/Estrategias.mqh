@@ -1,36 +1,27 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.58 - FIX BUFFERS: Ler CORES não TREND!   |
+//| Nexus Confluence EA v4.58                                        |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
-//| 🚨🚨🚨 v4.58: CORREÇÃO URGENTE - BUFFERS ERRADOS! (27/01/2025)|
-//|                                                                  |
-//| 🐛 BUG CRÍTICO IDENTIFICADO v4.57:                              |
-//|   ❌ EA lia buffers 0-8 (valores trend do indicador)            |
-//|   ❌ Mas indicador usa buffers 9-17 (CORES!)                    |
-//|   ❌ Resultado: W1=+2, valores incorretos, sincronização errada |
-//|   ❌ User: "VOCE ESTA PEGANDO AS CORES ERRADAS !!!!!!"          |
-//|                                                                  |
-//| 🔍 ESTRUTURA REAL DO INDICADOR GG_TrendBar:                     |
-//|   Buffer 0-8:  Valores de trend (Buffer_M1...Buffer_MN1)        |
-//|   Buffer 9-17: Índices de cor (Color_M1...Color_MN1)            |
-//|                                                                  |
-//| 📊 SISTEMA DE CORES DO INDICADOR:                               |
-//|   Cor 0 = Verde (Bullish)  → EA converte para +1                |
-//|   Cor 1 = Vermelho (Bearish) → EA converte para -1              |
-//|   Cor 2 = Amarelo (Neutro) → EA converte para 0                 |
-//|                                                                  |
-//| ✅ CORREÇÃO IMPLEMENTADA v4.58:                                 |
-//|   ✅ Mudou buffers: 0,2,4,6,8,10,12,14,16 → 9,10,11,12,13,14,15,16,17 |
-//|   ✅ Agora lê os buffers de COR corretamente!                   |
-//|   ✅ Converte cores para valores de trend no EA                 |
-//|   ✅ W1 nunca mais será ±2 (será 0,±1 conforme amarelo/verde/vermelho) |
-//|                                                                  |
-//| 🚨🚨🚨 v4.57: CORREÇÃO DEFINITIVA - TIMESTAMP SINCRONIZADO!    |
-//|          (27/01/2025)                                            |
-//|                                                                  |
-//| 🐛 BUG RAÍZ IDENTIFICADO (v4.56):                               |
+//| AUTOR: GitHub Copilot + Desenvolvedor                            |
+//| DATA: Janeiro 2025                                               |
+//| VERSÃO: 4.58                                                     |
+//+------------------------------------------------------------------+
+#property copyright "Nexus Confluence EA v4.58"
+#property version   "4.58"
+
+#include "Parametros.mqh"
+
+//+------------------------------------------------------------------+
+//| FUNÇÕES AUXILIARES DO MÓDULO                                     |
+//+------------------------------------------------------------------+
+
+string TimeframeToString(ENUM_TIMEFRAMES tf)
+{
+   switch(tf)
+   {
+      case PERIOD_M1:  return "M1";
 //|   ❌ iTime(..., 0) = timestamp do candle EM FORMAÇÃO!          |
 //|   ❌ CopyBuffer shift 1 = dados do candle FECHADO!              |
 //|   ❌ LOG mostrava timestamp FUTURO vs dados PASSADOS!           |
@@ -400,24 +391,10 @@ double g_temp_gg_w1[];
 double g_temp_gg_mn1[];
 
 //+------------------------------------------------------------------+
-//| 🔥 FUNÇÃO: UpdateBufferCache                                     |
-//| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
-//| Retorna true se sucesso, false se erro                          |
-//| ✅ v4.55 FIX: Arrays como SERIES para ler corretamente [0]=atual|
-//| 🔥 v4.57 FIX CRÍTICO: iTime shift 0→1 para sincronizar com dados|
+//| UpdateBufferCache - Atualiza todos os buffers                   |
 //+------------------------------------------------------------------+
 bool UpdateBufferCache()
 {
-    // 🔥 v4.57 FIX CRÍTICO DE SINCRONIZAÇÃO TEMPORAL:
-    // ❌ ANTES: iTime(..., 0) = timestamp do candle EM FORMAÇÃO (atual)
-    //    - Exemplo: Às 08:47, candle M15 atual = 08:45 (ainda aberto)
-    //    - CopyBuffer shift 1 = candle 08:30 (fechado)
-    //    - RESULTADO: Log mostra 08:45 mas dados são de 08:30 = DESSINCRONIZADO!
-    //
-    // ✅ AGORA: iTime(..., 1) = timestamp do último candle FECHADO
-    //    - CopyBuffer shift 1 = candle fechado
-    //    - iTime shift 1 = timestamp do candle fechado
-    //    - RESULTADO: Log e dados do MESMO candle = SINCRONIZADO!
     datetime currentBar = iTime(_Symbol, PERIOD_CURRENT, 1);
     
     if(g_bufferCache.lastUpdate == currentBar && g_bufferCache.isValid)
@@ -425,7 +402,6 @@ bool UpdateBufferCache()
         return true;
     }
     
-    // 🔥 v4.55 FIX CRÍTICO: Redimensionar arrays dinâmicos ANTES de usar
     ArrayResize(g_temp_wae_up, 3);
     ArrayResize(g_temp_wae_down, 3);
     ArrayResize(g_temp_wae_exp, 1);
@@ -445,8 +421,6 @@ bool UpdateBufferCache()
     ArrayResize(g_temp_gg_w1, 2);
     ArrayResize(g_temp_gg_mn1, 2);
     
-    // 🔥 v4.55 FIX CRÍTICO: Definir TODOS arrays temporários como SERIES!
-    // Isso garante que [0] = candle ATUAL, [1] = candle ANTERIOR
     ArraySetAsSeries(g_temp_wae_up, true);
     ArraySetAsSeries(g_temp_wae_down, true);
     ArraySetAsSeries(g_temp_wae_exp, true);
@@ -468,10 +442,8 @@ bool UpdateBufferCache()
     
     bool success = true;
     
-    // 1. WAE
     if(g_handles.wae_oper != INVALID_HANDLE)
     {
-        // 🔥 v4.56 FIX: Copiar do shift 1 (candle FECHADO), não shift 0 (em formação)
         if(CopyBuffer(g_handles.wae_oper, 0, 1, 3, g_temp_wae_up) == 3 &&
            CopyBuffer(g_handles.wae_oper, 1, 1, 3, g_temp_wae_down) == 3 &&
            CopyBuffer(g_handles.wae_oper, 2, 1, 1, g_temp_wae_exp) == 1)
@@ -486,10 +458,8 @@ bool UpdateBufferCache()
         else success = false;
     }
     
-    // 2. RSI OMA
     if(g_handles.rsi_oper != INVALID_HANDLE)
     {
-        // 🔥 v4.56 FIX: Copiar do shift 1 (candle FECHADO)
         if(CopyBuffer(g_handles.rsi_oper, 0, 1, 3, g_temp_rsi_red) == 3 &&
            CopyBuffer(g_handles.rsi_oper, 1, 1, 3, g_temp_rsi_blue) == 3)
         {
@@ -502,7 +472,6 @@ bool UpdateBufferCache()
         else success = false;
     }
     
-    // 3. Currency Strength
     if(g_handles.cs_oper != INVALID_HANDLE)
     {
         if(CopyBuffer(g_handles.cs_oper, 0, 1, 1, g_temp_cs_base) == 1 &&
@@ -514,10 +483,8 @@ bool UpdateBufferCache()
         else success = false;
     }
     
-    // 4. Supertrend (TrendMagic)
     if(g_handles.st_oper != INVALID_HANDLE)
     {
-        // 🔥 v4.56 FIX: Copiar do shift 1 (candle FECHADO)
         if(CopyBuffer(g_handles.st_oper, 0, 1, 3, g_temp_supertrend_up) == 3 &&
            CopyBuffer(g_handles.st_oper, 1, 1, 3, g_temp_supertrend_down) == 3)
         {
@@ -530,80 +497,52 @@ bool UpdateBufferCache()
         else success = false;
     }
     
-    // 5. GG TrendBar - 🔥 v4.58 FIX CRÍTICO: LER BUFFERS DE COR, NÃO DE TREND!
     if(g_handles.gg_global != INVALID_HANDLE)
     {
-        // � v4.58 CORREÇÃO URGENTE: BUFFERS ERRADOS!
-        // ❌ ANTES v4.57: Lia buffers 0,2,4,6,8,10,12,14,16 (valores trend -1/0/+1)
-        // ✅ AGORA v4.58: Lê buffers 9,10,11,12,13,14,15,16,17 (cores 0=Verde, 1=Vermelho, 2=Amarelo)
-        //
-        // ESTRUTURA DO INDICADOR:
-        // Buffer 0-8:  Valores de trend (Buffer_M1, Buffer_M5, ..., Buffer_MN1)
-        // Buffer 9-17: Índices de cor (Color_M1, Color_M5, ..., Color_MN1)
-        //   Cor 0 = Verde (Bullish +1)
-        //   Cor 1 = Vermelho (Bearish -1)
-        //   Cor 2 = Amarelo (Neutro 0)
-        //
-        // CONVERSÃO: Cor → Valor de Trend
-        //   0 (Verde) → +1 (Bullish)
-        //   1 (Vermelho) → -1 (Bearish)
-        //   2 (Amarelo) → 0 (Neutro)
-        
-        if(CopyBuffer(g_handles.gg_global, 9, 1, 2, g_temp_gg_m1) == 2 &&    // Color_M1
-           CopyBuffer(g_handles.gg_global, 10, 1, 2, g_temp_gg_m5) == 2 &&   // Color_M5
-           CopyBuffer(g_handles.gg_global, 11, 1, 2, g_temp_gg_m15) == 2 &&  // Color_M15
-           CopyBuffer(g_handles.gg_global, 12, 1, 2, g_temp_gg_m30) == 2 &&  // Color_M30
-           CopyBuffer(g_handles.gg_global, 13, 1, 2, g_temp_gg_h1) == 2 &&   // Color_H1
-           CopyBuffer(g_handles.gg_global, 14, 1, 2, g_temp_gg_h4) == 2 &&   // Color_H4
-           CopyBuffer(g_handles.gg_global, 15, 1, 2, g_temp_gg_d1) == 2 &&   // Color_D1
-           CopyBuffer(g_handles.gg_global, 16, 1, 2, g_temp_gg_w1) == 2 &&   // Color_W1
-           CopyBuffer(g_handles.gg_global, 17, 1, 2, g_temp_gg_mn1) == 2)    // Color_MN1
+        if(CopyBuffer(g_handles.gg_global, 9, 1, 2, g_temp_gg_m1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 10, 1, 2, g_temp_gg_m5) == 2 &&
+           CopyBuffer(g_handles.gg_global, 11, 1, 2, g_temp_gg_m15) == 2 &&
+           CopyBuffer(g_handles.gg_global, 12, 1, 2, g_temp_gg_m30) == 2 &&
+           CopyBuffer(g_handles.gg_global, 13, 1, 2, g_temp_gg_h1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 14, 1, 2, g_temp_gg_h4) == 2 &&
+           CopyBuffer(g_handles.gg_global, 15, 1, 2, g_temp_gg_d1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 16, 1, 2, g_temp_gg_w1) == 2 &&
+           CopyBuffer(g_handles.gg_global, 17, 1, 2, g_temp_gg_mn1) == 2)
         {
-            // 🔥 v4.58: CONVERTER CORES PARA VALORES DE TREND
-            // Cores do indicador → Valores para o EA
             for(int idx = 0; idx < 2; idx++)
             {
-                // M1: Cor → Trend
-                if(g_temp_gg_m1[idx] == 0) g_bufferCache.gg_m1[idx] = 1;        // Verde = +1
-                else if(g_temp_gg_m1[idx] == 1) g_bufferCache.gg_m1[idx] = -1;  // Vermelho = -1
-                else g_bufferCache.gg_m1[idx] = 0;                               // Amarelo = 0
+                if(g_temp_gg_m1[idx] == 0) g_bufferCache.gg_m1[idx] = 1;
+                else if(g_temp_gg_m1[idx] == 1) g_bufferCache.gg_m1[idx] = -1;
+                else g_bufferCache.gg_m1[idx] = 0;
                 
-                // M5: Cor → Trend
                 if(g_temp_gg_m5[idx] == 0) g_bufferCache.gg_m5[idx] = 1;
                 else if(g_temp_gg_m5[idx] == 1) g_bufferCache.gg_m5[idx] = -1;
                 else g_bufferCache.gg_m5[idx] = 0;
                 
-                // M15: Cor → Trend
                 if(g_temp_gg_m15[idx] == 0) g_bufferCache.gg_m15[idx] = 1;
                 else if(g_temp_gg_m15[idx] == 1) g_bufferCache.gg_m15[idx] = -1;
                 else g_bufferCache.gg_m15[idx] = 0;
                 
-                // M30: Cor → Trend
                 if(g_temp_gg_m30[idx] == 0) g_bufferCache.gg_m30[idx] = 1;
                 else if(g_temp_gg_m30[idx] == 1) g_bufferCache.gg_m30[idx] = -1;
                 else g_bufferCache.gg_m30[idx] = 0;
                 
-                // H1: Cor → Trend
                 if(g_temp_gg_h1[idx] == 0) g_bufferCache.gg_h1[idx] = 1;
                 else if(g_temp_gg_h1[idx] == 1) g_bufferCache.gg_h1[idx] = -1;
                 else g_bufferCache.gg_h1[idx] = 0;
                 
-                // H4: Cor → Trend
                 if(g_temp_gg_h4[idx] == 0) g_bufferCache.gg_h4[idx] = 1;
                 else if(g_temp_gg_h4[idx] == 1) g_bufferCache.gg_h4[idx] = -1;
                 else g_bufferCache.gg_h4[idx] = 0;
                 
-                // D1: Cor → Trend
                 if(g_temp_gg_d1[idx] == 0) g_bufferCache.gg_d1[idx] = 1;
                 else if(g_temp_gg_d1[idx] == 1) g_bufferCache.gg_d1[idx] = -1;
                 else g_bufferCache.gg_d1[idx] = 0;
                 
-                // W1: Cor → Trend
                 if(g_temp_gg_w1[idx] == 0) g_bufferCache.gg_w1[idx] = 1;
                 else if(g_temp_gg_w1[idx] == 1) g_bufferCache.gg_w1[idx] = -1;
                 else g_bufferCache.gg_w1[idx] = 0;
                 
-                // MN1: Cor → Trend
                 if(g_temp_gg_mn1[idx] == 0) g_bufferCache.gg_mn1[idx] = 1;
                 else if(g_temp_gg_mn1[idx] == 1) g_bufferCache.gg_mn1[idx] = -1;
                 else g_bufferCache.gg_mn1[idx] = 0;
@@ -615,14 +554,12 @@ bool UpdateBufferCache()
     g_bufferCache.isValid = success;
     g_bufferCache.lastUpdate = currentBar;
     
-    // 🔥 v4.40.5: LOGS DE CACHE REMOVIDOS (poluíam o log)
-    // Log apenas erros críticos consecutivos
     static int consecutiveErrors = 0;
     
     if(!success)
     {
         consecutiveErrors++;
-        if(consecutiveErrors >= MaxConsecutiveIndicatorErrors)  // ✅ v4.42: ANTI-HARDCODE
+        if(consecutiveErrors >= MaxConsecutiveIndicatorErrors)
         {
             PrintFormat("🔴 CRÍTICO: Buffer Cache com %d erros consecutivos!", consecutiveErrors);
             consecutiveErrors = 0;

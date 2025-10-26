@@ -156,84 +156,93 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| GATE 2: Multi-Timeframe Analysis (Score System)                 |
-    //| CRITICAL: GG TrendBar is MANDANTE - without confluence, filters |
-    //|           are NOT called. PREMIUM = ±4, GOOD = ±3, REJECT ≤ ±2  |
+    //| GATE 2: Multi-Timeframe Analysis (HIERARCHICAL LOGIC)           |
+    //| ORDEM DE VALIDAÇÃO: H4 → H1 (MANDANTES) → M30/M15 (PREMIUM/GOOD)|
+    //| CRITICAL: H4 e H1 devem estar alinhados primeiro!                |
+    //| PREMIUM: H4+H1 alinhados E M30+M15 alinhados                     |
+    //| GOOD: H4+H1 alinhados E (M30 OU M15 alinhado)                    |
+    //| REJECT: H4 e H1 NÃO alinhados OU nenhum M30/M15 alinhado        |
     //+------------------------------------------------------------------+
     bool ProcessGate2_MTF(void)
     {
-        // Get GG TrendBar signals for all 4 timeframes
-        int gg_macro1 = m_indicators.GetGGTrendSignal(m_macro1_tf);
-        int gg_macro2 = m_indicators.GetGGTrendSignal(m_macro2_tf);
-        int gg_macro3 = m_indicators.GetGGTrendSignal(m_macro3_tf);
-        int gg_operational = m_indicators.GetGGTrendSignal(m_operational_tf);
+        // Get GG TrendBar signals - ORDEM: H4 → H1 → M30 → M15 (macro para micro)
+        int gg_h4  = m_indicators.GetGGTrendSignal(m_macro1_tf);      // H4
+        int gg_h1  = m_indicators.GetGGTrendSignal(m_macro2_tf);      // H1
+        int gg_m30 = m_indicators.GetGGTrendSignal(m_macro3_tf);      // M30
+        int gg_m15 = m_indicators.GetGGTrendSignal(m_operational_tf); // M15
         
-        // Calculate MTF Score (sum of -1/0/+1 values)
-        m_mtf_score = gg_macro1 + gg_macro2 + gg_macro3 + gg_operational;
+        // Calculate MTF Score (for logging)
+        m_mtf_score = gg_h4 + gg_h1 + gg_m30 + gg_m15;
         
-        // GG TrendBar is MANDANTE: Only process if strong confluence
-        // PREMIUM: Score = ±4 (all 4 aligned)
-        // GOOD: Score = ±3 (3 of 4 aligned)
-        // REJECT: Score ≤ ±2 (insufficient confluence - DO NOT call filters)
+        // PASSO 1: H4 e H1 são MANDANTES - devem estar alinhados (ambos +1 ou ambos -1)
+        bool h4_h1_bullish = (gg_h4 == 1 && gg_h1 == 1);
+        bool h4_h1_bearish = (gg_h4 == -1 && gg_h1 == -1);
         
-        if(m_mtf_score == 4)
+        if(!h4_h1_bullish && !h4_h1_bearish)
         {
-            // PREMIUM BUY: All 4 timeframes bullish
-            m_signal_direction = SIGNAL_DIR_BUY;
-            m_signal_class = SIGNAL_PREMIUM;
-        }
-        else if(m_mtf_score == 3)
-        {
-            // GOOD BUY: 3 of 4 bullish
-            m_signal_direction = SIGNAL_DIR_BUY;
-            m_signal_class = SIGNAL_GOOD;
-        }
-        else if(m_mtf_score == -4)
-        {
-            // PREMIUM SELL: All 4 timeframes bearish
-            m_signal_direction = SIGNAL_DIR_SELL;
-            m_signal_class = SIGNAL_PREMIUM;
-        }
-        else if(m_mtf_score == -3)
-        {
-            // GOOD SELL: 3 of 4 bearish
-            m_signal_direction = SIGNAL_DIR_SELL;
-            m_signal_class = SIGNAL_GOOD;
-        }
-        else
-        {
-            // REJECT: Score between -2 and +2 (insufficient confluence)
+            // H4 e H1 NÃO alinhados → REJECT (não chama filtros)
             m_signal_class = SIGNAL_REJECT;
             m_signal_direction = SIGNAL_DIR_NONE;
+            
+            m_gate_results[2] = false;
+            m_gate_messages[2] = StringFormat("G2✗ H4/H1 desalinhados");
+            
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: H4/H1 não alinhados | H4:%+d H1:%+d M30:%+d M15:%+d",
+                              gg_h4, gg_h1, gg_m30, gg_m15));
+            return false;
         }
         
-        bool result = (m_signal_class != SIGNAL_REJECT);
-        
-        m_gate_results[2] = result;
-        m_gate_messages[2] = StringFormat("G2%s MTF:%+d %s", 
-                             result ? "✓" : "✗", 
-                             m_mtf_score,
-                             EnumToString(m_signal_class));
-        
-        if(result)
+        // PASSO 2: H4+H1 alinhados - determinar direção
+        if(h4_h1_bullish)
         {
-            m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s | Score:%+d | GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d",
-                              EnumToString(m_signal_class),
-                              m_mtf_score,
-                              EnumToString(m_macro1_tf), gg_macro1,
-                              EnumToString(m_macro2_tf), gg_macro2,
-                              EnumToString(m_macro3_tf), gg_macro3,
-                              EnumToString(m_operational_tf), gg_operational));
+            m_signal_direction = SIGNAL_DIR_BUY;
+        }
+        else if(h4_h1_bearish)
+        {
+            m_signal_direction = SIGNAL_DIR_SELL;
+        }
+        
+        // PASSO 3: Analisar M30 e M15 para classificar PREMIUM vs GOOD
+        bool m30_aligned = (h4_h1_bullish && gg_m30 == 1) || (h4_h1_bearish && gg_m30 == -1);
+        bool m15_aligned = (h4_h1_bullish && gg_m15 == 1) || (h4_h1_bearish && gg_m15 == -1);
+        
+        if(m30_aligned && m15_aligned)
+        {
+            // PREMIUM: Todos 4 timeframes alinhados
+            m_signal_class = SIGNAL_PREMIUM;
+        }
+        else if(m30_aligned || m15_aligned)
+        {
+            // GOOD: H4+H1 alinhados + pelo menos 1 dos operacionais (M30 ou M15)
+            m_signal_class = SIGNAL_GOOD;
         }
         else
         {
-            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: Score:%+d (need ±3 GOOD or ±4 PREMIUM) | GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d",
-                              m_mtf_score,
-                              EnumToString(m_macro1_tf), gg_macro1,
-                              EnumToString(m_macro2_tf), gg_macro2,
-                              EnumToString(m_macro3_tf), gg_macro3,
-                              EnumToString(m_operational_tf), gg_operational));
+            // REJECT: H4+H1 alinhados mas NENHUM M30/M15 alinhado
+            m_signal_class = SIGNAL_REJECT;
+            m_signal_direction = SIGNAL_DIR_NONE;
+            
+            m_gate_results[2] = false;
+            m_gate_messages[2] = StringFormat("G2✗ M30/M15 não alinhados");
+            
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: M30/M15 não alinhados com H4/H1 | H4:%+d H1:%+d M30:%+d M15:%+d",
+                              gg_h4, gg_h1, gg_m30, gg_m15));
+            return false;
         }
+        
+        // PASSO 4: PASSED - Log com ordem hierárquica (H4 → H1 → M30 → M15)
+        bool result = true;
+        
+        m_gate_results[2] = result;
+        m_gate_messages[2] = StringFormat("G2✓ %s Score:%+d", 
+                             EnumToString(m_signal_class),
+                             m_mtf_score);
+        
+        m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s %s | Score:%+d | H4:%+d → H1:%+d → M30:%+d → M15:%+d",
+                          EnumToString(m_signal_class),
+                          EnumToString(m_signal_direction),
+                          m_mtf_score,
+                          gg_h4, gg_h1, gg_m30, gg_m15));
         
         return result;
     }

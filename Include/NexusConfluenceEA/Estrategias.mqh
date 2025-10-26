@@ -71,7 +71,7 @@
 //|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
 //|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
 //|                                                                  |
-//| 🚨🚨� v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY              |
+//| 🚨🚨🚨 v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY              |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.53):                            |
 //|   ❌ Supertrend retornava DBL_MAX (~1.7e308) quando inativo    |
@@ -576,7 +576,7 @@ bool UpdateBufferCache()
     // 5. GG TrendBar - 🔥 v4.58 FIX CRÍTICO: LER BUFFERS DE COR, NÃO DE TREND!
     if(g_handles.gg_global != INVALID_HANDLE)
     {
-        // � v4.58 CORREÇÃO URGENTE: BUFFERS ERRADOS!
+        // 🔥 v4.58 CORREÇÃO URGENTE: BUFFERS ERRADOS!
         // ❌ ANTES v4.57: Lia buffers 0,2,4,6,8,10,12,14,16 (valores trend -1/0/+1)
         // ✅ AGORA v4.58: Lê buffers 9,10,11,12,13,14,15,16,17 (cores 0=Verde, 1=Vermelho, 2=Amarelo)
         //
@@ -836,7 +836,7 @@ bool InitializeIndicators(string symbol)
    //╔══════════════════════════════════════════════════════════════╗
    //║  5️⃣ CURRENCY STRENGTH - Contexto Moedas (Forex/Metais)      ║
    //╚══════════════════════════════════════════════════════════════╝
-   PrintFormat("� [5/5] Currency Strength (Contexto)...");
+   PrintFormat("💪 [5/5] Currency Strength (Contexto)...");
    g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
                                 CS_CalculationPeriod,
                                 CS_SmoothingPeriod,

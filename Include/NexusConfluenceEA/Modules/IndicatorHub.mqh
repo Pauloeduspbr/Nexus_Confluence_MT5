@@ -57,9 +57,6 @@ private:
     // Synchronization timestamp
     datetime        m_last_update_time;
     
-    // Indicator paths
-    string          m_indicator_path;
-    
 public:
     //+------------------------------------------------------------------+
     //| Constructor                                                      |
@@ -78,8 +75,6 @@ public:
         m_cs_available = false;
         m_last_update_time = 0;
         
-        m_indicator_path = "Indicators\\NexusConfluenceEA\\";
-        
         ArrayInitialize(m_gg_buffer, 0);
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
         ArrayInitialize(m_st_lower, EMPTY_VALUE);
@@ -94,6 +89,40 @@ public:
     }
     
     //+------------------------------------------------------------------+
+    //| Helper: Load indicator with multiple path attempts              |
+    //+------------------------------------------------------------------+
+    int LoadIndicator(string symbol, ENUM_TIMEFRAMES tf, string indicator_name, string display_name)
+    {
+        int handle = INVALID_HANDLE;
+        string paths[] = {
+            "NexusConfluenceEA\\",     // Subpasta recomendada
+            "\\NexusConfluenceEA\\",   // Com barra inicial
+            "",                         // Raiz de Indicators
+            "Market\\"                  // Market folder (se baixado do Market)
+        };
+        
+        for(int i = 0; i < ArraySize(paths); i++)
+        {
+            string full_path = paths[i] + indicator_name;
+            handle = iCustom(symbol, tf, full_path);
+            
+            if(handle != INVALID_HANDLE)
+            {
+                Print("✅ ", display_name, " loaded from: ", full_path);
+                return handle;
+            }
+            
+            // Limpar erro
+            ResetLastError();
+        }
+        
+        Print("❌ ERROR: Failed to load ", display_name, " from any path");
+        Print("   Tried paths: NexusConfluenceEA\\, \\NexusConfluenceEA\\, root, Market\\");
+        Print("   Make sure ", indicator_name, " is compiled (.ex5 exists)");
+        return INVALID_HANDLE;
+    }
+    
+    //+------------------------------------------------------------------+
     //| Initialization - Create all indicator handles                   |
     //+------------------------------------------------------------------+
     bool Init(string symbol, ENUM_TIMEFRAMES operational_tf)
@@ -102,45 +131,38 @@ public:
         m_operational_tf = operational_tf;
         
         Print("📊 Initializing IndicatorHub for ", m_symbol, " on ", EnumToString(operational_tf));
+        Print("   Looking for indicators in MQL5\\Indicators\\NexusConfluenceEA\\");
         
         // 1. GG TrendBar Indicator
-        m_gg_handle = iCustom(m_symbol, operational_tf, m_indicator_path + "GG_TrendBar_Indicator.ex5");
+        m_gg_handle = LoadIndicator(m_symbol, operational_tf, "GG_TrendBar_Indicator.ex5", "GG TrendBar");
         if(m_gg_handle == INVALID_HANDLE)
         {
-            Print("❌ ERROR: Failed to create GG_TrendBar handle");
             return false;
         }
-        Print("✅ GG TrendBar loaded");
         
         // 2. TrendMagic (Supertrend)
-        m_supertrend_handle = iCustom(m_symbol, operational_tf, m_indicator_path + "TrendMagic_MT5.ex5");
+        m_supertrend_handle = LoadIndicator(m_symbol, operational_tf, "TrendMagic_MT5.ex5", "Supertrend");
         if(m_supertrend_handle == INVALID_HANDLE)
         {
-            Print("❌ ERROR: Failed to create Supertrend handle");
             return false;
         }
-        Print("✅ Supertrend loaded");
         
         // 3. Waddah Attar Explosion
-        m_wae_handle = iCustom(m_symbol, operational_tf, m_indicator_path + "WaddahAttarExplosion_Professional.ex5");
+        m_wae_handle = LoadIndicator(m_symbol, operational_tf, "WaddahAttarExplosion_Professional.ex5", "WAE");
         if(m_wae_handle == INVALID_HANDLE)
         {
-            Print("❌ ERROR: Failed to create WAE handle");
             return false;
         }
-        Print("✅ WAE loaded");
         
         // 4. RSI OMA
-        m_rsi_oma_handle = iCustom(m_symbol, operational_tf, m_indicator_path + "RSIOMA_v2HHLSX_MT5.ex5");
+        m_rsi_oma_handle = LoadIndicator(m_symbol, operational_tf, "RSIOMA_v2HHLSX_MT5.ex5", "RSI OMA");
         if(m_rsi_oma_handle == INVALID_HANDLE)
         {
-            Print("❌ ERROR: Failed to create RSI OMA handle");
             return false;
         }
-        Print("✅ RSI OMA loaded");
         
         // 5. Currency Strength (with fallback for indices)
-        m_currency_handle = iCustom(m_symbol, operational_tf, m_indicator_path + "CurrencyStrengthMeter_MT5.ex5");
+        m_currency_handle = LoadIndicator(m_symbol, operational_tf, "CurrencyStrengthMeter_MT5.ex5", "Currency Strength");
         if(m_currency_handle == INVALID_HANDLE)
         {
             Print("⚠️ WARNING: Currency Strength not available - will skip Gate 5 for indices");
@@ -148,7 +170,6 @@ public:
         }
         else
         {
-            Print("✅ Currency Strength loaded");
             m_cs_available = true;
         }
         

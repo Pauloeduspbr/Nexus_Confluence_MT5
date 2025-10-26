@@ -433,34 +433,34 @@ double g_temp_gg_w1[];
 double g_temp_gg_mn1[];
 
 //+------------------------------------------------------------------+
-//| 🔥 NOVA FUNÇÃO v4.59: Converter índice de cor para valor de trend|
-//| Converte cores do GG_TrendBar para valores numéricos do EA      |
+//| NOVA FUNCAO v4.59: Converter indice de cor para valor de trend  |
+//| Converte cores do GG_TrendBar para valores numericos do EA      |
 //|                                                                  |
-//| PARÂMETROS:                                                      |
-//|   - colorIndex: Índice de cor do indicador (0/1/2)             |
+//| PARAMETROS:                                                      |
+//|   - colorIndex: Indice de cor do indicador (0/1/2)             |
 //|                                                                  |
 //| RETORNO:                                                         |
 //|   +1.0 = Verde (Bullish)                                        |
 //|   -1.0 = Vermelho (Bearish)                                      |
-//|    0.0 = Amarelo (Neutro) ou inválido                          |
+//|    0.0 = Amarelo (Neutro) ou invalido                          |
 //|                                                                  |
 //| SISTEMA DE CORES DO GG_TrendBar:                                |
-//|   Cor 0 = Verde (alta)    → +1                                  |
-//|   Cor 1 = Vermelho (baixa) → -1                                 |
-//|   Cor 2 = Amarelo (neutro) → 0                                  |
+//|   Cor 0 = Verde (alta)    -> +1                                 |
+//|   Cor 1 = Vermelho (baixa) -> -1                                |
+//|   Cor 2 = Amarelo (neutro) -> 0                                 |
 //+------------------------------------------------------------------+
 double ConvertColorToTrend(double colorIndex)
 {
-    // GG_TrendBar usa sistema de cores (índices de buffer Color_XX):
-    // 0 = Verde (Bullish)  → +1
-    // 1 = Vermelho (Bearish) → -1  
-    // 2 = Amarelo (Neutro) → 0
+    // GG_TrendBar usa sistema de cores (indices de buffer Color_XX):
+    // 0 = Verde (Bullish)  -> +1
+    // 1 = Vermelho (Bearish) -> -1  
+    // 2 = Amarelo (Neutro) -> 0
     
     int color = (int)MathRound(colorIndex);
     
     switch(color)
     {
-        case 0: return +1.0;  // Verde = Bullish
+        case 0: return 1.0;   // Verde = Bullish
         case 1: return -1.0;  // Vermelho = Bearish
         case 2: return 0.0;   // Amarelo = Neutro
         default: 

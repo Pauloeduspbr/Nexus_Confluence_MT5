@@ -1,9 +1,29 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.53 - FIX CRÍTICO: VALORES ±2 INVÁLIDOS!  |
+//| Nexus Confluence EA v4.54 - FIX CRÍTICO: SUPERTREND EMPTY_VALUE!|
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
+//| 🚨🚨🚨 v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY (26/10/2025) |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO (v4.53):                            |
+//|   ❌ Supertrend retornava DBL_MAX (~1.7e308) quando inativo    |
+//|   ❌ Threshold 1.0e10 era MUITO BAIXO para detectar!           |
+//|   ❌ Comparação `> 0` rejeitava possíveis valores negativos     |
+//|   ❌ Resultado: Não detectava corretamente buffer ativo         |
+//|                                                                  |
+//| 🔍 ANÁLISE DO PROBLEMA:                                         |
+//|   1. Log mostrava: bufferDown[0]=1.797693e+308 (DBL_MAX)       |
+//|   2. Código verificava: if(buf[1] < 1.0e10 && buf[1] > 0)      |
+//|   3. Problema: 1.7e+308 > 1.0e10 → NÃO detectava como EMPTY    |
+//|   4. Resultado: Tentava usar DBL_MAX como preço válido!        |
+//|                                                                  |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.54:                                 |
+//|   ✅ Threshold aumentado: 1.0e10 → 1.0e100                     |
+//|   ✅ Usar MathAbs() para valores negativos                      |
+//|   ✅ Verificar != EMPTY_VALUE explicitamente                    |
+//|   ✅ Detecção: MathAbs(buf[1]) < 1e100 && != EMPTY_VALUE       |
+//|                                                                  |
 //| 🚨🚨🚨 v4.53: CORREÇÃO URGENTE - INDICADOR ±2 (25/10/2025)     |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.52):                            |
@@ -767,22 +787,21 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
                bufferUp[0], bufferDown[0],
                bufferUp[1], bufferDown[1]);
 
-   // 🔥 CORREÇÃO CRÍTICA v4.14: TrendMagic usa DBL_MAX para buffer INATIVO!
-   // 🔥 CORREÇÃO CRÍTICA v4.27: LER CANDLE FECHADO [1] (sincronizar com outros indicadores)
-   // - bufferUp pequeno (< 1e10) = Linha UP ATIVA (tendência BULLISH)
-   // - bufferDown pequeno (< 1e10) = Linha DOWN ATIVA (tendência BEARISH)
-   // - Valor gigante (DBL_MAX ~1.7e308) = Linha INATIVA
-
-   double DBL_MAX_LIMIT = 1.0e10; // Threshold para detectar DBL_MAX
+   // 🔥 CORREÇÃO CRÍTICA v4.54: Detecção ROBUSTA de buffer ativo
+   // EMPTY_VALUE = DBL_MAX (~1.7e308) ou valores absurdos
+   // TrendMagic define EMPTY_VALUE nos buffers inativos
+   
+   double DBL_MAX_LIMIT = 1.0e100; // ✅ Threshold muito maior para pegar DBL_MAX corretamente
 
    // 🔥 v4.27: USAR CANDLE FECHADO [1] ao invés de [0] para sincronizar com GG/WAE/RSI/CS
-   // Determinar direção atual (qual linha tem valor VÁLIDO/PEQUENO) no candle FECHADO
-   bool currentBullish = (bufferUp[1] < DBL_MAX_LIMIT && bufferUp[1] > 0);
-   bool currentBearish = (bufferDown[1] < DBL_MAX_LIMIT && bufferDown[1] > 0);
+   // Determinar direção atual (qual linha tem valor VÁLIDO/RAZOÁVEL) no candle FECHADO
+   // ✅ v4.54: Usar MathAbs para pegar valores negativos também
+   bool currentBullish = (MathAbs(bufferUp[1]) < DBL_MAX_LIMIT && bufferUp[1] != EMPTY_VALUE);
+   bool currentBearish = (MathAbs(bufferDown[1]) < DBL_MAX_LIMIT && bufferDown[1] != EMPTY_VALUE);
 
    // Verificar se mudou de cor recentemente (últimos 3 candles FECHADOS)
-   bool wasBullish = (bufferUp[2] < DBL_MAX_LIMIT && bufferUp[2] > 0);
-   bool wasBearish = (bufferDown[2] < DBL_MAX_LIMIT && bufferDown[2] > 0);
+   bool wasBullish = (MathAbs(bufferUp[2]) < DBL_MAX_LIMIT && bufferUp[2] != EMPTY_VALUE);
+   bool wasBearish = (MathAbs(bufferDown[2]) < DBL_MAX_LIMIT && bufferDown[2] != EMPTY_VALUE);
    
    // Detectar mudança confirmada
    if(currentBullish && !wasBullish)

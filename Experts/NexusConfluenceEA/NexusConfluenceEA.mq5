@@ -1,5 +1,20 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.53 - FIX CRÍTICO: VALORES ±2 INVÁLIDOS!  |
+//| Nexus Confluence EA v4.54 - FIX CRÍTICO: SUPERTREND EMPTY_VALUE!|
+//| 🚨 v4.54: CORREÇÃO URGENTE - DETECÇÃO DE BUFFER ATIVO          |
+//|          (26/10/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO v4.53:                                           |
+//|   ❌ Supertrend retornava DBL_MAX (~1.7e308) quando inativo    |
+//|   ❌ Threshold 1.0e10 era MUITO BAIXO para detectar!           |
+//|   ❌ Comparação `> 0` rejeitava possíveis valores negativos     |
+//|   ❌ Resultado: Não detectava corretamente buffer ativo         |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.54:                                              |
+//|   ✅ Threshold aumentado: 1.0e10 → 1.0e100                     |
+//|   ✅ Usar MathAbs() para valores negativos                      |
+//|   ✅ Verificar != EMPTY_VALUE explicitamente                    |
+//|   ✅ Detecção robusta: MathAbs(buf[1]) < 1e100 && != EMPTY     |
+//|                                                                  |
 //| 🚨 v4.53: CORREÇÃO URGENTE - INDICADOR RETORNAVA ±2            |
 //|          (25/10/2025)                                            |
 //|                                                                  |
@@ -91,10 +106,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.52 - FIX CRÍTICO: Supertrend SELL (Close[1] vs BID)  |
+//| VERSÃO: 4.54 - FIX CRÍTICO: Supertrend EMPTY_VALUE detection    |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.53"
-#property version   "4.53"
+#property copyright "Nexus Confluence EA v4.54"
+#property version   "4.54"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

@@ -267,7 +267,7 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(3, StringFormat("Gate 3 REJECTED: Supertrend=%+d vs Direction=%s",
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s",
                               st_signal, EnumToString(m_signal_direction)));
         }
         
@@ -286,7 +286,7 @@ public:
         {
             m_gate_results[4] = false;
             m_gate_messages[4] = "G4✗ WAE flat";
-            m_core.LogMessage(3, "Gate 4 REJECTED: WAE not expanding (lateral market)");
+            m_core.LogMessage(2, "[OPERACIONAL] ❌ Gate 4 REJECTED: WAE not expanding (lateral market)");
             return false;
         }
         
@@ -315,7 +315,7 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(3, StringFormat("Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
                               wae_direction, rsi_signal, EnumToString(m_signal_direction)));
         }
         
@@ -369,7 +369,7 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(3, StringFormat("Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
                               base_strength, quote_strength, EnumToString(m_signal_direction)));
         }
         

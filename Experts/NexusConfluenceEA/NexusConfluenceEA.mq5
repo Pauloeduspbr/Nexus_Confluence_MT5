@@ -1,5 +1,20 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.57 - FIX TIMESTAMP: iTime shift 0→1!     |
+//| Nexus Confluence EA v4.58 - FIX BUFFERS: Ler CORES não TREND!   |
+//| 🚨 v4.58: CORREÇÃO URGENTE - BUFFERS ERRADOS!                   |
+//|          (27/01/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO v4.57:                              |
+//|   ❌ EA lia buffers 0-8 (valores trend do indicador)            |
+//|   ❌ Mas indicador GG_TrendBar usa buffers 9-17 (CORES!)        |
+//|   ❌ Resultado: W1=+2, valores incorretos, sincronização errada |
+//|   ❌ User: "VOCE ESTA PEGANDO AS CORES ERRADAS !!!!!!"          |
+//|                                                                  |
+//| ✅ CORREÇÃO v4.58:                                              |
+//|   ✅ Mudou buffers: 0,2,4,6,8,10,12,14,16 → 9,10,11,12,13,14,15,16,17 |
+//|   ✅ Agora lê buffers de COR (0=Verde, 1=Vermelho, 2=Amarelo)   |
+//|   ✅ Converte cores para valores de trend (+1/-1/0)             |
+//|   ✅ W1 nunca mais será ±2!                                      |
+//|                                                                  |
 //| 🚨 v4.57: CORREÇÃO DEFINITIVA - TIMESTAMP SINCRONIZADO!         |
 //|          (27/01/2025)                                            |
 //|                                                                  |
@@ -115,10 +130,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Janeiro 2025                                               |
-//| VERSÃO: 4.57 - FIX TIMESTAMP: iTime 0→1 (sync timestamp perfeito)|
+//| VERSÃO: 4.58 - FIX BUFFERS: Ler CORES não TREND! (W1≠±2)        |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.57"
-#property version   "4.57"
+#property copyright "Nexus Confluence EA v4.58"
+#property version   "4.58"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

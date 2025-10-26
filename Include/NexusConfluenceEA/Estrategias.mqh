@@ -1,9 +1,37 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.52 - FIX CRÍTICO: EA NÃO ABRE VENDA!     |
+//| Nexus Confluence EA v4.53 - FIX CRÍTICO: VALORES ±2 INVÁLIDOS!  |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
+//| 🚨🚨🚨 v4.53: CORREÇÃO URGENTE - INDICADOR ±2 (25/10/2025)     |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO (v4.52):                            |
+//|   ❌ GG_TrendBar retornava +2/-2 (sinais fortes)               |
+//|   ❌ EA espera APENAS -1, 0, +1                                 |
+//|   ❌ Resultado: TODAS comparações quebradas!                    |
+//|   ❌ M15=-2 nunca era == -1 → setup sempre rejeitado           |
+//|                                                                  |
+//| 🔍 ANÁLISE DO PROBLEMA:                                         |
+//|   1. Indicador v2.10/v2.11 tinha lógica de intensidade:        |
+//|      if(adx_diff >= 10.0) IndVal[x] = 2; // FORTE              |
+//|      else IndVal[x] = 1; // fraco                               |
+//|                                                                  |
+//|   2. EA esperava valores simples:                               |
+//|      -1 = BEARISH, 0 = NEUTRAL, +1 = BULLISH                   |
+//|                                                                  |
+//|   3. Comparação falhava:                                        |
+//|      if(m15Value == -1) // M15 bearish?                         |
+//|      MAS m15Value = -2 (forte) → falha na comparação!          |
+//|                                                                  |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.53:                                 |
+//|   ✅ GG_TrendBar v2.12: Removido lógica de intensidade         |
+//|   ✅ Indicador retorna APENAS: -1, 0, +1                       |
+//|   ✅ -1 = BEARISH (vermelho)                                    |
+//|   ✅  0 = NEUTRAL (amarelo)                                     |
+//|   ✅ +1 = BULLISH (verde)                                       |
+//|   ✅ EA agora recebe valores corretos                           |
+//|                                                                  |
 //| 🚨🚨🚨 v4.52: CORREÇÃO URGENTE - EA NÃO ABRE VENDA (25/10/2025)|
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.50-v4.51):                      |

@@ -1,7 +1,22 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.52 - FIX CRÍTICO: EA NÃO ABRE VENDA!     |
-//| 🚨 v4.52: CORREÇÃO URGENTE - SUPERTREND REJEITAVA SELL         |
+//| Nexus Confluence EA v4.53 - FIX CRÍTICO: VALORES ±2 INVÁLIDOS!  |
+//| 🚨 v4.53: CORREÇÃO URGENTE - INDICADOR RETORNAVA ±2            |
 //|          (25/10/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO v4.52:                                           |
+//|   ❌ GG_TrendBar retornava +2/-2 (sinais fortes)               |
+//|   ❌ EA espera APENAS -1, 0, +1                                 |
+//|   ❌ Resultado: TODAS comparações quebradas!                    |
+//|   ❌ M15=-2 nunca era == -1 → setup sempre rejeitado           |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.53:                                              |
+//|   ✅ GG_TrendBar v2.12: Removido lógica de intensidade         |
+//|   ✅ Indicador retorna APENAS: -1, 0, +1                       |
+//|   ✅ -1 = BEARISH (vermelho)                                    |
+//|   ✅  0 = NEUTRAL (amarelo)                                     |
+//|   ✅ +1 = BULLISH (verde)                                       |
+//|                                                                  |
+//| 🚨 v4.52: FIX CRÍTICO - EA NÃO ABRE VENDA!                     |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO v4.51:                                           |
 //|   ❌ EA NÃO abria VENDA mesmo com todos indicadores alinhados! |
@@ -78,8 +93,8 @@
 //| DATA: Outubro 2025                                               |
 //| VERSÃO: 4.52 - FIX CRÍTICO: Supertrend SELL (Close[1] vs BID)  |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.52"
-#property version   "4.52"
+#property copyright "Nexus Confluence EA v4.53"
+#property version   "4.53"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

@@ -464,7 +464,7 @@ double ConvertColorToTrend(double colorIndex)
         case 1: return -1.0;  // Vermelho = Bearish
         case 2: return 0.0;   // Amarelo = Neutro
         default: 
-            PrintFormat("⚠️ WARNING: Cor desconhecida no GG_TrendBar: %.0f (esperado: 0=Verde, 1=Vermelho, 2=Amarelo)", colorIndex);
+            PrintFormat("WARNING: Cor desconhecida no GG_TrendBar: %.0f (esperado: 0=Verde, 1=Vermelho, 2=Amarelo)", colorIndex);
             return 0.0;
     }
 }

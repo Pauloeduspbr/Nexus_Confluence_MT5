@@ -1,10 +1,38 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.47 - CLASSIFICAÇÃO BASEADA EM INTENSIDADE |
+//| Nexus Confluence EA v4.49 - LÓGICA FINAL CORRETA                |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
-//| 🔥🔥🔥 CRÍTICO v4.47: CLASSIFICAÇÃO INTELIGENTE (25/10/2025)    |
+//| 🔥🔥🔥 v4.49: LÓGICA CORRETA DEFINITIVA (25/10/2025)           |
+//|                                                                  |
+//| 🏆 PREMIUM:                                                      |
+//|   ✅ H4 + H1 + M30 + M15 = TODOS alinhados (mesma cor)          |
+//|                                                                  |
+//| ⭐ GOOD (3 cenários válidos):                                   |
+//|   1️⃣ H4+H1+M30 alinhados, M15 NEUTRO (amarelo/0)               |
+//|   2️⃣ H4+H1+M15 alinhados, M30 NEUTRO (amarelo/0)               |
+//|   3️⃣ H4+H1 alinhados, M30+M15 ambos NEUTROS                    |
+//|                                                                  |
+//| ❌ REJECT:                                                       |
+//|   ❌ M15 OPOSTO a H4+H1 (vermelho quando H4+H1 verdes)          |
+//|   ❌ M30 OPOSTO a H4+H1                                          |
+//|   ❌ H4 e H1 divergentes entre si                                |
+//|   ✅ NEUTRO (amarelo/0) é ACEITO como GOOD                      |
+//|                                                                  |
+//| ❌ v4.48 INCORRETA (REVERTIDA):                                 |
+//|   ❌ PROBLEMA v4.47: Exigir sinais ±2 atrasava entradas!        |
+//|   ✅ CORREÇÃO v4.48: Volta para > 0 / < 0 (qualquer sinal)      |
+//|      - Não exige mais intensidade mínima                         |
+//|      - M15 deve estar alinhado (não neutro)                      |
+//|      - Classificação PREMIUM/GOOD baseada em alinhamento         |
+//|                                                                  |
+//| 🔥🔥🔥 LÓGICA RESTAURADA (v4.46):                               |
+//|   - PREMIUM: Todos TFs alinhados (H4+H1+M30+M15 mesma direção)  |
+//|   - GOOD: Principais alinhados (H4+H1+M15), M30 diverge         |
+//|   - REJECT: Qualquer TF principal divergente                    |
+//|                                                                  |
+//| ❌ v4.47 PROBLEMÁTICA (REVERTIDA):                              |
 //|   ✅ PREMIUM: Exige TODOS TFs FORTES (±2) e alinhados           |
 //|      - H4 = ±2 (FORTE)                                           |
 //|      - H1 = ±2 (FORTE)                                           |
@@ -1290,97 +1318,98 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    
    PrintFormat("   TF OPERACIONAL (%s): %+d %s",
                TimeframeToString(g_tfOperacional), operationalValue,
-               (operationalValue > 0) ? "🟢 BULLISH" : 
-               (operationalValue < 0) ? "🔴 BEARISH" : "⚪ NEUTRO");
+               (operationalValue > 0) ? "🟢 VERDE" : 
+               (operationalValue < 0) ? "🔴 VERMELHO" : "⚪ AMARELO (NEUTRO)");
    
-   // 🔥 v4.47 NOVA LÓGICA: TF operacional pode ser FRACO/NEUTRO para GOOD
-   // PREMIUM exige operacional FORTE (±2)
-   // GOOD aceita operacional FRACO (±1) ou NEUTRO (0)
+   // 🔥 v4.49 LÓGICA CORRETA:
+   // - NEUTRO (0) = ACEITO para GOOD (não rejeita!)
+   // - OPOSTO = REJEITADO (verde quando macros vermelhos, ou vice-versa)
    
-   int operationalIntensity = MathAbs(operationalValue);
-   bool operationalStrong = (operationalIntensity == 2);
-   bool operationalWeak = (operationalIntensity == 1);
-   bool operationalNeutral = (operationalIntensity == 0);
-   
-   // VALIDAÇÃO 1: TF operacional NÃO pode ser OPOSTO FORTE aos macros
    bool operationalBullish = (operationalValue > 0);
    bool operationalBearish = (operationalValue < 0);
+   bool operationalNeutral = (operationalValue == 0);
    
-   // 🔥 CRÍTICO: Rejeitar se operacional FORTE (±2) vai CONTRA os macros
-   if(operationalStrong)
+   // VALIDAÇÃO: TF operacional NÃO pode ser OPOSTO aos macros
+   // ✅ NEUTRO (amarelo) = OK para GOOD
+   // ❌ OPOSTO (verde vs vermelho) = REJEITADO
+   
+   bool operationalOpposite = (operationalBullish && macro1Bearish && macro2Bearish) ||
+                              (operationalBearish && macro1Bullish && macro2Bullish);
+   
+   if(operationalOpposite)
    {
-      if(!((operationalBullish && macro1Bullish && macro2Bullish) ||
-           (operationalBearish && macro1Bearish && macro2Bearish)))
-      {
-         PrintFormat("❌ REJEIÇÃO CRÍTICA: TF OPERACIONAL FORTE DIVERGE DOS MACROS!");
-         PrintFormat("   TF Operacional (%s): %s FORTE (±2)", 
-                     TimeframeToString(g_tfOperacional),
-                     operationalBullish ? "🟢 BULLISH" : "🔴 BEARISH");
-         PrintFormat("   MACRO-1 (%s): %s", 
-                     TimeframeToString(g_tfMacro1),
-                     macro1Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
-         PrintFormat("   MACRO-2 (%s): %s", 
-                     TimeframeToString(g_tfMacro2),
-                     macro2Bullish ? "🟢 BULLISH" : "🔴 BEARISH");
-         PrintFormat("   ⚠️ REGRA: TF operacional FORTE não pode divergir dos macros!");
-         PrintFormat("════════════════════════════════════════════════════════════════");
-         return result;
-      }
+      PrintFormat("❌ REJEIÇÃO CRÍTICA: TF OPERACIONAL OPOSTO AOS MACROS!");
+      PrintFormat("   TF Operacional (%s): %s", 
+                  TimeframeToString(g_tfOperacional),
+                  operationalBullish ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   MACRO-1 (%s): %s", 
+                  TimeframeToString(g_tfMacro1),
+                  macro1Bullish ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   MACRO-2 (%s): %s", 
+                  TimeframeToString(g_tfMacro2),
+                  macro2Bullish ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   ⚠️ REGRA v4.49: M15 OPOSTO é REJEITADO (M15 NEUTRO é ACEITO como GOOD)");
+      PrintFormat("════════════════════════════════════════════════════════════════");
+      return result;
    }
    
    // ✅ TF OPERACIONAL VALIDADO!
-   // Forte e alinhado = perfeito para PREMIUM
-   // Fraco/Neutro = aceitável para GOOD (macros decidem)
-   result.operationalAligned = operationalStrong && 
-                               ((operationalBullish && macro1Bullish && macro2Bullish) ||
+   // - Alinhado (mesma cor) = PREMIUM
+   // - Neutro (amarelo) = GOOD
+   result.operationalAligned = ((operationalBullish && macro1Bullish && macro2Bullish) ||
                                 (operationalBearish && macro1Bearish && macro2Bearish));
    
    if(result.operationalAligned)
    {
-      PrintFormat("✅✅✅ TF OPERACIONAL FORTE E ALINHADO!");
-      PrintFormat("   TF Operacional (%s): %s FORTE (±2)",
+      PrintFormat("✅✅✅ TF OPERACIONAL ALINHADO COM MACROS!");
+      PrintFormat("   TF Operacional (%s): %s alinhado com MACRO-1 e MACRO-2",
                   TimeframeToString(g_tfOperacional),
-                  operationalBullish ? "🟢 BULLISH" : "🔴 BEARISH");
-      PrintFormat("   🏆 Qualifica para PREMIUM se outros filtros alinharem");
+                  operationalBullish ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   🏆 Qualifica para PREMIUM se M30 também alinhado");
    }
-   else if(operationalWeak || operationalNeutral)
+   else if(operationalNeutral)
    {
-      PrintFormat("⭐ TF OPERACIONAL FRACO/NEUTRO - ACEITÁVEL PARA GOOD");
-      PrintFormat("   TF Operacional (%s): %+d (%s)",
-                  TimeframeToString(g_tfOperacional), operationalValue,
-                  operationalWeak ? "FRACO ±1" : "NEUTRO 0");
-      PrintFormat("   ⚠️ Macros FORTES (H4+H1+M30) devem estar alinhados para aceitar");
+      PrintFormat("⭐ TF OPERACIONAL NEUTRO - ACEITO PARA GOOD!");
+      PrintFormat("   TF Operacional (%s): ⚪ AMARELO (neutro)",
+                  TimeframeToString(g_tfOperacional));
       PrintFormat("   ⭐ Qualifica para GOOD (não PREMIUM)");
    }
+   PrintFormat("   TF Operacional (%s): %s alinhado com MACRO-1 e MACRO-2",
+               TimeframeToString(g_tfOperacional),
+               operationalBullish ? "🟢 BULLISH" : "🔴 BEARISH");
    PrintFormat("────────────────────────────────────────────────────────────────");
    
-   // VALIDAÇÃO 3: MACRO-3 (se aplicável) - BÔNUS para PREMIUM
+   // VALIDAÇÃO 3: MACRO-3 (M30 - se aplicável) - BÔNUS para PREMIUM
    if(g_numNiveisMacro == 3)
    {
-      // 🔥 v4.23 CORREÇÃO CRÍTICA: M30 divergente NÃO deve rejeitar, apenas impede PREMIUM
-      int expectedValue = (result.direction == TRADE_DIRECTION_BUY) ? 1 : -1;
-
-      if(macro3Value == expectedValue)  // MACRO-3 alinha com direção do trade
+      // 🔥 v4.49 LÓGICA CORRETA:
+      // - M30 alinhado = PREMIUM
+      // - M30 neutro (amarelo/0) = GOOD
+      // - M30 oposto = GOOD (não rejeita!)
+      
+      bool macro3Bullish = (macro3Value > 0);
+      bool macro3Bearish = (macro3Value < 0);
+      bool macro3Neutral = (macro3Value == 0);
+      
+      // M30 alinhado com direção dos macros
+      if((macro3Bullish && macro1Bullish && macro2Bullish) ||
+         (macro3Bearish && macro1Bearish && macro2Bearish))
       {
          result.m30Aligned = true;
          PrintFormat("🏆 ALINHAMENTO PREMIUM: MACRO-1 + MACRO-2 + MACRO-3 = %s",
-                     (result.direction == TRADE_DIRECTION_BUY) ? "BULLISH" : "BEARISH");
+                     macro3Bullish ? "🟢 VERDE" : "🔴 VERMELHO");
       }
-      else if(macro3Value == -expectedValue)  // MACRO-3 oposto à direção
+      else if(macro3Neutral)
       {
          result.m30Aligned = false;
-
-         // 🔥 v4.23: M30 OPOSTO = SETUP GOOD (NÃO REJEITAR!)
-         // BUG v4.21: Rejeitava se AllowGoodSetups=false mesmo com H4+H1 válidos
-         // CORREÇÃO: M30 só define PREMIUM vs GOOD, não válido vs inválido
+         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 ⚪ AMARELO (neutro)");
+         PrintFormat("   ✅ M30 NEUTRO é ACEITO como GOOD");
+      }
+      else  // M30 oposto
+      {
+         result.m30Aligned = false;
          PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 oposto");
          PrintFormat("   ⚠️ MACRO-3 divergente - será classificado como GOOD (não PREMIUM)");
-         // NÃO retornar aqui! Continuar validação (será GOOD se 2/3 filtros)
-      }
-      else  // Neutro (macro3Value == 0)
-      {
-         result.m30Aligned = false;
-         PrintFormat("⭐ ALINHAMENTO GOOD: MACRO-1+MACRO-2 alinhados, MACRO-3 neutro");
       }
    }
    else
@@ -1390,84 +1419,64 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
       PrintFormat("⭐ ALINHAMENTO GOOD: Sistema 2 níveis (MACRO-1 + MACRO-2)");
    }
    
-   // 🔥🔥🔥 v4.47 CLASSIFICAÇÃO COM INTENSIDADE DE SINAL 🔥🔥🔥
-   // NOVA LÓGICA BASEADA EM INTENSIDADE:
-   //   - PREMIUM: TODOS os TFs FORTES (±2) e alinhados
-   //   - GOOD: Macros FORTES (±2) alinhados, operacional FRACO/NEUTRO aceitável
-   //   - REJECT: Qualquer macro fraco ou divergente
+   // 🔥🔥🔥 v4.49 CLASSIFICAÇÃO CORRETA DEFINITIVA 🔥🔥🔥
+   // LÓGICA BASEADA NO ESPECIFICADO PELO USUÁRIO:
+   //   - PREMIUM: TODOS alinhados (H4+H1+M30+M15 mesma cor)
+   //   - GOOD: H4+H1 alinhados, M30 ou M15 podem ser NEUTROS (nunca opostos)
+   //   - REJECT: Qualquer TF OPOSTO (não apenas divergente)
    
    PrintFormat("────────────────────────────────────────────────────────────────");
-   PrintFormat("🎯 [CLASSIFICAÇÃO GG TRENDBAR v4.47 - BASEADA EM INTENSIDADE]");
+   PrintFormat("🎯 [CLASSIFICAÇÃO GG TRENDBAR v4.49 - LÓGICA CORRETA]");
    
-   // Verificar intensidade dos MACROS
-   int macro1Intensity = MathAbs(macro1Value);
-   int macro2Intensity = MathAbs(macro2Value);
-   int macro3Intensity = (g_numNiveisMacro == 3) ? MathAbs(macro3Value) : 2; // Assume forte se não existe
+   bool allAligned = (result.h4Aligned && result.h1Aligned && 
+                      result.operationalAligned && 
+                      (g_numNiveisMacro < 3 || result.m30Aligned));
    
-   bool macro1Strong = (macro1Intensity == 2);
-   bool macro2Strong = (macro2Intensity == 2);
-   bool macro3Strong = (macro3Intensity == 2);
-   
-   // CRITÉRIO 1: Macros devem ser FORTES (±2)
-   if(!macro1Strong || !macro2Strong)
-   {
-      result.classification = SETUP_REJECT;
-      PrintFormat("❌ CLASSIFICAÇÃO: REJECT");
-      PrintFormat("   Motivo: Macros principais não são FORTES o suficiente");
-      PrintFormat("   - MACRO-1 (%s): %s (%+d)", TimeframeToString(g_tfMacro1),
-                  macro1Strong ? "✅ FORTE" : "❌ FRACO", macro1Value);
-      PrintFormat("   - MACRO-2 (%s): %s (%+d)", TimeframeToString(g_tfMacro2),
-                  macro2Strong ? "✅ FORTE" : "❌ FRACO", macro2Value);
-      PrintFormat("   🎯 EXIGÊNCIA v4.47: H4 e H1 devem ser ±2 (sinais fortes)");
-      return result;
-   }
-   
-   // CRITÉRIO 2: PREMIUM = Todos FORTES e alinhados
-   bool allStrongAndAligned = (macro1Strong && macro2Strong && macro3Strong && 
-                               result.h4Aligned && result.h1Aligned && 
-                               result.operationalAligned && 
-                               (g_numNiveisMacro < 3 || result.m30Aligned));
-   
-   if(allStrongAndAligned)
+   if(allAligned)
    {
       result.classification = SETUP_PREMIUM;
       PrintFormat("🏆 CLASSIFICAÇÃO: PREMIUM");
-      PrintFormat("   Motivo: TODOS os timeframes FORTES (±2) e alinhados");
-      PrintFormat("   - MACRO-1 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro1), macro1Value);
-      PrintFormat("   - MACRO-2 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro2), macro2Value);
+      PrintFormat("   Motivo: TODOS os timeframes alinhados (mesma cor)");
+      PrintFormat("   - MACRO-1 (%s): ✅ %s", TimeframeToString(g_tfMacro1),
+                  (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   - MACRO-2 (%s): ✅ %s", TimeframeToString(g_tfMacro2),
+                  (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
       if(g_numNiveisMacro == 3)
       {
-         PrintFormat("   - MACRO-3 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro3), macro3Value);
+         PrintFormat("   - MACRO-3 (%s): ✅ %s", TimeframeToString(g_tfMacro3),
+                     (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
       }
-      PrintFormat("   - OPERACIONAL (%s): ✅ FORTE %+d", TimeframeToString(g_tfOperacional), operationalValue);
+      PrintFormat("   - OPERACIONAL (%s): ✅ %s", TimeframeToString(g_tfOperacional),
+                  (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
       PrintFormat("   🎯 Risco recomendado: MaxRiskPremium (até 2%%)");
    }
-   // CRITÉRIO 3: GOOD = Macros FORTES alinhados, operacional pode ser FRACO/NEUTRO
-   else if(macro1Strong && macro2Strong && result.h4Aligned && result.h1Aligned)
+   else if(result.h4Aligned && result.h1Aligned)
    {
+      // H4+H1 alinhados = pode ser GOOD
+      // M30 e/ou M15 podem ser NEUTROS (já validado que não são OPOSTOS)
       result.classification = SETUP_GOOD;
       PrintFormat("⭐ CLASSIFICAÇÃO: GOOD");
-      PrintFormat("   Motivo: Macros principais FORTES (±2) alinhados");
-      PrintFormat("   - MACRO-1 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro1), macro1Value);
-      PrintFormat("   - MACRO-2 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro2), macro2Value);
+      PrintFormat("   Motivo: H4+H1 alinhados, M30 ou M15 NEUTRO/divergente (não oposto)");
+      PrintFormat("   - MACRO-1 (%s): ✅ %s", TimeframeToString(g_tfMacro1),
+                  (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
+      PrintFormat("   - MACRO-2 (%s): ✅ %s", TimeframeToString(g_tfMacro2),
+                  (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
       
       if(g_numNiveisMacro == 3)
       {
-         if(macro3Strong && result.m30Aligned)
-            PrintFormat("   - MACRO-3 (%s): ✅ FORTE %+d", TimeframeToString(g_tfMacro3), macro3Value);
+         if(result.m30Aligned)
+            PrintFormat("   - MACRO-3 (%s): ✅ %s", TimeframeToString(g_tfMacro3),
+                       (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
          else
-            PrintFormat("   - MACRO-3 (%s): ⚠️ %s %+d", TimeframeToString(g_tfMacro3),
-                       macro3Strong ? "FORTE mas divergente" : "FRACO/NEUTRO", macro3Value);
+            PrintFormat("   - MACRO-3 (%s): ⚠️ ⚪ AMARELO ou divergente", TimeframeToString(g_tfMacro3));
       }
       
-      if(operationalStrong && result.operationalAligned)
-         PrintFormat("   - OPERACIONAL (%s): ✅ FORTE %+d", TimeframeToString(g_tfOperacional), operationalValue);
-      else if(operationalWeak)
-         PrintFormat("   - OPERACIONAL (%s): ⚠️ FRACO %+d (ACEITÁVEL PARA GOOD)", 
-                    TimeframeToString(g_tfOperacional), operationalValue);
+      if(result.operationalAligned)
+         PrintFormat("   - OPERACIONAL (%s): ✅ %s", TimeframeToString(g_tfOperacional),
+                    (result.direction == TRADE_DIRECTION_BUY) ? "🟢 VERDE" : "🔴 VERMELHO");
       else
-         PrintFormat("   - OPERACIONAL (%s): ⚠️ NEUTRO %+d (ACEITÁVEL PARA GOOD)", 
-                    TimeframeToString(g_tfOperacional), operationalValue);
+         PrintFormat("   - OPERACIONAL (%s): ⚠️ ⚪ AMARELO (neutro - ACEITO)", 
+                    TimeframeToString(g_tfOperacional));
       
       PrintFormat("   🎯 Risco recomendado: AccountRiskPercent (até 1.5%%)");
    }
@@ -1475,7 +1484,7 @@ MultiTFResult AnalyzeMultiTimeframeAlignment()
    {
       result.classification = SETUP_REJECT;
       PrintFormat("❌ CLASSIFICAÇÃO: REJECT");
-      PrintFormat("   Motivo: Alinhamento insuficiente entre timeframes");
+      PrintFormat("   Motivo: H4 ou H1 não alinhados (ou TF oposto detectado)");
       PrintFormat("   (Este ponto nunca deveria ser alcançado - validações anteriores rejeitam)");
       return result;
    }

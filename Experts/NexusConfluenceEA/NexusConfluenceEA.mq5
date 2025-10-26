@@ -1,20 +1,38 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.47 - CLASSIFICAÇÃO INTELIGENTE           |
-//| 🔥 v4.47: ACEITA M15 FRACO/NEUTRO PARA SETUPS GOOD             |
+//| Nexus Confluence EA v4.49 - LÓGICA CORRETA DEFINITIVA           |
+//| 🎯 v4.49: LÓGICA FINAL ESPECIFICADA PELO USUÁRIO               |
 //|          (25/10/2025)                                            |
 //|                                                                  |
-//| 🎯 NOVO v4.47: LÓGICA BASEADA EM INTENSIDADE DE SINAL          |
-//|   ✅ PREMIUM: Exige TODOS TFs FORTES (±2) e alinhados          |
-//|      - H4 = ±2, H1 = ±2, M30 = ±2, M15 = ±2                   |
+//| 🏆 PREMIUM: H4+H1+M30+M15 TODOS ALINHADOS (mesma cor)           |
+//|   ✅ H4 VERDE + H1 VERDE + M30 VERDE + M15 VERDE = BUY          |
+//|   ✅ H4 VERMELHO + H1 VERMELHO + M30 VERMELHO + M15 VERMELHO = SELL |
 //|                                                                  |
-//|   ✅ GOOD: Macros FORTES (±2), M15 pode ser FRACO/NEUTRO       |
-//|      - H4 = ±2, H1 = ±2 (OBRIGATÓRIO)                          |
-//|      - M15 = ±1 ou 0 (ACEITA FRACO/NEUTRO!)                    |
-//|      - Bloqueia M15 = ±2 OPOSTO aos macros                     |
+//| ⭐ GOOD (3 cenários):                                           |
+//|   1️⃣ H4+H1+M30 alinhados, M15 AMARELO (neutro)                 |
+//|   2️⃣ H4+H1+M15 alinhados, M30 AMARELO (neutro)                 |
+//|   3️⃣ H4+H1 alinhados, M30 divergente (não oposto)              |
 //|                                                                  |
-//|   ❌ REJECT: H4 ou H1 fracos (±1)                              |
+//| ❌ REJECT:                                                       |
+//|   ❌ M15 OPOSTO a H4+H1 (vermelho vs verde ou vice-versa)       |
+//|   ❌ M30 OPOSTO a H4+H1                                          |
+//|   ❌ H4 e H1 divergentes                                         |
+//|   ✅ AMARELO (neutro/0) é ACEITO como GOOD                      |
+//|                                                                  |
+//| 🔥 v4.46: GG TRENDBAR v2.10 mantém intensidade (análise)       |
+//|   - H4/H1 deviam ser ±2 (FORTE) para aceitar trade              |
+//|   - Muitos setups válidos rejeitados                            |
+//|   - Delay nas entradas (esperando intensidade)                  |
+//|                                                                  |
+//| ✅ CORREÇÃO v4.48: Volta para lógica v4.46                      |
+//|   - Aceita qualquer sinal > 0 (bullish) ou < 0 (bearish)       |
+//|   - Não exige intensidade mínima                                |
+//|   - M15 deve estar alinhado (não neutro)                        |
+//|   - PREMIUM: Todos TFs alinhados                                |
+//|   - GOOD: H4+H1+M15 alinhados, M30 diverge                      |
 //|                                                                  |
 //| 🔥 v4.46: GG TRENDBAR v2.10 COM INTENSIDADE +2/-2              |
+//|   - Indicador mantém intensidade (útil para análise)           |
+//|   - EA não usa intensidade para filtrar (usa apenas direção)   |
 //|   ✅ GG TrendBar v2.10 agora retorna:                           |
 //|      +2 = Bullish FORTE (PADX-NADX >= 10)                      |
 //|      +1 = Bullish fraco (PADX > NADX, diferença < 10)         |
@@ -58,10 +76,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.47 - CLASSIFICAÇÃO INTELIGENTE (M15 flexível)        |
+//| VERSÃO: 4.49 - LÓGICA CORRETA (neutro aceito, oposto rejeitado)|
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.47"
-#property version   "4.47"
+#property copyright "Nexus Confluence EA v4.49"
+#property version   "4.49"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

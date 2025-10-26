@@ -1,85 +1,56 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.49 - LÓGICA CORRETA DEFINITIVA           |
-//| 🎯 v4.49: LÓGICA FINAL ESPECIFICADA PELO USUÁRIO               |
-//|          (25/10/2025)                                            |
+//| Nexus Confluence EA v4.50 - FILTROS SINCRONIZADOS CORRIGIDOS    |
+//| 🎯 v4.50: CORREÇÕES CRÍTICAS NOS FILTROS (25/10/2025)          |
+//|                                                                  |
+//| ✅ CORRIGIDO: GetSupertrendSignal()                             |
+//|   - BUY: Linha azul ativa + PREÇO ACIMA da linha azul          |
+//|   - SELL: Linha vermelha ativa + PREÇO ABAIXO da linha vermelha|
+//|   - Problema v4.49: Não verificava posição do preço             |
+//|                                                                  |
+//| ✅ CORRIGIDO: GetCurrencyStrengthSignal()                       |
+//|   - BUY: Linha verde > vermelha + linha verde > 0              |
+//|   - SELL: Linha vermelha > verde + linha vermelha > 0          |
+//|   - Problema v4.49: Não verificava se estava acima de 0        |
 //|                                                                  |
 //| 🏆 PREMIUM: H4+H1+M30+M15 TODOS ALINHADOS (mesma cor)           |
 //|   ✅ H4 VERDE + H1 VERDE + M30 VERDE + M15 VERDE = BUY          |
 //|   ✅ H4 VERMELHO + H1 VERMELHO + M30 VERMELHO + M15 VERMELHO = SELL |
 //|                                                                  |
-//| ⭐ GOOD (3 cenários):                                           |
-//|   1️⃣ H4+H1+M30 alinhados, M15 AMARELO (neutro)                 |
-//|   2️⃣ H4+H1+M15 alinhados, M30 AMARELO (neutro)                 |
-//|   3️⃣ H4+H1 alinhados, M30 divergente (não oposto)              |
+//| ⭐ GOOD (3 cenários válidos):                                   |
+//|   1️⃣ H4+H1+M30 alinhados, M15 NEUTRO (amarelo/0)               |
+//|   2️⃣ H4+H1+M15 alinhados, M30 NEUTRO (amarelo/0)               |
+//|   3️⃣ H4+H1 alinhados, M30+M15 ambos NEUTROS ou divergentes     |
 //|                                                                  |
 //| ❌ REJECT:                                                       |
 //|   ❌ M15 OPOSTO a H4+H1 (vermelho vs verde ou vice-versa)       |
 //|   ❌ M30 OPOSTO a H4+H1                                          |
-//|   ❌ H4 e H1 divergentes                                         |
+//|   ❌ H4 e H1 divergentes entre si                                |
 //|   ✅ AMARELO (neutro/0) é ACEITO como GOOD                      |
 //|                                                                  |
-//| 🔥 v4.46: GG TRENDBAR v2.10 mantém intensidade (análise)       |
-//|   - H4/H1 deviam ser ±2 (FORTE) para aceitar trade              |
-//|   - Muitos setups válidos rejeitados                            |
-//|   - Delay nas entradas (esperando intensidade)                  |
+//| � FILTROS - BUY:                                               |
+//|   1. Supertrend: LINHA AZUL + CANDLE ACIMA DA LINHA AZUL       |
+//|   2. WAE: HISTOGRAMA VERDE                                      |
+//|   3. WAE: BARRA VERDE ACIMA DA LINHA AMARELA                    |
+//|   4. RSI OMA: LINHA VERMELHA ACIMA DA LINHA AZUL               |
+//|   5. Currency: LINHA VERDE ACIMA DA VERMELHA                    |
+//|   6. Currency: LINHA VERDE ACIMA DO NÍVEL 0                     |
 //|                                                                  |
-//| ✅ CORREÇÃO v4.48: Volta para lógica v4.46                      |
-//|   - Aceita qualquer sinal > 0 (bullish) ou < 0 (bearish)       |
-//|   - Não exige intensidade mínima                                |
-//|   - M15 deve estar alinhado (não neutro)                        |
-//|   - PREMIUM: Todos TFs alinhados                                |
-//|   - GOOD: H4+H1+M15 alinhados, M30 diverge                      |
+//| 📊 FILTROS - SELL:                                              |
+//|   1. Supertrend: LINHA VERMELHA + CANDLE ABAIXO DA LINHA       |
+//|   2. WAE: HISTOGRAMA VERMELHO                                   |
+//|   3. WAE: BARRA VERMELHO ACIMA DA LINHA AMARELA                 |
+//|   4. RSI OMA: LINHA VERMELHA ABAIXO DA LINHA AZUL              |
+//|   5. Currency: LINHA VERMELHA ACIMA DA AZUL                     |
+//|   6. Currency: LINHA VERMELHA ACIMA DO NÍVEL 0                  |
 //|                                                                  |
-//| 🔥 v4.46: GG TRENDBAR v2.10 COM INTENSIDADE +2/-2              |
-//|   - Indicador mantém intensidade (útil para análise)           |
-//|   - EA não usa intensidade para filtrar (usa apenas direção)   |
-//|   ✅ GG TrendBar v2.10 agora retorna:                           |
-//|      +2 = Bullish FORTE (PADX-NADX >= 10)                      |
-//|      +1 = Bullish fraco (PADX > NADX, diferença < 10)         |
-//|       0 = Neutro (amarelo)                                      |
-//|      -1 = Bearish fraco (NADX > PADX, diferença < 10)         |
-//|      -2 = Bearish FORTE (NADX-PADX >= 10)                      |
-//|                                                                  |
-//|   ✅ EA v4.45 já compatível (usa > 0 e < 0)                    |
-//|   ✅ Logs mostram intensidade (FORTE vs fraco)                 |
-//|                                                                  |
-//| 🔥 v4.45: CORREÇÃO BUG DETECÇÃO SINAIS                         |
-//|   ❌ BUG: Comparava == 1, ignorava +2 (verde forte)            |
-//|   ✅ FIX: Mudado para > 0 (bullish) e < 0 (bearish)            |
-//|                                                                  |
-//| 🔥 v4.44: CORREÇÃO BUG VALIDAÇÃO TF OPERACIONAL                |
-//|   - EA NUNCA validava timeframe operacional (M15, M30, H1)!    |
-//|   - RESULTADO: Abria BUY com H4+H1 GREEN mas M15 RED ❌        |
-//|   - Violava ABSOLUTAMENTE o Sistema Universal                   |
-//|   - ~40% dos trades eram contra o TF operacional!              |
-//|                                                                  |
-//| ✅ CORREÇÃO IMPLEMENTADA:                                        |
-//|   1. VALIDAÇÃO TF OPERACIONAL OBRIGATÓRIA                       |
-//|      - Adicionado em AnalyzeMultiTimeframeAlignment()           |
-//|      - TF operacional DEVE estar alinhado com MACRO-1+MACRO-2   |
-//|      - Se divergir: REJEITA IMEDIATAMENTE ❌                    |
-//|                                                                  |
-//|   2. CLASSIFICAÇÃO PREMIUM/GOOD CORRIGIDA                       |
-//|      - PREMIUM: TODOS TFs alinhados (incluindo operacional)     |
-//|      - GOOD: Principais alinhados, MACRO-3 pode divergir        |
-//|                                                                  |
-//|   3. CALCULATESETUPSCORE() REFATORADO                           |
-//|      - Recebe mtf.classification (não mais mtf.m30Aligned)      |
-//|      - Filtros apenas CONFIRMAM ou REJEITAM                     |
-//|                                                                  |
-//| ✅ IMPACTO ESPERADO (ENORME):                                    |
-//|   - Win Rate: +8-13% (elimina trades contra operacional)       |
-//|   - Drawdown: -40% (de -91% para -50%)                         |
-//|   - Sharpe Ratio: +45-71% (de 0.38 para 0.55-0.65)            |
-//|   - Número de trades: -60% (muito mais seletivo)               |
-//|   - Trades errados: -87% (de ~40% para ~5%)                    |
+//| 🔥 v4.49: LÓGICA CORRETA DEFINITIVA (25/10/2025)               |
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.49 - LÓGICA CORRETA (neutro aceito, oposto rejeitado)|
+//| VERSÃO: 4.50 - FILTROS SINCRONIZADOS (Supertrend + CS corrigidos)|
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.49"
-#property version   "4.49"
+#property copyright "Nexus Confluence EA v4.50"
+#property version   "4.50"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

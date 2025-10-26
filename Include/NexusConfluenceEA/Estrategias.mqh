@@ -1,13 +1,24 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.49 - LÓGICA FINAL CORRETA                |
+//| Nexus Confluence EA v4.50 - FILTROS SINCRONIZADOS               |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
-//| 🔥🔥🔥 v4.49: LÓGICA CORRETA DEFINITIVA (25/10/2025)           |
+//| 🔥🔥🔥 v4.50: CORREÇÕES CRÍTICAS NOS FILTROS (25/10/2025)      |
 //|                                                                  |
-//| 🏆 PREMIUM:                                                      |
-//|   ✅ H4 + H1 + M30 + M15 = TODOS alinhados (mesma cor)          |
+//| ✅ CORRIGIDO: GetSupertrendSignal()                             |
+//|   - BUY: Linha azul ativa + PREÇO ACIMA da linha azul          |
+//|   - SELL: Linha vermelha ativa + PREÇO ABAIXO da linha vermelha|
+//|   - Problema v4.49: Não verificava posição do preço             |
+//|                                                                  |
+//| ✅ CORRIGIDO: GetCurrencyStrengthSignal()                       |
+//|   - BUY: Linha verde > vermelha + linha verde > 0              |
+//|   - SELL: Linha vermelha > verde + linha vermelha > 0          |
+//|   - Problema v4.49: Não verificava se estava acima de 0        |
+//|                                                                  |
+//| 🏆 PREMIUM: H4+H1+M30+M15 TODOS ALINHADOS (mesma cor)           |
+//|   ✅ H4 VERDE + H1 VERDE + M30 VERDE + M15 VERDE = BUY          |
+//|   ✅ H4 VERMELHO + H1 VERMELHO + M30 VERMELHO + M15 VERMELHO = SELL |
 //|                                                                  |
 //| ⭐ GOOD (3 cenários válidos):                                   |
 //|   1️⃣ H4+H1+M30 alinhados, M15 NEUTRO (amarelo/0)               |
@@ -19,6 +30,22 @@
 //|   ❌ M30 OPOSTO a H4+H1                                          |
 //|   ❌ H4 e H1 divergentes entre si                                |
 //|   ✅ NEUTRO (amarelo/0) é ACEITO como GOOD                      |
+//|                                                                  |
+//| 📊 FILTROS - BUY:                                               |
+//|   1. Supertrend: LINHA AZUL + PREÇO ACIMA DA LINHA AZUL        |
+//|   2. WAE: HISTOGRAMA VERDE                                      |
+//|   3. WAE: BARRA VERDE ACIMA DA LINHA AMARELA                    |
+//|   4. RSI OMA: LINHA VERMELHA ACIMA DA LINHA AZUL               |
+//|   5. Currency: LINHA VERDE ACIMA DA VERMELHA                    |
+//|   6. Currency: LINHA VERDE ACIMA DO NÍVEL 0                     |
+//|                                                                  |
+//| 📊 FILTROS - SELL:                                              |
+//|   1. Supertrend: LINHA VERMELHA + PREÇO ABAIXO DA LINHA        |
+//|   2. WAE: HISTOGRAMA VERMELHO                                   |
+//|   3. WAE: BARRA VERMELHO ACIMA DA LINHA AMARELA                 |
+//|   4. RSI OMA: LINHA VERMELHA ABAIXO DA LINHA AZUL              |
+//|   5. Currency: LINHA VERMELHA ACIMA DA AZUL                     |
+//|   6. Currency: LINHA VERMELHA ACIMA DO NÍVEL 0                  |
 //|                                                                  |
 //| ❌ v4.48 INCORRETA (REVERTIDA):                                 |
 //|   ❌ PROBLEMA v4.47: Exigir sinais ±2 atrasava entradas!        |
@@ -684,20 +711,53 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
       result.turnedRecently = true;
    }
    
+   // 🔥 v4.50 FIX: Verificar posição do preço em relação à linha Supertrend
+   // BUY: Linha azul ativa + PREÇO ACIMA da linha azul
+   // SELL: Linha vermelha ativa + PREÇO ABAIXO da linha vermelha
+   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   
    // Definir direção usando candle FECHADO [1]
    if(currentBullish && !currentBearish)
    {
-      result.direction = TRADE_DIRECTION_BUY;
-      result.strength = bufferUp[1];  // 🔥 v4.27: Usar candle FECHADO [1]
-      result.isValid = true;
-      PrintFormat("   ✅ %s = BULLISH (BUY)", TimeframeToString(timeframe));
+      // 🔥 v4.50: BUY apenas se PREÇO ACIMA da linha azul
+      bool priceAboveLine = (currentPrice > bufferUp[1]);
+      
+      if(priceAboveLine)
+      {
+         result.direction = TRADE_DIRECTION_BUY;
+         result.strength = bufferUp[1];
+         result.isValid = true;
+         PrintFormat("   ✅ %s = BULLISH (BUY) - Preço %.5f ACIMA linha %.5f", 
+                     TimeframeToString(timeframe), currentPrice, bufferUp[1]);
+      }
+      else
+      {
+         result.direction = TRADE_DIRECTION_NONE;
+         result.isValid = false;
+         PrintFormat("   ❌ %s = Linha azul ativa MAS preço %.5f NÃO está acima da linha %.5f", 
+                     TimeframeToString(timeframe), currentPrice, bufferUp[1]);
+      }
    }
    else if(currentBearish && !currentBullish)
    {
-      result.direction = TRADE_DIRECTION_SELL;
-      result.strength = bufferDown[1];  // 🔥 v4.27: Usar candle FECHADO [1]
-      result.isValid = true;
-      PrintFormat("   ✅ %s = BEARISH (SELL)", TimeframeToString(timeframe));
+      // 🔥 v4.50: SELL apenas se PREÇO ABAIXO da linha vermelha
+      bool priceBelowLine = (currentPrice < bufferDown[1]);
+      
+      if(priceBelowLine)
+      {
+         result.direction = TRADE_DIRECTION_SELL;
+         result.strength = bufferDown[1];
+         result.isValid = true;
+         PrintFormat("   ✅ %s = BEARISH (SELL) - Preço %.5f ABAIXO linha %.5f", 
+                     TimeframeToString(timeframe), currentPrice, bufferDown[1]);
+      }
+      else
+      {
+         result.direction = TRADE_DIRECTION_NONE;
+         result.isValid = false;
+         PrintFormat("   ❌ %s = Linha vermelha ativa MAS preço %.5f NÃO está abaixo da linha %.5f", 
+                     TimeframeToString(timeframe), currentPrice, bufferDown[1]);
+      }
    }
    else if(currentBullish && currentBearish)
    {
@@ -770,13 +830,25 @@ CSSignal GetCurrencyStrengthSignal(string symbol, TRADE_DIRECTION direction, ASS
    {
       if(direction == TRADE_DIRECTION_BUY)
       {
-         // Para compra: moeda base deve ser mais forte
-         result.isAligned = (baseStrength[0] > quoteStrength[0]);
+         // 🔥 v4.50 FIX: Para compra - moeda base > moeda cotação E base > 0
+         result.isAligned = (baseStrength[0] > quoteStrength[0]) && (baseStrength[0] > 0.0);
+         
+         PrintFormat("   🔍 Currency Strength BUY: Base=%.2f Quote=%.2f | Base>Quote=%s | Base>0=%s | ALIGNED=%s",
+                     baseStrength[0], quoteStrength[0],
+                     (baseStrength[0] > quoteStrength[0]) ? "YES" : "NO",
+                     (baseStrength[0] > 0.0) ? "YES" : "NO",
+                     result.isAligned ? "YES" : "NO");
       }
       else if(direction == TRADE_DIRECTION_SELL)
       {
-         // Para venda: moeda cotação deve ser mais forte
-         result.isAligned = (quoteStrength[0] > baseStrength[0]);
+         // 🔥 v4.50 FIX: Para venda - moeda cotação > moeda base E cotação > 0
+         result.isAligned = (quoteStrength[0] > baseStrength[0]) && (quoteStrength[0] > 0.0);
+         
+         PrintFormat("   🔍 Currency Strength SELL: Base=%.2f Quote=%.2f | Quote>Base=%s | Quote>0=%s | ALIGNED=%s",
+                     baseStrength[0], quoteStrength[0],
+                     (quoteStrength[0] > baseStrength[0]) ? "YES" : "NO",
+                     (quoteStrength[0] > 0.0) ? "YES" : "NO",
+                     result.isAligned ? "YES" : "NO");
       }
    }
    else
@@ -785,13 +857,25 @@ CSSignal GetCurrencyStrengthSignal(string symbol, TRADE_DIRECTION direction, ASS
       // Ouro sobe quando USD fraco
       if(direction == TRADE_DIRECTION_BUY)
       {
-         // Para compra de ouro: USD (quote) deve estar fraco
-         result.isAligned = (quoteStrength[0] < baseStrength[0]);
+         // 🔥 v4.50 FIX: Para compra de ouro - USD (quote) fraco E base (XAU) > 0
+         result.isAligned = (quoteStrength[0] < baseStrength[0]) && (baseStrength[0] > 0.0);
+         
+         PrintFormat("   🔍 Currency Strength METALS BUY: Base(XAU)=%.2f Quote(USD)=%.2f | Base>Quote=%s | Base>0=%s | ALIGNED=%s",
+                     baseStrength[0], quoteStrength[0],
+                     (baseStrength[0] > quoteStrength[0]) ? "YES" : "NO",
+                     (baseStrength[0] > 0.0) ? "YES" : "NO",
+                     result.isAligned ? "YES" : "NO");
       }
       else if(direction == TRADE_DIRECTION_SELL)
       {
-         // Para venda de ouro: USD (quote) deve estar forte
-         result.isAligned = (quoteStrength[0] > baseStrength[0]);
+         // 🔥 v4.50 FIX: Para venda de ouro - USD (quote) forte E cotação > 0
+         result.isAligned = (quoteStrength[0] > baseStrength[0]) && (quoteStrength[0] > 0.0);
+         
+         PrintFormat("   🔍 Currency Strength METALS SELL: Base(XAU)=%.2f Quote(USD)=%.2f | Quote>Base=%s | Quote>0=%s | ALIGNED=%s",
+                     baseStrength[0], quoteStrength[0],
+                     (quoteStrength[0] > baseStrength[0]) ? "YES" : "NO",
+                     (quoteStrength[0] > 0.0) ? "YES" : "NO",
+                     result.isAligned ? "YES" : "NO");
       }
    }
    

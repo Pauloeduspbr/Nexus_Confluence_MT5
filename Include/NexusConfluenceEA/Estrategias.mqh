@@ -349,24 +349,25 @@ struct BufferCache {
 BufferCache g_bufferCache;
 
 // 🔥 Arrays temporários GLOBAIS para UpdateBufferCache (workaround compilador MQL5)
-double g_temp_wae_up[3];
-double g_temp_wae_down[3];
-double g_temp_wae_exp[1];
-double g_temp_rsi_red[3];
-double g_temp_rsi_blue[3];
-double g_temp_cs_base[1];
-double g_temp_cs_quote[1];
-double g_temp_supertrend_up[3];
-double g_temp_supertrend_down[3];
-double g_temp_gg_m1[2];
-double g_temp_gg_m5[2];
-double g_temp_gg_m15[2];
-double g_temp_gg_m30[2];
-double g_temp_gg_h1[2];
-double g_temp_gg_h4[2];
-double g_temp_gg_d1[2];
-double g_temp_gg_w1[2];
-double g_temp_gg_mn1[2];
+// ✅ v4.55: Arrays DINÂMICOS (sem tamanho fixo) para permitir ArraySetAsSeries
+double g_temp_wae_up[];
+double g_temp_wae_down[];
+double g_temp_wae_exp[];
+double g_temp_rsi_red[];
+double g_temp_rsi_blue[];
+double g_temp_cs_base[];
+double g_temp_cs_quote[];
+double g_temp_supertrend_up[];
+double g_temp_supertrend_down[];
+double g_temp_gg_m1[];
+double g_temp_gg_m5[];
+double g_temp_gg_m15[];
+double g_temp_gg_m30[];
+double g_temp_gg_h1[];
+double g_temp_gg_h4[];
+double g_temp_gg_d1[];
+double g_temp_gg_w1[];
+double g_temp_gg_mn1[];
 
 //+------------------------------------------------------------------+
 //| 🔥 FUNÇÃO: UpdateBufferCache                                     |

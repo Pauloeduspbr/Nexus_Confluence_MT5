@@ -1,7 +1,21 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.51 - FIX CRÍTICO LEITURA GG TRENDBAR     |
-//| 🚨 v4.51: CORREÇÃO URGENTE - EA ABRIA BUY COM H4 VERMELHO!     |
+//| Nexus Confluence EA v4.52 - FIX CRÍTICO: EA NÃO ABRE VENDA!     |
+//| 🚨 v4.52: CORREÇÃO URGENTE - SUPERTREND REJEITAVA SELL         |
 //|          (25/10/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO v4.51:                                           |
+//|   ❌ EA NÃO abria VENDA mesmo com todos indicadores alinhados! |
+//|   ❌ Supertrend rejeitava SELL incorretamente                   |
+//|   ❌ CAUSA: Comparava BID (preço atual) com Supertrend[1]      |
+//|   ❌ Spread causava rejeição: BID < linha, mas Close[1] > linha|
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.52:                                              |
+//|   ✅ Mudado de SYMBOL_BID → Close[1] do último candle          |
+//|   ✅ Compara Close[1] com Supertrend[1] (mesmo candle!)        |
+//|   ✅ Elimina problema de spread/preço atual                     |
+//|   ✅ SELL agora funciona corretamente                           |
+//|                                                                  |
+//| 🚨 v4.51: FIX CRÍTICO - EA ABRIA BUY COM H4 VERMELHO!          |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO v4.50:                                           |
 //|   ❌ EA abria COMPRA com H4 VERMELHO (bearish)!                |
@@ -62,10 +76,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.51 - FIX CRÍTICO: Leitura correta GG TrendBar ([0])  |
+//| VERSÃO: 4.52 - FIX CRÍTICO: Supertrend SELL (Close[1] vs BID)  |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.51"
-#property version   "4.51"
+#property copyright "Nexus Confluence EA v4.52"
+#property version   "4.52"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

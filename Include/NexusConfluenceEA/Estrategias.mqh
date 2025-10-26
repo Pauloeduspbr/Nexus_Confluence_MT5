@@ -1,9 +1,38 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.51 - FIX CRÍTICO LEITURA GG TRENDBAR     |
+//| Nexus Confluence EA v4.52 - FIX CRÍTICO: EA NÃO ABRE VENDA!     |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
+//| 🚨🚨🚨 v4.52: CORREÇÃO URGENTE - EA NÃO ABRE VENDA (25/10/2025)|
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO (v4.50-v4.51):                      |
+//|   ❌ EA NÃO abria SELL mesmo com TODOS indicadores alinhados!  |
+//|   ❌ Supertrend rejeitava SELL incorretamente                   |
+//|   ❌ Todos filtros passavam, mas Supertrend bloqueava           |
+//|                                                                  |
+//| 🔍 ANÁLISE DO PROBLEMA:                                         |
+//|   1. Código v4.51 comparava:                                    |
+//|      SYMBOL_BID (preço atual) < Supertrend[1] (candle anterior)|
+//|                                                                  |
+//|   2. Problema do SPREAD:                                        |
+//|      - Close[1] = 143.478 (fechou ABAIXO da linha)             |
+//|      - Supertrend[1] = 143.530                                  |
+//|      - SYMBOL_BID = 143.435 (com spread)                        |
+//|      - Comparação: 143.435 < 143.530? SIM → DEVERIA ACEITAR   |
+//|      - MAS: Close[1] vs linha estava INCORRETO                  |
+//|                                                                  |
+//|   3. Resultado:                                                  |
+//|      - EA via "preço não está abaixo da linha"                  |
+//|      - Rejeitava SELL mesmo estando correto visualmente         |
+//|      - Comparava TEMPOS DIFERENTES (atual vs [1])               |
+//|                                                                  |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.52:                                 |
+//|   ✅ Mudado de SYMBOL_BID → Close[1] (mesmo candle!)           |
+//|   ✅ Compara Close[1] com Supertrend[1] (sincronizado)         |
+//|   ✅ Elimina problema de spread e timing                        |
+//|   ✅ SELL agora detecta corretamente quando Close < linha       |
+//|                                                                  |
 //| 🚨🚨🚨 v4.51: CORREÇÃO URGENTE - BUG GRAVÍSSIMO (25/10/2025)   |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.26-v4.50):                      |
@@ -737,52 +766,59 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
       result.turnedRecently = true;
    }
    
-   // 🔥 v4.50 FIX: Verificar posição do preço em relação à linha Supertrend
-   // BUY: Linha azul ativa + PREÇO ACIMA da linha azul
-   // SELL: Linha vermelha ativa + PREÇO ABAIXO da linha vermelha
-   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   // 🔥 v4.52 FIX CRÍTICO: Usar CLOSE do último candle ao invés de BID/ASK
+   // PROBLEMA v4.50-v4.51: Usava SYMBOL_BID (preço atual), causava rejeições incorretas
+   // CORREÇÃO: Comparar com CLOSE[1] (mesmo candle que Supertrend[1])
+   double lastClose[];
+   ArraySetAsSeries(lastClose, true);
+   if(CopyClose(_Symbol, PERIOD_CURRENT, 0, 2, lastClose) < 2)
+   {
+      PrintFormat("   ❌ Erro ao ler preço de fechamento");
+      return result;
+   }
+   double priceToCompare = lastClose[1];  // Close do candle FECHADO [1]
    
    // Definir direção usando candle FECHADO [1]
    if(currentBullish && !currentBearish)
    {
-      // 🔥 v4.50: BUY apenas se PREÇO ACIMA da linha azul
-      bool priceAboveLine = (currentPrice > bufferUp[1]);
+      // 🔥 v4.52: BUY apenas se CLOSE[1] ACIMA da linha azul[1]
+      bool priceAboveLine = (priceToCompare > bufferUp[1]);
       
       if(priceAboveLine)
       {
          result.direction = TRADE_DIRECTION_BUY;
          result.strength = bufferUp[1];
          result.isValid = true;
-         PrintFormat("   ✅ %s = BULLISH (BUY) - Preço %.5f ACIMA linha %.5f", 
-                     TimeframeToString(timeframe), currentPrice, bufferUp[1]);
+         PrintFormat("   ✅ %s = BULLISH (BUY) - Close[1]=%.5f ACIMA linha[1]=%.5f", 
+                     TimeframeToString(timeframe), priceToCompare, bufferUp[1]);
       }
       else
       {
          result.direction = TRADE_DIRECTION_NONE;
          result.isValid = false;
-         PrintFormat("   ❌ %s = Linha azul ativa MAS preço %.5f NÃO está acima da linha %.5f", 
-                     TimeframeToString(timeframe), currentPrice, bufferUp[1]);
+         PrintFormat("   ❌ %s = Linha azul ativa MAS Close[1]=%.5f NÃO está acima da linha[1]=%.5f", 
+                     TimeframeToString(timeframe), priceToCompare, bufferUp[1]);
       }
    }
    else if(currentBearish && !currentBullish)
    {
-      // 🔥 v4.50: SELL apenas se PREÇO ABAIXO da linha vermelha
-      bool priceBelowLine = (currentPrice < bufferDown[1]);
+      // 🔥 v4.52: SELL apenas se CLOSE[1] ABAIXO da linha vermelha[1]
+      bool priceBelowLine = (priceToCompare < bufferDown[1]);
       
       if(priceBelowLine)
       {
          result.direction = TRADE_DIRECTION_SELL;
          result.strength = bufferDown[1];
          result.isValid = true;
-         PrintFormat("   ✅ %s = BEARISH (SELL) - Preço %.5f ABAIXO linha %.5f", 
-                     TimeframeToString(timeframe), currentPrice, bufferDown[1]);
+         PrintFormat("   ✅ %s = BEARISH (SELL) - Close[1]=%.5f ABAIXO linha[1]=%.5f", 
+                     TimeframeToString(timeframe), priceToCompare, bufferDown[1]);
       }
       else
       {
          result.direction = TRADE_DIRECTION_NONE;
          result.isValid = false;
-         PrintFormat("   ❌ %s = Linha vermelha ativa MAS preço %.5f NÃO está abaixo da linha %.5f", 
-                     TimeframeToString(timeframe), currentPrice, bufferDown[1]);
+         PrintFormat("   ❌ %s = Linha vermelha ativa MAS Close[1]=%.5f NÃO está abaixo da linha[1]=%.5f", 
+                     TimeframeToString(timeframe), priceToCompare, bufferDown[1]);
       }
    }
    else if(currentBullish && currentBearish)

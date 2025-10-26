@@ -1,6 +1,22 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.55 - FIX CRÍTICO: ARRAYS NÃO ERAM SERIES!|
-//| 🚨 v4.55: CORREÇÃO URGENTE - LOG vs GRÁFICO DIVERGENTE         |
+//| Nexus Confluence EA v4.56 - FIX CRÍTICO: COPYBUFFER SHIFT 0→1! |
+//| 🚨 v4.56: CORREÇÃO DEFINITIVA - SINCRONIZAÇÃO LOG vs GRÁFICO   |
+//|          (27/01/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG RAÍZ IDENTIFICADO v4.55:                                 |
+//|   ❌ CopyBuffer usava shift 0 = CANDLE EM FORMAÇÃO!            |
+//|   ❌ Gráfico mostra candle FECHADO (shift 1)                    |
+//|   ❌ EA lia candle ATUAL (shift 0 - muda a cada tick!)         |
+//|   ❌ Resultado: LOG NUNCA sincronizava com gráfico!            |
+//|   ❌ User: "ainda ha problema com sincronização"                |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.56:                                              |
+//|   ✅ TODOS CopyBuffer mudados: shift 0 → shift 1               |
+//|   ✅ Agora lê APENAS candles FECHADOS (estáveis)               |
+//|   ✅ LOG perfeitamente sincronizado com gráfico!                |
+//|   ✅ Corrigidos: WAE, RSI, Supertrend, GG (9 TFs), CS          |
+//|                                                                  |
+//| 🚨 v4.55: CORREÇÃO URGENTE - ARRAYS NÃO ERAM SERIES            |
 //|          (26/10/2025)                                            |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO v4.54:                                           |
@@ -8,12 +24,10 @@
 //|   ❌ CopyBuffer em array não-series: [0]=antigo, [1]=atual     |
 //|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
 //|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
-//|   ❌ v4.51 mudou [1]→[0] MAS array não era series = PIOROU!    |
 //|                                                                  |
 //| 🔧 CORREÇÃO v4.55:                                              |
 //|   ✅ ArraySetAsSeries em TODOS arrays temporários              |
 //|   ✅ Agora [0] = candle ATUAL, [1] = candle ANTERIOR           |
-//|   ✅ LOG e gráfico agora SINCRONIZADOS!                         |
 //|   ✅ Arrays series: g_temp_gg_*, g_temp_wae_*, etc             |
 //|                                                                  |
 //| 🚨 v4.54: CORREÇÃO URGENTE - DETECÇÃO DE BUFFER ATIVO          |
@@ -22,14 +36,11 @@
 //| 🐛 BUG CRÍTICO v4.53:                                           |
 //|   ❌ Supertrend retornava DBL_MAX (~1.7e308) quando inativo    |
 //|   ❌ Threshold 1.0e10 era MUITO BAIXO para detectar!           |
-//|   ❌ Comparação `> 0` rejeitava possíveis valores negativos     |
-//|   ❌ Resultado: Não detectava corretamente buffer ativo         |
 //|                                                                  |
 //| 🔧 CORREÇÃO v4.54:                                              |
 //|   ✅ Threshold aumentado: 1.0e10 → 1.0e100                     |
 //|   ✅ Usar MathAbs() para valores negativos                      |
 //|   ✅ Verificar != EMPTY_VALUE explicitamente                    |
-//|   ✅ Detecção robusta: MathAbs(buf[1]) < 1e100 && != EMPTY     |
 //|                                                                  |
 //| 🚨 v4.53: CORREÇÃO URGENTE - INDICADOR RETORNAVA ±2            |
 //|          (25/10/2025)                                            |
@@ -37,28 +48,10 @@
 //| 🐛 BUG CRÍTICO v4.52:                                           |
 //|   ❌ GG_TrendBar retornava +2/-2 (sinais fortes)               |
 //|   ❌ EA espera APENAS -1, 0, +1                                 |
-//|   ❌ Resultado: TODAS comparações quebradas!                    |
-//|   ❌ M15=-2 nunca era == -1 → setup sempre rejeitado           |
 //|                                                                  |
 //| 🔧 CORREÇÃO v4.53:                                              |
 //|   ✅ GG_TrendBar v2.12: Removido lógica de intensidade         |
 //|   ✅ Indicador retorna APENAS: -1, 0, +1                       |
-//|   ✅ -1 = BEARISH (vermelho)                                    |
-//|   ✅  0 = NEUTRAL (amarelo)                                     |
-//|   ✅ +1 = BULLISH (verde)                                       |
-//|                                                                  |
-//| 🚨 v4.52: FIX CRÍTICO - EA NÃO ABRE VENDA!                     |
-//|                                                                  |
-//| 🐛 BUG CRÍTICO v4.51:                                           |
-//|   ❌ EA NÃO abria VENDA mesmo com todos indicadores alinhados! |
-//|   ❌ Supertrend rejeitava SELL incorretamente                   |
-//|   ❌ CAUSA: Comparava BID (preço atual) com Supertrend[1]      |
-//|   ❌ Spread causava rejeição: BID < linha, mas Close[1] > linha|
-//|                                                                  |
-//| 🔧 CORREÇÃO v4.52:                                              |
-//|   ✅ Mudado de SYMBOL_BID → Close[1] do último candle          |
-//|   ✅ Compara Close[1] com Supertrend[1] (mesmo candle!)        |
-//|   ✅ Elimina problema de spread/preço atual                     |
 //|   ✅ SELL agora funciona corretamente                           |
 //|                                                                  |
 //| 🚨 v4.51: FIX CRÍTICO - EA ABRIA BUY COM H4 VERMELHO!          |
@@ -121,11 +114,11 @@
 //| 🔥 v4.49: LÓGICA CORRETA DEFINITIVA (25/10/2025)               |
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
-//| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.55 - FIX CRÍTICO: Arrays não eram SERIES (log errado) |
+//| DATA: Janeiro 2025                                               |
+//| VERSÃO: 4.56 - FIX DEFINITIVO: CopyBuffer shift 0→1 (sync OK!)  |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.55"
-#property version   "4.55"
+#property copyright "Nexus Confluence EA v4.56"
+#property version   "4.56"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

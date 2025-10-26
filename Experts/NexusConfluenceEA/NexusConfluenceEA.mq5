@@ -1,5 +1,21 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.54 - FIX CRÍTICO: SUPERTREND EMPTY_VALUE!|
+//| Nexus Confluence EA v4.55 - FIX CRÍTICO: ARRAYS NÃO ERAM SERIES!|
+//| 🚨 v4.55: CORREÇÃO URGENTE - LOG vs GRÁFICO DIVERGENTE         |
+//|          (26/10/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO v4.54:                                           |
+//|   ❌ Arrays temporários NÃO eram definidos como SERIES!        |
+//|   ❌ CopyBuffer em array não-series: [0]=antigo, [1]=atual     |
+//|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
+//|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
+//|   ❌ v4.51 mudou [1]→[0] MAS array não era series = PIOROU!    |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.55:                                              |
+//|   ✅ ArraySetAsSeries em TODOS arrays temporários              |
+//|   ✅ Agora [0] = candle ATUAL, [1] = candle ANTERIOR           |
+//|   ✅ LOG e gráfico agora SINCRONIZADOS!                         |
+//|   ✅ Arrays series: g_temp_gg_*, g_temp_wae_*, etc             |
+//|                                                                  |
 //| 🚨 v4.54: CORREÇÃO URGENTE - DETECÇÃO DE BUFFER ATIVO          |
 //|          (26/10/2025)                                            |
 //|                                                                  |
@@ -106,10 +122,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.54 - FIX CRÍTICO: Supertrend EMPTY_VALUE detection    |
+//| VERSÃO: 4.55 - FIX CRÍTICO: Arrays não eram SERIES (log errado) |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.54"
-#property version   "4.54"
+#property copyright "Nexus Confluence EA v4.55"
+#property version   "4.55"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

@@ -1,9 +1,33 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.54 - FIX CRÍTICO: SUPERTREND EMPTY_VALUE!|
+//| Nexus Confluence EA v4.55 - FIX CRÍTICO: ARRAYS NÃO ERAM SERIES!|
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
+//| 🚨🚨🚨 v4.55: CORREÇÃO URGENTE - LOG vs GRÁFICO (26/10/2025)   |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO (v4.54):                            |
+//|   ❌ Arrays temporários NÃO eram definidos como SERIES!        |
+//|   ❌ CopyBuffer em array não-series: [0]=antigo, [1]=atual     |
+//|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
+//|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
+//|                                                                  |
+//| 🔍 ANÁLISE DO PROBLEMA:                                         |
+//|   1. UpdateBufferCache fazia:                                   |
+//|      CopyBuffer(..., 0, 2, g_temp_gg_h4)                        |
+//|   2. Array NÃO tinha ArraySetAsSeries(array, true)             |
+//|   3. Resultado SEM series:                                      |
+//|      g_temp_gg_h4[0] = shift 1 (ANTIGO)                         |
+//|      g_temp_gg_h4[1] = shift 0 (ATUAL)                          |
+//|   4. v4.51 mudou de [1]→[0] achando que [0]=atual             |
+//|   5. MAS [0] era ANTIGO! = LOG mostrava valor errado!          |
+//|                                                                  |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.55:                                 |
+//|   ✅ ArraySetAsSeries em TODOS arrays temporários              |
+//|   ✅ Agora com series: [0]=atual, [1]=anterior                  |
+//|   ✅ LOG e gráfico agora SINCRONIZADOS!                         |
+//|   ✅ Arrays corrigidos: g_temp_gg_*, wae_*, rsi_*, etc         |
+//|                                                                  |
 //| 🚨🚨🚨 v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY (26/10/2025) |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.53):                            |
@@ -348,6 +372,7 @@ double g_temp_gg_mn1[2];
 //| 🔥 FUNÇÃO: UpdateBufferCache                                     |
 //| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
 //| Retorna true se sucesso, false se erro                          |
+//| ✅ v4.55 FIX: Arrays como SERIES para ler corretamente [0]=atual|
 //+------------------------------------------------------------------+
 bool UpdateBufferCache()
 {
@@ -357,6 +382,27 @@ bool UpdateBufferCache()
     {
         return true;
     }
+    
+    // 🔥 v4.55 FIX CRÍTICO: Definir TODOS arrays temporários como SERIES!
+    // Isso garante que [0] = candle ATUAL, [1] = candle ANTERIOR
+    ArraySetAsSeries(g_temp_wae_up, true);
+    ArraySetAsSeries(g_temp_wae_down, true);
+    ArraySetAsSeries(g_temp_wae_exp, true);
+    ArraySetAsSeries(g_temp_rsi_red, true);
+    ArraySetAsSeries(g_temp_rsi_blue, true);
+    ArraySetAsSeries(g_temp_cs_base, true);
+    ArraySetAsSeries(g_temp_cs_quote, true);
+    ArraySetAsSeries(g_temp_supertrend_up, true);
+    ArraySetAsSeries(g_temp_supertrend_down, true);
+    ArraySetAsSeries(g_temp_gg_m1, true);
+    ArraySetAsSeries(g_temp_gg_m5, true);
+    ArraySetAsSeries(g_temp_gg_m15, true);
+    ArraySetAsSeries(g_temp_gg_m30, true);
+    ArraySetAsSeries(g_temp_gg_h1, true);
+    ArraySetAsSeries(g_temp_gg_h4, true);
+    ArraySetAsSeries(g_temp_gg_d1, true);
+    ArraySetAsSeries(g_temp_gg_w1, true);
+    ArraySetAsSeries(g_temp_gg_mn1, true);
     
     bool success = true;
     

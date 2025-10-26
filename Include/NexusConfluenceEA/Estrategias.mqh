@@ -443,11 +443,6 @@ double g_temp_gg_mn1[];
 //|   +1.0 = Verde (Bullish)                                        |
 //|   -1.0 = Vermelho (Bearish)                                      |
 //|    0.0 = Amarelo (Neutro) ou invalido                          |
-//|                                                                  |
-//| SISTEMA DE CORES DO GG_TrendBar:                                |
-//|   Cor 0 = Verde (alta)    = +1                                  |
-//|   Cor 1 = Vermelho (baixa) = -1                                 |
-//|   Cor 2 = Amarelo (neutro) = 0                                  |
 //+------------------------------------------------------------------+
 double ConvertColorToTrend(double colorIndex)
 {
@@ -881,7 +876,7 @@ bool InitializeIndicators(string symbol)
    //╔══════════════════════════════════════════════════════════════╗
    //║  5️⃣ CURRENCY STRENGTH - Contexto Moedas (Forex/Metais)      ║
    //╚══════════════════════════════════════════════════════════════╝
-   PrintFormat("� [5/5] Currency Strength (Contexto)...");
+   PrintFormat("💰 [5/5] Currency Strength (Contexto)...");
    g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
                                 CS_CalculationPeriod,
                                 CS_SmoothingPeriod,
@@ -947,6 +942,11 @@ bool InitializeIndicators(string symbol)
    else
    {
       PrintFormat("   ✅ WAE anexado ao subwindow 3");
+   }
+   
+   PrintFormat("════════════════════════════════════════════════════════════════");
+   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS E ANEXADOS COM SUCESSO!");
+   PrintFormat("════════════════════════
    }
    
    PrintFormat("════════════════════════════════════════════════════════════════");

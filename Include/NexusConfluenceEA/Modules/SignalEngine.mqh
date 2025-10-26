@@ -157,6 +157,8 @@ public:
     
     //+------------------------------------------------------------------+
     //| GATE 2: Multi-Timeframe Analysis (Score System)                 |
+    //| CRITICAL: GG TrendBar is MANDANTE - without confluence, filters |
+    //|           are NOT called. PREMIUM = ±4, GOOD = ±3, REJECT ≤ ±2  |
     //+------------------------------------------------------------------+
     bool ProcessGate2_MTF(void)
     {
@@ -169,38 +171,38 @@ public:
         // Calculate MTF Score (sum of -1/0/+1 values)
         m_mtf_score = gg_macro1 + gg_macro2 + gg_macro3 + gg_operational;
         
-        // Determine direction and classification
-        if(m_mtf_score >= m_min_score)
+        // GG TrendBar is MANDANTE: Only process if strong confluence
+        // PREMIUM: Score = ±4 (all 4 aligned)
+        // GOOD: Score = ±3 (3 of 4 aligned)
+        // REJECT: Score ≤ ±2 (insufficient confluence - DO NOT call filters)
+        
+        if(m_mtf_score == 4)
         {
+            // PREMIUM BUY: All 4 timeframes bullish
             m_signal_direction = SIGNAL_DIR_BUY;
-            
-            // PREMIUM: All 4 aligned (score = +4)
-            if(m_mtf_score == 4)
-            {
-                m_signal_class = SIGNAL_PREMIUM;
-            }
-            else
-            {
-                m_signal_class = SIGNAL_GOOD;
-            }
+            m_signal_class = SIGNAL_PREMIUM;
         }
-        else if(m_mtf_score <= -m_min_score)
+        else if(m_mtf_score == 3)
         {
+            // GOOD BUY: 3 of 4 bullish
+            m_signal_direction = SIGNAL_DIR_BUY;
+            m_signal_class = SIGNAL_GOOD;
+        }
+        else if(m_mtf_score == -4)
+        {
+            // PREMIUM SELL: All 4 timeframes bearish
             m_signal_direction = SIGNAL_DIR_SELL;
-            
-            // PREMIUM: All 4 aligned (score = -4)
-            if(m_mtf_score == -4)
-            {
-                m_signal_class = SIGNAL_PREMIUM;
-            }
-            else
-            {
-                m_signal_class = SIGNAL_GOOD;
-            }
+            m_signal_class = SIGNAL_PREMIUM;
+        }
+        else if(m_mtf_score == -3)
+        {
+            // GOOD SELL: 3 of 4 bearish
+            m_signal_direction = SIGNAL_DIR_SELL;
+            m_signal_class = SIGNAL_GOOD;
         }
         else
         {
-            // Score between -1 and +1: REJECT
+            // REJECT: Score between -2 and +2 (insufficient confluence)
             m_signal_class = SIGNAL_REJECT;
             m_signal_direction = SIGNAL_DIR_NONE;
         }
@@ -215,17 +217,22 @@ public:
         
         if(result)
         {
-            m_core.LogMessage(3, StringFormat("Gate 2: GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d | Score:%+d",
+            m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s | Score:%+d | GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d",
+                              EnumToString(m_signal_class),
+                              m_mtf_score,
                               EnumToString(m_macro1_tf), gg_macro1,
                               EnumToString(m_macro2_tf), gg_macro2,
                               EnumToString(m_macro3_tf), gg_macro3,
-                              EnumToString(m_operational_tf), gg_operational,
-                              m_mtf_score));
+                              EnumToString(m_operational_tf), gg_operational));
         }
         else
         {
-            m_core.LogMessage(3, StringFormat("Gate 2 REJECTED: Score %+d (need >= %d or <= -%d)",
-                              m_mtf_score, m_min_score, m_min_score));
+            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: Score:%+d (need ±3 GOOD or ±4 PREMIUM) | GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d",
+                              m_mtf_score,
+                              EnumToString(m_macro1_tf), gg_macro1,
+                              EnumToString(m_macro2_tf), gg_macro2,
+                              EnumToString(m_macro3_tf), gg_macro3,
+                              EnumToString(m_operational_tf), gg_operational));
         }
         
         return result;

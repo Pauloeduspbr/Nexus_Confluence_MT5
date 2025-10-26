@@ -240,6 +240,8 @@ public:
     
     //+------------------------------------------------------------------+
     //| GATE 3: Supertrend Direction (with 1 candle tolerance)          |
+    //| TOLERÂNCIA: ST=0 permitido para GOOD e PREMIUM                  |
+    //|             ST oposto permitido APENAS para PREMIUM              |
     //+------------------------------------------------------------------+
     bool ProcessGate3_Supertrend(void)
     {
@@ -248,18 +250,41 @@ public:
         bool result = false;
         
         // Check alignment with MTF direction
-        if(m_signal_direction == SIGNAL_DIR_BUY && st_signal == 1)
+        if(m_signal_direction == SIGNAL_DIR_BUY)
         {
-            result = true;
+            if(st_signal == 1)
+            {
+                // Perfect alignment
+                result = true;
+            }
+            else if(st_signal == 0)
+            {
+                // Neutral Supertrend - allow for GOOD and PREMIUM (tolerance)
+                result = (m_signal_class == SIGNAL_GOOD || m_signal_class == SIGNAL_PREMIUM);
+            }
+            else if(st_signal == -1)
+            {
+                // Opposite - ONLY allow for PREMIUM (1 candle lag tolerance)
+                result = (m_signal_class == SIGNAL_PREMIUM);
+            }
         }
-        else if(m_signal_direction == SIGNAL_DIR_SELL && st_signal == -1)
+        else if(m_signal_direction == SIGNAL_DIR_SELL)
         {
-            result = true;
-        }
-        else if(st_signal == 0)
-        {
-            // Neutral Supertrend - allow if MTF is strong
-            result = (m_signal_class == SIGNAL_PREMIUM);
+            if(st_signal == -1)
+            {
+                // Perfect alignment
+                result = true;
+            }
+            else if(st_signal == 0)
+            {
+                // Neutral Supertrend - allow for GOOD and PREMIUM (tolerance)
+                result = (m_signal_class == SIGNAL_GOOD || m_signal_class == SIGNAL_PREMIUM);
+            }
+            else if(st_signal == 1)
+            {
+                // Opposite - ONLY allow for PREMIUM (1 candle lag tolerance)
+                result = (m_signal_class == SIGNAL_PREMIUM);
+            }
         }
         
         m_gate_results[3] = result;
@@ -267,8 +292,8 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s",
-                              st_signal, EnumToString(m_signal_direction)));
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s (Class=%s)",
+                              st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         
         return result;

@@ -1,42 +1,9 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.59 - CORREÇÃO DEFINITIVA BUFFERS GG!     |
+//| Nexus Confluence EA v4.58 - FIX BUFFERS: Ler CORES não TREND!   |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
-//| 🔥🔥🔥 v4.59: CORREÇÃO DEFINITIVA - 5 PROBLEMAS CRÍTICOS (26/10/2025)|
-//|                                                                  |
-//| ✅ CORREÇÕES IMPLEMENTADAS v4.59:                               |
-//|   1️⃣ BUFFERS CORRETOS DO GG_TRENDBAR                            |
-//|      ❌ BUG: EA lia buffers 0-8 (valores trend internos)        |
-//|      ✅ FIX: Agora lê buffers 9-17 (cores expostas)             |
-//|      ✅ NOVA FUNÇÃO: ConvertColorToTrend() centraliza conversão |
-//|      ✅ VALIDAÇÃO: W1 nunca mais será ±2 (apenas -1/0/+1)      |
-//|                                                                  |
-//|   2️⃣ THRESHOLD SUPERTREND CORRIGIDO                             |
-//|      ❌ BUG: Threshold 1e10 não detectava DBL_MAX (1.7e308)    |
-//|      ✅ FIX: Aumentado para 1e100 detecta corretamente          |
-//|      ✅ IMPACTO: Supertrend agora identifica buffers ativos/empty|
-//|                                                                  |
-//|   3️⃣ ARRAYS TEMPORÁRIOS COMO SERIES (já corrigido v4.55)       |
-//|      ✅ Todos arrays definidos com ArraySetAsSeries(true)       |
-//|      ✅ [0] = candle atual, [1] = anterior (correto!)          |
-//|                                                                  |
-//|   4️⃣ SINCRONIZAÇÃO TEMPORAL (já corrigido v4.57)               |
-//|      ✅ iTime(..., 1) ao invés de iTime(..., 0)                |
-//|      ✅ Timestamp sincronizado com dados de CopyBuffer          |
-//|                                                                  |
-//|   5️⃣ VALIDAÇÃO DE VALORES NO GETGGTRENDBARSIGNAL()              |
-//|      ✅ Adiciona verificação de valores ±2 (erro fatal)         |
-//|      ✅ Garante apenas -1/0/+1 na lógica do EA                  |
-//|                                                                  |
-//| 📊 IMPACTO ESPERADO v4.59:                                      |
-//|   ✅ W1 correto: -1 (bearish), 0 (neutro), +1 (bullish)        |
-//|   ✅ Supertrend detecta corretamente ativo/inativo              |
-//|   ✅ Log sincronizado perfeitamente com gráfico                 |
-//|   ✅ Todos valores dentro do range esperado (-1/0/+1)          |
-//|   ✅ Zero falsos positivos por valores errados                  |
-//|                                                                  |
 //| 🚨🚨🚨 v4.58: CORREÇÃO URGENTE - BUFFERS ERRADOS! (27/01/2025)|
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO v4.57:                              |
@@ -326,10 +293,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.59 - CORREÇÃO DEFINITIVA: Buffers GG + Threshold ST  |
+//| VERSÃO: 4.44 - CORREÇÃO CRÍTICA: Validação TF Operacional      |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.59"
-#property version   "4.59"
+#property copyright "Nexus Confluence EA v4.44"
+#property version   "4.44"
 
 #include "Parametros.mqh"
 
@@ -433,38 +400,11 @@ double g_temp_gg_w1[];
 double g_temp_gg_mn1[];
 
 //+------------------------------------------------------------------+
-//| NOVA FUNCAO v4.59: Converter indice de cor para valor de trend  |
-//| Converte cores do GG_TrendBar para valores numericos do EA      |
-//|                                                                  |
-//| PARAMETROS:                                                      |
-//|   - colorIndex: Indice de cor do indicador (0/1/2)             |
-//|                                                                  |
-//| RETORNO:                                                         |
-//|   +1.0 = Verde (Bullish)                                        |
-//|   -1.0 = Vermelho (Bearish)                                      |
-//|    0.0 = Amarelo (Neutro) ou invalido                          |
-//+------------------------------------------------------------------+
-double ConvertColorToTrend(double colorIndex)
-{
-   int color = (int)MathRound(colorIndex);
-   
-   switch(color)
-   {
-      case 0: return 1.0;
-      case 1: return -1.0;
-      case 2: return 0.0;
-      default:
-         PrintFormat("WARNING: Cor desconhecida no GG_TrendBar: %.0f", colorIndex);
-         return 0.0;
-   }
-}
-//+------------------------------------------------------------------+
 //| 🔥 FUNÇÃO: UpdateBufferCache                                     |
 //| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
 //| Retorna true se sucesso, false se erro                          |
 //| ✅ v4.55 FIX: Arrays como SERIES para ler corretamente [0]=atual|
 //| 🔥 v4.57 FIX CRÍTICO: iTime shift 0→1 para sincronizar com dados|
-//| 🔥 v4.59 FIX URGENTE: Buffers 9-17 (cores) ao invés de 0-8 (trend)|
 //+------------------------------------------------------------------+
 bool UpdateBufferCache()
 {
@@ -609,55 +549,67 @@ bool UpdateBufferCache()
         //   1 (Vermelho) → -1 (Bearish)
         //   2 (Amarelo) → 0 (Neutro)
         
-        if(CopyBuffer(g_handles.gg_global, 9, 1, 2, g_temp_gg_m1) == 2 &&    // 🔥 Buffer 9 = Color_M1
-           CopyBuffer(g_handles.gg_global, 10, 1, 2, g_temp_gg_m5) == 2 &&   // 🔥 Buffer 10 = Color_M5
-           CopyBuffer(g_handles.gg_global, 11, 1, 2, g_temp_gg_m15) == 2 &&  // 🔥 Buffer 11 = Color_M15
-           CopyBuffer(g_handles.gg_global, 12, 1, 2, g_temp_gg_m30) == 2 &&  // 🔥 Buffer 12 = Color_M30
-           CopyBuffer(g_handles.gg_global, 13, 1, 2, g_temp_gg_h1) == 2 &&   // 🔥 Buffer 13 = Color_H1
-           CopyBuffer(g_handles.gg_global, 14, 1, 2, g_temp_gg_h4) == 2 &&   // 🔥 Buffer 14 = Color_H4
-           CopyBuffer(g_handles.gg_global, 15, 1, 2, g_temp_gg_d1) == 2 &&   // 🔥 Buffer 15 = Color_D1
-           CopyBuffer(g_handles.gg_global, 16, 1, 2, g_temp_gg_w1) == 2 &&   // 🔥 Buffer 16 = Color_W1
-           CopyBuffer(g_handles.gg_global, 17, 1, 2, g_temp_gg_mn1) == 2)    // 🔥 Buffer 17 = Color_MN1
+        if(CopyBuffer(g_handles.gg_global, 9, 1, 2, g_temp_gg_m1) == 2 &&    // Color_M1
+           CopyBuffer(g_handles.gg_global, 10, 1, 2, g_temp_gg_m5) == 2 &&   // Color_M5
+           CopyBuffer(g_handles.gg_global, 11, 1, 2, g_temp_gg_m15) == 2 &&  // Color_M15
+           CopyBuffer(g_handles.gg_global, 12, 1, 2, g_temp_gg_m30) == 2 &&  // Color_M30
+           CopyBuffer(g_handles.gg_global, 13, 1, 2, g_temp_gg_h1) == 2 &&   // Color_H1
+           CopyBuffer(g_handles.gg_global, 14, 1, 2, g_temp_gg_h4) == 2 &&   // Color_H4
+           CopyBuffer(g_handles.gg_global, 15, 1, 2, g_temp_gg_d1) == 2 &&   // Color_D1
+           CopyBuffer(g_handles.gg_global, 16, 1, 2, g_temp_gg_w1) == 2 &&   // Color_W1
+           CopyBuffer(g_handles.gg_global, 17, 1, 2, g_temp_gg_mn1) == 2)    // Color_MN1
         {
-            // 🔥 v4.59: CONVERTER CORES PARA VALORES DE TREND usando função dedicada
-            // Agora usando ConvertColorToTrend() para clareza e manutenibilidade
+            // 🔥 v4.58: CONVERTER CORES PARA VALORES DE TREND
+            // Cores do indicador → Valores para o EA
             for(int idx = 0; idx < 2; idx++)
             {
-                // Converter todas as cores para valores de trend (-1/0/+1)
-                g_bufferCache.gg_m1[idx] = ConvertColorToTrend(g_temp_gg_m1[idx]);
-                g_bufferCache.gg_m5[idx] = ConvertColorToTrend(g_temp_gg_m5[idx]);
-                g_bufferCache.gg_m15[idx] = ConvertColorToTrend(g_temp_gg_m15[idx]);
-                g_bufferCache.gg_m30[idx] = ConvertColorToTrend(g_temp_gg_m30[idx]);
-                g_bufferCache.gg_h1[idx] = ConvertColorToTrend(g_temp_gg_h1[idx]);
-                g_bufferCache.gg_h4[idx] = ConvertColorToTrend(g_temp_gg_h4[idx]);
-                g_bufferCache.gg_d1[idx] = ConvertColorToTrend(g_temp_gg_d1[idx]);
-                g_bufferCache.gg_w1[idx] = ConvertColorToTrend(g_temp_gg_w1[idx]);
-                g_bufferCache.gg_mn1[idx] = ConvertColorToTrend(g_temp_gg_mn1[idx]);
-            }
-            
-            // 🔥 v4.59 VALIDAÇÃO: W1 nunca deve ser ±2 após conversão!
-            if(MathAbs(g_bufferCache.gg_w1[0]) > 1.0)
-            {
-                PrintFormat("❌ ERRO CRÍTICO v4.59: W1=%.0f (deve ser -1/0/+1) - Conversão falhou!", 
-                    g_bufferCache.gg_w1[0]);
-                success = false;
-            }
-            
-            // 🔥 v4.59 DEBUG: Log conversões (apenas primeira vez ou quando mudar)
-            static double lastW1 = 999;
-            if(lastW1 != g_bufferCache.gg_w1[0])
-            {
-                PrintFormat("✅ v4.59 GG Conversão: W1[0]=%.0f (era cor %.0f) | H4[0]=%.0f (era cor %.0f)",
-                    g_bufferCache.gg_w1[0], g_temp_gg_w1[0],
-                    g_bufferCache.gg_h4[0], g_temp_gg_h4[0]);
-                lastW1 = g_bufferCache.gg_w1[0];
+                // M1: Cor → Trend
+                if(g_temp_gg_m1[idx] == 0) g_bufferCache.gg_m1[idx] = 1;        // Verde = +1
+                else if(g_temp_gg_m1[idx] == 1) g_bufferCache.gg_m1[idx] = -1;  // Vermelho = -1
+                else g_bufferCache.gg_m1[idx] = 0;                               // Amarelo = 0
+                
+                // M5: Cor → Trend
+                if(g_temp_gg_m5[idx] == 0) g_bufferCache.gg_m5[idx] = 1;
+                else if(g_temp_gg_m5[idx] == 1) g_bufferCache.gg_m5[idx] = -1;
+                else g_bufferCache.gg_m5[idx] = 0;
+                
+                // M15: Cor → Trend
+                if(g_temp_gg_m15[idx] == 0) g_bufferCache.gg_m15[idx] = 1;
+                else if(g_temp_gg_m15[idx] == 1) g_bufferCache.gg_m15[idx] = -1;
+                else g_bufferCache.gg_m15[idx] = 0;
+                
+                // M30: Cor → Trend
+                if(g_temp_gg_m30[idx] == 0) g_bufferCache.gg_m30[idx] = 1;
+                else if(g_temp_gg_m30[idx] == 1) g_bufferCache.gg_m30[idx] = -1;
+                else g_bufferCache.gg_m30[idx] = 0;
+                
+                // H1: Cor → Trend
+                if(g_temp_gg_h1[idx] == 0) g_bufferCache.gg_h1[idx] = 1;
+                else if(g_temp_gg_h1[idx] == 1) g_bufferCache.gg_h1[idx] = -1;
+                else g_bufferCache.gg_h1[idx] = 0;
+                
+                // H4: Cor → Trend
+                if(g_temp_gg_h4[idx] == 0) g_bufferCache.gg_h4[idx] = 1;
+                else if(g_temp_gg_h4[idx] == 1) g_bufferCache.gg_h4[idx] = -1;
+                else g_bufferCache.gg_h4[idx] = 0;
+                
+                // D1: Cor → Trend
+                if(g_temp_gg_d1[idx] == 0) g_bufferCache.gg_d1[idx] = 1;
+                else if(g_temp_gg_d1[idx] == 1) g_bufferCache.gg_d1[idx] = -1;
+                else g_bufferCache.gg_d1[idx] = 0;
+                
+                // W1: Cor → Trend
+                if(g_temp_gg_w1[idx] == 0) g_bufferCache.gg_w1[idx] = 1;
+                else if(g_temp_gg_w1[idx] == 1) g_bufferCache.gg_w1[idx] = -1;
+                else g_bufferCache.gg_w1[idx] = 0;
+                
+                // MN1: Cor → Trend
+                if(g_temp_gg_mn1[idx] == 0) g_bufferCache.gg_mn1[idx] = 1;
+                else if(g_temp_gg_mn1[idx] == 1) g_bufferCache.gg_mn1[idx] = -1;
+                else g_bufferCache.gg_mn1[idx] = 0;
             }
         }
-        else 
-        {
-            PrintFormat("❌ ERRO: Falha ao ler buffers de cor (9-17) do GG_TrendBar!");
-            success = false;
-        }
+        else success = false;
     }
     
     g_bufferCache.isValid = success;
@@ -876,7 +828,7 @@ bool InitializeIndicators(string symbol)
    //╔══════════════════════════════════════════════════════════════╗
    //║  5️⃣ CURRENCY STRENGTH - Contexto Moedas (Forex/Metais)      ║
    //╚══════════════════════════════════════════════════════════════╝
-   PrintFormat("💰 [5/5] Currency Strength (Contexto)...");
+   PrintFormat("� [5/5] Currency Strength (Contexto)...");
    g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
                                 CS_CalculationPeriod,
                                 CS_SmoothingPeriod,
@@ -925,27 +877,22 @@ bool InitializeIndicators(string symbol)
    }
    
    // RSI OMA - Subwindow 2
-   {f(!ChartIndicatorAdd(0, 2, g_handles.rsi_oper))
-      PrintFormat("   ✅ Currency Strength anexado ao subwindow 1");
-   }  PrintFormat("⚠️ Aviso: Não foi possível anexar RSI OMA ao subwindow 2");
-   }
-   // RSI OMA - Subwindow 2
    if(!ChartIndicatorAdd(0, 2, g_handles.rsi_oper))
-   {  PrintFormat("   ✅ RSI OMA anexado ao subwindow 2");
+   {
       PrintFormat("⚠️ Aviso: Não foi possível anexar RSI OMA ao subwindow 2");
    }
-   elseAE - Subwindow 3
-   {f(!ChartIndicatorAdd(0, 3, g_handles.wae_oper))
+   else
+   {
       PrintFormat("   ✅ RSI OMA anexado ao subwindow 2");
-   }  PrintFormat("⚠️ Aviso: Não foi possível anexar WAE ao subwindow 3");
    }
+   
    // WAE - Subwindow 3
    if(!ChartIndicatorAdd(0, 3, g_handles.wae_oper))
-   {  PrintFormat("   ✅ WAE anexado ao subwindow 3");
+   {
       PrintFormat("⚠️ Aviso: Não foi possível anexar WAE ao subwindow 3");
    }
-   elsetFormat("════════════════════════════════════════════════════════════════");
-   {rintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS E ANEXADOS COM SUCESSO!");
+   else
+   {
       PrintFormat("   ✅ WAE anexado ao subwindow 3");
    }
    
@@ -1004,15 +951,11 @@ TMSignal GetSupertrendSignal(int handle, ENUM_TIMEFRAMES timeframe)
                bufferUp[0], bufferDown[0],
                bufferUp[1], bufferDown[1]);
 
-   // 🔥 CORREÇÃO CRÍTICA v4.59: Detecção ROBUSTA de buffer ativo
+   // 🔥 CORREÇÃO CRÍTICA v4.54: Detecção ROBUSTA de buffer ativo
    // EMPTY_VALUE = DBL_MAX (~1.7e308) ou valores absurdos
    // TrendMagic define EMPTY_VALUE nos buffers inativos
    
-   // 🔥 v4.59 FIX CRÍTICO: Threshold 1e100 (era 1e10, muito baixo!)
-   // PROBLEMA v4.54: DBL_MAX = 1.7e308, mas threshold era 1e10
-   // RESULTADO: 1.7e308 > 1.0e10 = true → NÃO detectava como EMPTY!
-   // CORREÇÃO: Aumentar para 1e100 detecta corretamente DBL_MAX
-   double DBL_MAX_LIMIT = 1.0e100;  // ✅ Threshold adequado para detectar DBL_MAX (~1.7e308)
+   double DBL_MAX_LIMIT = 1.0e100; // ✅ Threshold muito maior para pegar DBL_MAX corretamente
 
    // 🔥 v4.27: USAR CANDLE FECHADO [1] ao invés de [0] para sincronizar com GG/WAE/RSI/CS
    // Determinar direção atual (qual linha tem valor VÁLIDO/RAZOÁVEL) no candle FECHADO
@@ -1500,20 +1443,6 @@ GGTrendBarSignal GetGGTrendBarSignal()
    result.h4Value = (int)gg_h4[0];    // 🔥 v4.51: [1] → [0]
    result.d1Value = (int)gg_d1[0];    // 🔥 v4.51: [1] → [0]
    result.w1Value = (int)gg_w1[0];    // 🔥 v4.51: [1] → [0]
-   result.mn1Value = (int)gg_mn1[0];  // 🔥 v4.51: [1] → [0]
-   
-   // 🔥 v4.59 VALIDAÇÃO CRÍTICA: Valores devem ser -1/0/+1 (nunca ±2)!
-   // Se aparecer ±2, significa que a conversão de cores falhou
-   if(MathAbs(result.w1Value) > 1 || MathAbs(result.h4Value) > 1 || MathAbs(result.h1Value) > 1)
-   {
-      PrintFormat("❌ ERRO CRÍTICO v4.59: Valores GG fora do range esperado!");
-      PrintFormat("   W1=%d (deve ser -1/0/+1)", result.w1Value);
-      PrintFormat("   H4=%d (deve ser -1/0/+1)", result.h4Value);
-      PrintFormat("   H1=%d (deve ser -1/0/+1)", result.h1Value);
-      PrintFormat("   CAUSA: Conversão de cores falhou ou lendo buffers errados!");
-      result.isValid = false;
-      return result;
-   }
    result.mn1Value = (int)gg_mn1[0];  // 🔥 v4.51: [1] → [0]
 
    PrintFormat("🔍 [DEBUG GG TRENDBAR v4.51] Valores ATUAIS do indicador [0]:");

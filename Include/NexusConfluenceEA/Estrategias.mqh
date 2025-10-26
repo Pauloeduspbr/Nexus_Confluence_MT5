@@ -1,18 +1,8 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.59 - FIX DEFINITIVO: Conversão de Cores! |
+//| Nexus Confluence EA v4.58 - FIX BUFFERS: Ler CORES não TREND!   |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
-//|                                                                   |
-//| 🚨🚨🚨 v4.59: CORREÇÃO DEFINITIVA - CONVERSÃO DE CORES!        |
-//|          (27/01/2025 - Implementação Final)                     |
-//|                                                                   |
-//| 🏆 MELHORIAS v4.59:                                              |
-//|   ✅ Criada função ConvertColorToTrend() centralizada           |
-//|   ✅ Código limpo e mantível (9 linhas vs 81 linhas)            |
-//|   ✅ Validação automática de valores convertidos                |
-//|   ✅ Logs atualizados para v4.59                                |
-//|   ✅ Removido log obsoleto de intensidade ±2                    |
 //|                                                                   |
 //| 🚨🚨🚨 v4.58: CORREÇÃO URGENTE - BUFFERS ERRADOS! (27/01/2025)|
 //|                                                                  |
@@ -71,7 +61,7 @@
 //|   ❌ Código usava [0] achando que era atual = LIA ANTIGO!      |
 //|   ❌ Resultado: LOG mostrava dados ERRADOS vs gráfico          |
 //|                                                                  |
-//| 🚨🚨🚨 v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY              |
+//| 🚨🚨� v4.54: CORREÇÃO URGENTE - SUPERTREND EMPTY              |
 //|                                                                  |
 //| 🐛 BUG CRÍTICO IDENTIFICADO (v4.53):                            |
 //|   ❌ Supertrend retornava DBL_MAX (~1.7e308) quando inativo    |
@@ -303,10 +293,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.59                                                     |
+//| VERSÃO: 4.44 - CORREÇÃO CRÍTICA: Validação TF Operacional      |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.59"
-#property version   "4.59"
+#property copyright "Nexus Confluence EA v4.44"
+#property version   "4.44"
 
 #include "Parametros.mqh"
 
@@ -410,44 +400,11 @@ double g_temp_gg_w1[];
 double g_temp_gg_mn1[];
 
 //+------------------------------------------------------------------+
-//| 🔥 NOVA FUNÇÃO v4.59: Converter índice de cor para valor de trend|
-//| Converte os índices de cor do GG_TrendBar para valores do EA    |
-//|                                                                   |
-//| PARÂMETROS:                                                      |
-//|   - colorIndex: Índice de cor do indicador (0, 1 ou 2)          |
-//|                                                                   |
-//| RETORNO:                                                         |
-//|   +1  = Bullish (cor Verde = 0 no indicador)                    |
-//|   -1  = Bearish (cor Vermelho = 1 no indicador)                 |
-//|    0  = Neutro (cor Amarelo = 2 no indicador)                   |
-//+------------------------------------------------------------------+
-double ConvertColorToTrend(double colorIndex)
-{
-    // GG_TrendBar usa sistema de cores:
-    // 0 = Verde (Bullish)  = +1
-    // 1 = Vermelho (Bearish) = -1  
-    // 2 = Amarelo (Neutro) = 0
-    
-    int color = (int)MathRound(colorIndex);
-    
-    switch(color)
-    {
-        case 0: return +1.0;  // Verde = Bullish
-        case 1: return -1.0;  // Vermelho = Bearish
-        case 2: return 0.0;   // Amarelo = Neutro
-        default: 
-            PrintFormat("WARNING: Unknown color index: %.0f (esperado 0,1 ou 2)", colorIndex);
-            return 0.0;
-    }
-}
-
-//+------------------------------------------------------------------+
 //| 🔥 FUNÇÃO: UpdateBufferCache                                     |
 //| Atualiza TODOS os buffers de UMA VEZ (chamada 1x por candle)    |
 //| Retorna true se sucesso, false se erro                          |
 //| ✅ v4.55 FIX: Arrays como SERIES para ler corretamente [0]=atual|
 //| 🔥 v4.57 FIX CRÍTICO: iTime shift 0→1 para sincronizar com dados|
-//| 🔥 v4.59 FIX CRÍTICO: Buffers 9-17 (cores) + função conversão   |
 //+------------------------------------------------------------------+
 bool UpdateBufferCache()
 {
@@ -576,7 +533,7 @@ bool UpdateBufferCache()
     // 5. GG TrendBar - 🔥 v4.58 FIX CRÍTICO: LER BUFFERS DE COR, NÃO DE TREND!
     if(g_handles.gg_global != INVALID_HANDLE)
     {
-        // 🔥 v4.58 CORREÇÃO URGENTE: BUFFERS ERRADOS!
+        // � v4.58 CORREÇÃO URGENTE: BUFFERS ERRADOS!
         // ❌ ANTES v4.57: Lia buffers 0,2,4,6,8,10,12,14,16 (valores trend -1/0/+1)
         // ✅ AGORA v4.58: Lê buffers 9,10,11,12,13,14,15,16,17 (cores 0=Verde, 1=Vermelho, 2=Amarelo)
         //
@@ -602,19 +559,54 @@ bool UpdateBufferCache()
            CopyBuffer(g_handles.gg_global, 16, 1, 2, g_temp_gg_w1) == 2 &&   // Color_W1
            CopyBuffer(g_handles.gg_global, 17, 1, 2, g_temp_gg_mn1) == 2)    // Color_MN1
         {
-            // 🔥 v4.59: CONVERTER CORES PARA VALORES DE TREND usando função auxiliar
-            // Cores do indicador → Valores para o EA (simplificado e mais limpo)
+            // 🔥 v4.58: CONVERTER CORES PARA VALORES DE TREND
+            // Cores do indicador → Valores para o EA
             for(int idx = 0; idx < 2; idx++)
             {
-                g_bufferCache.gg_m1[idx] = ConvertColorToTrend(g_temp_gg_m1[idx]);
-                g_bufferCache.gg_m5[idx] = ConvertColorToTrend(g_temp_gg_m5[idx]);
-                g_bufferCache.gg_m15[idx] = ConvertColorToTrend(g_temp_gg_m15[idx]);
-                g_bufferCache.gg_m30[idx] = ConvertColorToTrend(g_temp_gg_m30[idx]);
-                g_bufferCache.gg_h1[idx] = ConvertColorToTrend(g_temp_gg_h1[idx]);
-                g_bufferCache.gg_h4[idx] = ConvertColorToTrend(g_temp_gg_h4[idx]);
-                g_bufferCache.gg_d1[idx] = ConvertColorToTrend(g_temp_gg_d1[idx]);
-                g_bufferCache.gg_w1[idx] = ConvertColorToTrend(g_temp_gg_w1[idx]);
-                g_bufferCache.gg_mn1[idx] = ConvertColorToTrend(g_temp_gg_mn1[idx]);
+                // M1: Cor → Trend
+                if(g_temp_gg_m1[idx] == 0) g_bufferCache.gg_m1[idx] = 1;        // Verde = +1
+                else if(g_temp_gg_m1[idx] == 1) g_bufferCache.gg_m1[idx] = -1;  // Vermelho = -1
+                else g_bufferCache.gg_m1[idx] = 0;                               // Amarelo = 0
+                
+                // M5: Cor → Trend
+                if(g_temp_gg_m5[idx] == 0) g_bufferCache.gg_m5[idx] = 1;
+                else if(g_temp_gg_m5[idx] == 1) g_bufferCache.gg_m5[idx] = -1;
+                else g_bufferCache.gg_m5[idx] = 0;
+                
+                // M15: Cor → Trend
+                if(g_temp_gg_m15[idx] == 0) g_bufferCache.gg_m15[idx] = 1;
+                else if(g_temp_gg_m15[idx] == 1) g_bufferCache.gg_m15[idx] = -1;
+                else g_bufferCache.gg_m15[idx] = 0;
+                
+                // M30: Cor → Trend
+                if(g_temp_gg_m30[idx] == 0) g_bufferCache.gg_m30[idx] = 1;
+                else if(g_temp_gg_m30[idx] == 1) g_bufferCache.gg_m30[idx] = -1;
+                else g_bufferCache.gg_m30[idx] = 0;
+                
+                // H1: Cor → Trend
+                if(g_temp_gg_h1[idx] == 0) g_bufferCache.gg_h1[idx] = 1;
+                else if(g_temp_gg_h1[idx] == 1) g_bufferCache.gg_h1[idx] = -1;
+                else g_bufferCache.gg_h1[idx] = 0;
+                
+                // H4: Cor → Trend
+                if(g_temp_gg_h4[idx] == 0) g_bufferCache.gg_h4[idx] = 1;
+                else if(g_temp_gg_h4[idx] == 1) g_bufferCache.gg_h4[idx] = -1;
+                else g_bufferCache.gg_h4[idx] = 0;
+                
+                // D1: Cor → Trend
+                if(g_temp_gg_d1[idx] == 0) g_bufferCache.gg_d1[idx] = 1;
+                else if(g_temp_gg_d1[idx] == 1) g_bufferCache.gg_d1[idx] = -1;
+                else g_bufferCache.gg_d1[idx] = 0;
+                
+                // W1: Cor → Trend
+                if(g_temp_gg_w1[idx] == 0) g_bufferCache.gg_w1[idx] = 1;
+                else if(g_temp_gg_w1[idx] == 1) g_bufferCache.gg_w1[idx] = -1;
+                else g_bufferCache.gg_w1[idx] = 0;
+                
+                // MN1: Cor → Trend
+                if(g_temp_gg_mn1[idx] == 0) g_bufferCache.gg_mn1[idx] = 1;
+                else if(g_temp_gg_mn1[idx] == 1) g_bufferCache.gg_mn1[idx] = -1;
+                else g_bufferCache.gg_mn1[idx] = 0;
             }
         }
         else success = false;
@@ -836,7 +828,7 @@ bool InitializeIndicators(string symbol)
    //╔══════════════════════════════════════════════════════════════╗
    //║  5️⃣ CURRENCY STRENGTH - Contexto Moedas (Forex/Metais)      ║
    //╚══════════════════════════════════════════════════════════════╝
-   PrintFormat("💪 [5/5] Currency Strength (Contexto)...");
+   PrintFormat("� [5/5] Currency Strength (Contexto)...");
    g_handles.cs_oper = iCustom(symbol, g_tfOperacional, path_cs,
                                 CS_CalculationPeriod,
                                 CS_SmoothingPeriod,
@@ -1453,29 +1445,36 @@ GGTrendBarSignal GetGGTrendBarSignal()
    result.w1Value = (int)gg_w1[0];    // 🔥 v4.51: [1] → [0]
    result.mn1Value = (int)gg_mn1[0];  // 🔥 v4.51: [1] → [0]
 
-   // 🔥 v4.59: VALIDAÇÃO CRÍTICA - valores devem ser APENAS -1, 0 ou +1
-   // (Nunca ±2 pois agora lemos cores e convertemos)
-   if(MathAbs(result.w1Value) > 1 || MathAbs(result.h4Value) > 1 || MathAbs(result.h1Value) > 1)
-   {
-      PrintFormat("� ERRO CRÍTICO v4.59: Valores fora do esperado após conversão!");
-      PrintFormat("   W1=%+d (esperado: -1/0/+1)", result.w1Value);
-      PrintFormat("   H4=%+d (esperado: -1/0/+1)", result.h4Value);
-      PrintFormat("   H1=%+d (esperado: -1/0/+1)", result.h1Value);
-      PrintFormat("   ⚠️ CAUSA: Conversão ConvertColorToTrend() falhou ou buffers errados!");
-   }
-
-   PrintFormat("�🔍 [DEBUG GG TRENDBAR v4.59] Valores CONVERTIDOS (cores→trend):");
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.51] Valores ATUAIS do indicador [0]:");
    PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
                result.m1Value, result.m5Value, result.m15Value, result.m30Value,
                result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);
    
-   // 🔥 v4.59 ATUALIZADO: Aceitar valores +1 (bullish) e -1 (bearish)
-   // v4.58 lê cores do indicador e converte para -1/0/+1 no EA
-   // Valores +2/-2 NÃO existem mais após conversão de cor→trend
-   result.h4Bullish = (result.h4Value > 0);   // ✅ Verde (+1)
-   result.h1Bullish = (result.h1Value > 0);   // ✅ Verde (+1)
-   result.m30Bullish = (result.m30Value > 0); // ✅ Verde (+1)
-   result.m15Bullish = (result.m15Value > 0); // ✅ Verde (+1)
+   // 🔥 v4.46 LOG INTENSIDADE: Identificar sinais fortes (+2/-2) vs fracos (+1/-1)
+   string intensityLog = "🔥 [INTENSIDADE v4.46] ";
+   if(MathAbs(result.h4Value) == 2) intensityLog += "H4=FORTE ";
+   else if(result.h4Value != 0) intensityLog += "H4=fraco ";
+   
+   if(MathAbs(result.h1Value) == 2) intensityLog += "H1=FORTE ";
+   else if(result.h1Value != 0) intensityLog += "H1=fraco ";
+   
+   if(MathAbs(result.m30Value) == 2) intensityLog += "M30=FORTE ";
+   else if(result.m30Value != 0) intensityLog += "M30=fraco ";
+   
+   if(MathAbs(result.m15Value) == 2) intensityLog += "M15=FORTE ";
+   else if(result.m15Value != 0) intensityLog += "M15=fraco ";
+   
+   Print(intensityLog);
+   
+   // 🔥 v4.45 CORREÇÃO CRÍTICA: Aceitar valores +1 E +2 como BULLISH!
+   // BUG v4.44: Comparava exatamente == 1, ignorando == 2 (verde forte)
+   // RESULTADO: H4=+2 não era reconhecido como bullish!
+   // CORREÇÃO: Usar > 0 para bullish, < 0 para bearish
+   // v4.46: Agora GG TrendBar retorna +2/-2 (forte) e +1/-1 (fraco)!
+   result.h4Bullish = (result.h4Value > 0);   // ✅ Aceita +1 e +2
+   result.h1Bullish = (result.h1Value > 0);   // ✅ Aceita +1 e +2
+   result.m30Bullish = (result.m30Value > 0); // ✅ Aceita +1 e +2
+   result.m15Bullish = (result.m15Value > 0); // ✅ Aceita +1 e +2
    
    // Determinar direção geral (pode ser usado como confirmação)
    int sumSignals = result.h4Value + result.h1Value + result.m30Value + result.m15Value;

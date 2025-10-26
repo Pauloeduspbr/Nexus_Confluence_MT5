@@ -609,9 +609,6 @@ bool UpdateBufferCache()
                 else g_bufferCache.gg_mn1[idx] = 0;
             }
         }
-            for(int idx = 0; idx < 2; idx++)
-            }
-        }
         else success = false;
     }
     

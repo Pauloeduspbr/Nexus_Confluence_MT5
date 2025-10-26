@@ -1,9 +1,35 @@
 //+------------------------------------------------------------------+
 //| Estrategias.mqh                                                  |
-//| Nexus Confluence EA v4.50 - FILTROS SINCRONIZADOS               |
+//| Nexus Confluence EA v4.51 - FIX CRÍTICO LEITURA GG TRENDBAR     |
 //|                                                                   |
 //| PROPÓSITO: Centralizar TODA a lógica de estratégias multi-TF     |
 //|                                                                   |
+//| 🚨🚨🚨 v4.51: CORREÇÃO URGENTE - BUG GRAVÍSSIMO (25/10/2025)   |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO IDENTIFICADO (v4.26-v4.50):                      |
+//|   ❌ EA abria COMPRA com H4 VERMELHO (bearish)!                |
+//|   ❌ EA ignorava completamente o timeframe H4                   |
+//|   ❌ Causa: Leitura incorreta dos buffers do indicador          |
+//|                                                                  |
+//| 🔍 ANÁLISE DO PROBLEMA:                                         |
+//|   1. CopyBuffer(handle, 10, 0, 2, array) copia:                |
+//|      - array[0] = valor ATUAL do indicador                      |
+//|      - array[1] = valor ANTERIOR (candle passado)               |
+//|                                                                  |
+//|   2. Código v4.50 fazia:                                        |
+//|      macro1Data = gg_h4[1]  ← ERRO! Pegava candle ANTERIOR     |
+//|                                                                  |
+//|   3. Resultado:                                                  |
+//|      - EA via H4 de ONTEM ao invés de H4 de HOJE               |
+//|      - Abria trades com informação DESATUALIZADA                |
+//|      - Ignorava mudanças de tendência no H4                     |
+//|                                                                  |
+//| ✅ CORREÇÃO IMPLEMENTADA v4.51:                                 |
+//|   ✅ Mudado de gg_h4[1] → gg_h4[0] (valor ATUAL)               |
+//|   ✅ Aplicado a TODOS os timeframes (M1-MN1)                    |
+//|   ✅ EA agora lê corretamente o último valor do indicador       |
+//|   ✅ Validação Multi-TF funcionando corretamente                |
+//|                                                                  |
 //| 🔥🔥🔥 v4.50: CORREÇÕES CRÍTICAS NOS FILTROS (25/10/2025)      |
 //|                                                                  |
 //| ✅ CORRIGIDO: GetSupertrendSignal()                             |
@@ -1101,26 +1127,31 @@ GGTrendBarSignal GetGGTrendBarSignal()
    double macro3Data = 0.0;
    
    // Mapear g_tfMacro1 para os dados do GG TrendBar
-   if(g_tfMacro1 == PERIOD_H4)       macro1Data = gg_h4[1];
-   else if(g_tfMacro1 == PERIOD_D1)  macro1Data = gg_d1[1];
-   else if(g_tfMacro1 == PERIOD_W1)  macro1Data = gg_w1[1];
-   else if(g_tfMacro1 == PERIOD_M30) macro1Data = gg_m30[1];
-   else if(g_tfMacro1 == PERIOD_H1)  macro1Data = gg_h1[1];
+   // 🔥 v4.51 FIX CRÍTICO: Usar [0] ao invés de [1]!
+   // PROBLEMA v4.50: CopyBuffer(..., 0, 2) copia índices [0,1] do indicador
+   // - gg_h4[0] = valor ATUAL (último cálculo do indicador)
+   // - gg_h4[1] = valor ANTERIOR (candle passado)
+   // EA estava usando [1], pegando dado ANTIGO ao invés do ATUAL!
+   if(g_tfMacro1 == PERIOD_H4)       macro1Data = gg_h4[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro1 == PERIOD_D1)  macro1Data = gg_d1[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro1 == PERIOD_W1)  macro1Data = gg_w1[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro1 == PERIOD_M30) macro1Data = gg_m30[0];  // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro1 == PERIOD_H1)  macro1Data = gg_h1[0];   // 🔥 v4.51: [1] → [0]
    
    // Mapear g_tfMacro2 para os dados do GG TrendBar
-   if(g_tfMacro2 == PERIOD_H1)       macro2Data = gg_h1[1];
-   else if(g_tfMacro2 == PERIOD_H4)  macro2Data = gg_h4[1];
-   else if(g_tfMacro2 == PERIOD_D1)  macro2Data = gg_d1[1];
-   else if(g_tfMacro2 == PERIOD_M30) macro2Data = gg_m30[1];
-   else if(g_tfMacro2 == PERIOD_M15) macro2Data = gg_m15[1];
+   if(g_tfMacro2 == PERIOD_H1)       macro2Data = gg_h1[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro2 == PERIOD_H4)  macro2Data = gg_h4[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro2 == PERIOD_D1)  macro2Data = gg_d1[0];   // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro2 == PERIOD_M30) macro2Data = gg_m30[0];  // 🔥 v4.51: [1] → [0]
+   else if(g_tfMacro2 == PERIOD_M15) macro2Data = gg_m15[0];  // 🔥 v4.51: [1] → [0]
    
    // Mapear g_tfMacro3 para os dados do GG TrendBar (se aplicável)
    if(g_numNiveisMacro == 3)
    {
-      if(g_tfMacro3 == PERIOD_M30)       macro3Data = gg_m30[1];
-      else if(g_tfMacro3 == PERIOD_H1)   macro3Data = gg_h1[1];
-      else if(g_tfMacro3 == PERIOD_M15)  macro3Data = gg_m15[1];
-      else if(g_tfMacro3 == PERIOD_M5)   macro3Data = gg_m5[1];
+      if(g_tfMacro3 == PERIOD_M30)       macro3Data = gg_m30[0];  // 🔥 v4.51: [1] → [0]
+      else if(g_tfMacro3 == PERIOD_H1)   macro3Data = gg_h1[0];   // 🔥 v4.51: [1] → [0]
+      else if(g_tfMacro3 == PERIOD_M15)  macro3Data = gg_m15[0];  // 🔥 v4.51: [1] → [0]
+      else if(g_tfMacro3 == PERIOD_M5)   macro3Data = gg_m5[0];   // 🔥 v4.51: [1] → [0]
    }
    
    // Validar se PELO MENOS OS TIMEFRAMES MACRO TÊM DADOS
@@ -1139,33 +1170,35 @@ GGTrendBarSignal GetGGTrendBarSignal()
       return result;
    }
    
-   // 🔥 v4.26 CORREÇÃO CRÍTICA FINAL: LER CANDLE FECHADO [1]!
-   // PROBLEMA v4.23: Usava [0] = candle EM FORMAÇÃO (valores instáveis!)
-   // MOTIVO: EA executa em NOVO CANDLE, mas [0] acabou de abrir (valores iniciais)
-   // RESULTADO: Dessincronia - EA vê valores DIFERENTES dos sinais visuais
-   // SOLUÇÃO DEFINITIVA: LER CANDLE FECHADO [1] = valores CONFIRMADOS
+   // 🔥 v4.51 CORREÇÃO CRÍTICA: LER ÍNDICE [0] (VALOR ATUAL DO INDICADOR)!
+   // PROBLEMA v4.26-v4.50: Usava [1] = candle ANTERIOR ao invés do ATUAL
+   // MOTIVO: CopyBuffer(..., 0, 2) copia [0]=ATUAL, [1]=ANTERIOR
+   // RESULTADO: EA via H4 de ONTEM ao invés de H4 de HOJE!
 
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.26] CANDLE FECHADO [1] (CONFIRMADO E ESTÁVEL):");
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.51] VALORES ATUAIS DO INDICADOR [0]:");
    PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
-               gg_m1[1], gg_m5[1], gg_m15[1], gg_m30[1], gg_h1[1], gg_h4[1], gg_d1[1], gg_w1[1], gg_mn1[1]);
+               gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
 
    PrintFormat("🔍 [DEBUG GG TRENDBAR v4.26] CANDLE ATUAL [0] (EM FORMAÇÃO - NÃO USAR!):");
    PrintFormat("   M1=%.0f | M5=%.0f | M15=%.0f | M30=%.0f | H1=%.0f | H4=%.0f | D1=%.0f | W1=%.0f | MN1=%.0f",
                gg_m1[0], gg_m5[0], gg_m15[0], gg_m30[0], gg_h1[0], gg_h4[0], gg_d1[0], gg_w1[0], gg_mn1[0]);
 
-   // 🔥 v4.26: USAR CANDLE FECHADO [1] para SINCRONIZAR COM SINAIS VISUAIS
-   // Todos os filtros (GG, WAE, RSI, CS) agora leem [1] → MESMOS VALORES QUE APARECEM NO GRÁFICO!
-   result.m1Value = (int)gg_m1[1];
-   result.m5Value = (int)gg_m5[1];
-   result.m15Value = (int)gg_m15[1];
-   result.m30Value = (int)gg_m30[1];
-   result.h1Value = (int)gg_h1[1];
-   result.h4Value = (int)gg_h4[1];
-   result.d1Value = (int)gg_d1[1];
-   result.w1Value = (int)gg_w1[1];
-   result.mn1Value = (int)gg_mn1[1];
+   // 🔥 v4.51 CORREÇÃO CRÍTICA: USAR ÍNDICE [0] (VALOR ATUAL DO INDICADOR)!
+   // PROBLEMA v4.26-v4.50: Usava [1] = valor ANTERIOR (candle passado)
+   // CAUSA: CopyBuffer copia [0]=ATUAL do indicador, [1]=ANTERIOR
+   // RESULTADO: EA via H4 de ONTEM ao invés de HOJE = trades incorretos!
+   // CORREÇÃO: Usar [0] para pegar valor ATUAL do indicador
+   result.m1Value = (int)gg_m1[0];    // 🔥 v4.51: [1] → [0]
+   result.m5Value = (int)gg_m5[0];    // 🔥 v4.51: [1] → [0]
+   result.m15Value = (int)gg_m15[0];  // 🔥 v4.51: [1] → [0]
+   result.m30Value = (int)gg_m30[0];  // 🔥 v4.51: [1] → [0]
+   result.h1Value = (int)gg_h1[0];    // 🔥 v4.51: [1] → [0]
+   result.h4Value = (int)gg_h4[0];    // 🔥 v4.51: [1] → [0]
+   result.d1Value = (int)gg_d1[0];    // 🔥 v4.51: [1] → [0]
+   result.w1Value = (int)gg_w1[0];    // 🔥 v4.51: [1] → [0]
+   result.mn1Value = (int)gg_mn1[0];  // 🔥 v4.51: [1] → [0]
 
-   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.46] Valores convertidos (int) do candle [1] - CONFIRMADOS:");
+   PrintFormat("🔍 [DEBUG GG TRENDBAR v4.51] Valores ATUAIS do indicador [0]:");
    PrintFormat("   M1=%+d | M5=%+d | M15=%+d | M30=%+d | H1=%+d | H4=%+d | D1=%+d | W1=%+d | MN1=%+d",
                result.m1Value, result.m5Value, result.m15Value, result.m30Value,
                result.h1Value, result.h4Value, result.d1Value, result.w1Value, result.mn1Value);

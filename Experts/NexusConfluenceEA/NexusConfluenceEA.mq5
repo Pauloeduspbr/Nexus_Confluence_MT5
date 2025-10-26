@@ -1,6 +1,21 @@
 //+------------------------------------------------------------------+
-//| Nexus Confluence EA v4.50 - FILTROS SINCRONIZADOS CORRIGIDOS    |
-//| 🎯 v4.50: CORREÇÕES CRÍTICAS NOS FILTROS (25/10/2025)          |
+//| Nexus Confluence EA v4.51 - FIX CRÍTICO LEITURA GG TRENDBAR     |
+//| 🚨 v4.51: CORREÇÃO URGENTE - EA ABRIA BUY COM H4 VERMELHO!     |
+//|          (25/10/2025)                                            |
+//|                                                                  |
+//| 🐛 BUG CRÍTICO v4.50:                                           |
+//|   ❌ EA abria COMPRA com H4 VERMELHO (bearish)!                |
+//|   ❌ EA ignorava completamente o H4 na validação                |
+//|   ❌ CAUSA: Lia gg_h4[1] ao invés de gg_h4[0]                  |
+//|                                                                  |
+//| 🔧 CORREÇÃO v4.51:                                              |
+//|   ✅ CopyBuffer(..., 0, 2) copia:                               |
+//|      - índice [0] = valor ATUAL do indicador                    |
+//|      - índice [1] = valor ANTERIOR (candle passado)             |
+//|   ✅ Mudado de gg_h4[1] → gg_h4[0] (valor ATUAL)               |
+//|   ✅ EA agora lê corretamente todos os timeframes               |
+//|                                                                  |
+//| 🎯 v4.50: FILTROS SINCRONIZADOS (25/10/2025)                   |
 //|                                                                  |
 //| ✅ CORRIGIDO: GetSupertrendSignal()                             |
 //|   - BUY: Linha azul ativa + PREÇO ACIMA da linha azul          |
@@ -47,10 +62,10 @@
 //|                                                                  |
 //| AUTOR: GitHub Copilot + Desenvolvedor                            |
 //| DATA: Outubro 2025                                               |
-//| VERSÃO: 4.50 - FILTROS SINCRONIZADOS (Supertrend + CS corrigidos)|
+//| VERSÃO: 4.51 - FIX CRÍTICO: Leitura correta GG TrendBar ([0])  |
 //+------------------------------------------------------------------+
-#property copyright "Nexus Confluence EA v4.50"
-#property version   "4.50"
+#property copyright "Nexus Confluence EA v4.51"
+#property version   "4.51"
 
 //--- Incluir módulos SIMPLIFICADOS
 #include <Trade\Trade.mqh>

@@ -1,0 +1,456 @@
+//+------------------------------------------------------------------+
+//|                                                  SignalEngine.mqh |
+//|                           Nexus Confluence EA - Signal Processing|
+//|                            Gates 0-5 Implementation & Scoring     |
+//+------------------------------------------------------------------+
+#property copyright "Nexus Confluence EA"
+#property version   "1.00"
+#property strict
+
+#include "Core.mqh"
+#include "MarketAccess.mqh"
+#include "IndicatorHub.mqh"
+
+//+------------------------------------------------------------------+
+//| Signal Classification Enumeration                                |
+//+------------------------------------------------------------------+
+enum ENUM_SIGNAL_CLASS
+{
+    SIGNAL_NONE,      // No valid signal
+    SIGNAL_REJECT,    // Rejected by gates
+    SIGNAL_GOOD,      // Good signal (score >= 2, not all aligned)
+    SIGNAL_PREMIUM    // Premium signal (all 4 timeframes aligned)
+};
+
+//+------------------------------------------------------------------+
+//| Signal Direction Enumeration                                     |
+//+------------------------------------------------------------------+
+enum ENUM_SIGNAL_DIRECTION
+{
+    SIGNAL_DIR_NONE,
+    SIGNAL_DIR_BUY,
+    SIGNAL_DIR_SELL
+};
+
+//+------------------------------------------------------------------+
+//| SignalEngine Class - Implements all 6 gates                      |
+//+------------------------------------------------------------------+
+class CSignalEngine
+{
+private:
+    CCore           *m_core;
+    CMarketAccess   *m_market;
+    CIndicatorHub   *m_indicators;
+    
+    // MTF Configuration
+    ENUM_TIMEFRAMES m_macro1_tf;      // Highest timeframe
+    ENUM_TIMEFRAMES m_macro2_tf;      // High timeframe
+    ENUM_TIMEFRAMES m_macro3_tf;      // Medium timeframe
+    ENUM_TIMEFRAMES m_operational_tf; // Operational timeframe
+    
+    // Signal state
+    int             m_mtf_score;
+    ENUM_SIGNAL_CLASS m_signal_class;
+    ENUM_SIGNAL_DIRECTION m_signal_direction;
+    
+    // Gate results (for logging)
+    bool            m_gate_results[6];
+    string          m_gate_messages[6];
+    
+    // Minimum score threshold
+    int             m_min_score;
+    
+public:
+    //+------------------------------------------------------------------+
+    //| Constructor                                                      |
+    //+------------------------------------------------------------------+
+    CSignalEngine(void)
+    {
+        m_core = NULL;
+        m_market = NULL;
+        m_indicators = NULL;
+        
+        m_macro1_tf = PERIOD_H4;
+        m_macro2_tf = PERIOD_H1;
+        m_macro3_tf = PERIOD_M30;
+        m_operational_tf = PERIOD_M15;
+        
+        m_mtf_score = 0;
+        m_signal_class = SIGNAL_NONE;
+        m_signal_direction = SIGNAL_DIR_NONE;
+        m_min_score = 2;
+        
+        ArrayInitialize(m_gate_results, false);
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Destructor                                                       |
+    //+------------------------------------------------------------------+
+    ~CSignalEngine(void)
+    {
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Initialization                                                   |
+    //+------------------------------------------------------------------+
+    bool Init(CCore *core, CMarketAccess *market, CIndicatorHub *indicators,
+              ENUM_TIMEFRAMES macro1, ENUM_TIMEFRAMES macro2, 
+              ENUM_TIMEFRAMES macro3, ENUM_TIMEFRAMES operational,
+              int min_score = 2)
+    {
+        if(core == NULL || market == NULL || indicators == NULL)
+        {
+            Print("❌ ERROR: Invalid module references in SignalEngine");
+            return false;
+        }
+        
+        m_core = core;
+        m_market = market;
+        m_indicators = indicators;
+        
+        m_macro1_tf = macro1;
+        m_macro2_tf = macro2;
+        m_macro3_tf = macro3;
+        m_operational_tf = operational;
+        m_min_score = min_score;
+        
+        Print(StringFormat("✅ SignalEngine initialized | MTF: %s/%s/%s/%s | MinScore: %d",
+              EnumToString(m_macro1_tf), EnumToString(m_macro2_tf),
+              EnumToString(m_macro3_tf), EnumToString(m_operational_tf),
+              m_min_score));
+        
+        return true;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 0: Synchronization (handled by Core)                       |
+    //+------------------------------------------------------------------+
+    bool ProcessGate0_Sync(void)
+    {
+        // Validation already done by Core::IsNewCandle()
+        // Just verify buffer sync is valid
+        bool result = m_core.IsBufferSyncValid();
+        
+        m_gate_results[0] = result;
+        m_gate_messages[0] = result ? "G0✓ Sync" : "G0✗ Desync";
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 1: Market Access                                            |
+    //+------------------------------------------------------------------+
+    bool ProcessGate1_Market(void)
+    {
+        bool result = m_market.IsTradingAllowed();
+        
+        m_gate_results[1] = result;
+        m_gate_messages[1] = result ? "G1✓ Market" : "G1✗ Blocked";
+        
+        if(!result)
+        {
+            m_core.LogMessage(3, "Gate 1 REJECTED: Market not tradeable");
+        }
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 2: Multi-Timeframe Analysis (Score System)                 |
+    //+------------------------------------------------------------------+
+    bool ProcessGate2_MTF(void)
+    {
+        // Get GG TrendBar signals for all 4 timeframes
+        int gg_macro1 = m_indicators.GetGGTrendSignal(m_macro1_tf);
+        int gg_macro2 = m_indicators.GetGGTrendSignal(m_macro2_tf);
+        int gg_macro3 = m_indicators.GetGGTrendSignal(m_macro3_tf);
+        int gg_operational = m_indicators.GetGGTrendSignal(m_operational_tf);
+        
+        // Calculate MTF Score (sum of -1/0/+1 values)
+        m_mtf_score = gg_macro1 + gg_macro2 + gg_macro3 + gg_operational;
+        
+        // Determine direction and classification
+        if(m_mtf_score >= m_min_score)
+        {
+            m_signal_direction = SIGNAL_DIR_BUY;
+            
+            // PREMIUM: All 4 aligned (score = +4)
+            if(m_mtf_score == 4)
+            {
+                m_signal_class = SIGNAL_PREMIUM;
+            }
+            else
+            {
+                m_signal_class = SIGNAL_GOOD;
+            }
+        }
+        else if(m_mtf_score <= -m_min_score)
+        {
+            m_signal_direction = SIGNAL_DIR_SELL;
+            
+            // PREMIUM: All 4 aligned (score = -4)
+            if(m_mtf_score == -4)
+            {
+                m_signal_class = SIGNAL_PREMIUM;
+            }
+            else
+            {
+                m_signal_class = SIGNAL_GOOD;
+            }
+        }
+        else
+        {
+            // Score between -1 and +1: REJECT
+            m_signal_class = SIGNAL_REJECT;
+            m_signal_direction = SIGNAL_DIR_NONE;
+        }
+        
+        bool result = (m_signal_class != SIGNAL_REJECT);
+        
+        m_gate_results[2] = result;
+        m_gate_messages[2] = StringFormat("G2%s MTF:%+d %s", 
+                             result ? "✓" : "✗", 
+                             m_mtf_score,
+                             EnumToString(m_signal_class));
+        
+        if(result)
+        {
+            m_core.LogMessage(3, StringFormat("Gate 2: GG[%s]:%+d [%s]:%+d [%s]:%+d [%s]:%+d | Score:%+d",
+                              EnumToString(m_macro1_tf), gg_macro1,
+                              EnumToString(m_macro2_tf), gg_macro2,
+                              EnumToString(m_macro3_tf), gg_macro3,
+                              EnumToString(m_operational_tf), gg_operational,
+                              m_mtf_score));
+        }
+        else
+        {
+            m_core.LogMessage(3, StringFormat("Gate 2 REJECTED: Score %+d (need >= %d or <= -%d)",
+                              m_mtf_score, m_min_score, m_min_score));
+        }
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 3: Supertrend Direction (with 1 candle tolerance)          |
+    //+------------------------------------------------------------------+
+    bool ProcessGate3_Supertrend(void)
+    {
+        int st_signal = m_indicators.GetSupertrendSignal();
+        
+        bool result = false;
+        
+        // Check alignment with MTF direction
+        if(m_signal_direction == SIGNAL_DIR_BUY && st_signal == 1)
+        {
+            result = true;
+        }
+        else if(m_signal_direction == SIGNAL_DIR_SELL && st_signal == -1)
+        {
+            result = true;
+        }
+        else if(st_signal == 0)
+        {
+            // Neutral Supertrend - allow if MTF is strong
+            result = (m_signal_class == SIGNAL_PREMIUM);
+        }
+        
+        m_gate_results[3] = result;
+        m_gate_messages[3] = StringFormat("G3%s ST:%+d", result ? "✓" : "✗", st_signal);
+        
+        if(!result)
+        {
+            m_core.LogMessage(3, StringFormat("Gate 3 REJECTED: Supertrend=%+d vs Direction=%s",
+                              st_signal, EnumToString(m_signal_direction)));
+        }
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 4: Momentum - WAE FIRST, then RSI OMA (CRITICAL ORDER)     |
+    //+------------------------------------------------------------------+
+    bool ProcessGate4_Momentum(void)
+    {
+        // STEP 1: Check WAE expansion (filters lateral markets)
+        bool wae_expanding = m_indicators.IsWAEExpanding();
+        
+        if(!wae_expanding)
+        {
+            m_gate_results[4] = false;
+            m_gate_messages[4] = "G4✗ WAE flat";
+            m_core.LogMessage(3, "Gate 4 REJECTED: WAE not expanding (lateral market)");
+            return false;
+        }
+        
+        // Get WAE direction
+        int wae_direction = m_indicators.GetWAEDirection();
+        
+        // STEP 2: Confirm with RSI OMA (confirms directional pressure)
+        int rsi_signal = m_indicators.GetRSIOMASignal();
+        
+        // Both must align with MTF direction
+        bool result = false;
+        
+        if(m_signal_direction == SIGNAL_DIR_BUY)
+        {
+            result = (wae_direction == 1 && rsi_signal == 1);
+        }
+        else if(m_signal_direction == SIGNAL_DIR_SELL)
+        {
+            result = (wae_direction == -1 && rsi_signal == -1);
+        }
+        
+        m_gate_results[4] = result;
+        m_gate_messages[4] = StringFormat("G4%s WAE:%+d RSI:%+d", 
+                             result ? "✓" : "✗", 
+                             wae_direction, rsi_signal);
+        
+        if(!result)
+        {
+            m_core.LogMessage(3, StringFormat("Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
+                              wae_direction, rsi_signal, EnumToString(m_signal_direction)));
+        }
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| GATE 5: Currency Strength Context (with fallback for indices)   |
+    //+------------------------------------------------------------------+
+    bool ProcessGate5_Context(void)
+    {
+        // Check if Currency Strength is available
+        if(!m_indicators.IsCurrencyStrengthAvailable())
+        {
+            // Fallback for indices - automatically pass
+            m_gate_results[5] = true;
+            m_gate_messages[5] = "G5✓ CS N/A";
+            m_core.LogMessage(3, "Gate 5: Currency Strength not available (Index) - PASS");
+            return true;
+        }
+        
+        // Get Currency Strength values
+        double base_strength, quote_strength;
+        if(!m_indicators.GetCurrencyStrength(base_strength, quote_strength))
+        {
+            // If failed to get values, skip gate (fallback)
+            m_gate_results[5] = true;
+            m_gate_messages[5] = "G5✓ CS Skip";
+            m_core.LogMessage(2, "⚠️ Gate 5: Failed to get CS values - SKIP");
+            return true;
+        }
+        
+        bool result = false;
+        
+        // Validate strength alignment with direction
+        if(m_signal_direction == SIGNAL_DIR_BUY)
+        {
+            // BUY: Base currency should be stronger than quote
+            result = (base_strength > 0 && base_strength > quote_strength);
+        }
+        else if(m_signal_direction == SIGNAL_DIR_SELL)
+        {
+            // SELL: Quote currency should be stronger than base
+            result = (quote_strength > 0 && quote_strength > base_strength);
+        }
+        
+        m_gate_results[5] = result;
+        m_gate_messages[5] = StringFormat("G5%s Base:%.2f Quote:%.2f", 
+                             result ? "✓" : "✗", 
+                             base_strength, quote_strength);
+        
+        if(!result)
+        {
+            m_core.LogMessage(3, StringFormat("Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
+                              base_strength, quote_strength, EnumToString(m_signal_direction)));
+        }
+        
+        return result;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Process All Gates Sequentially                                  |
+    //+------------------------------------------------------------------+
+    bool ProcessAllGates(void)
+    {
+        // Reset state
+        m_mtf_score = 0;
+        m_signal_class = SIGNAL_NONE;
+        m_signal_direction = SIGNAL_DIR_NONE;
+        ArrayInitialize(m_gate_results, false);
+        
+        // Gate 0: Synchronization
+        if(!ProcessGate0_Sync())
+            return false;
+        
+        // Gate 1: Market Access
+        if(!ProcessGate1_Market())
+            return false;
+        
+        // Gate 2: Multi-Timeframe Analysis
+        if(!ProcessGate2_MTF())
+            return false;
+        
+        // Gate 3: Supertrend Direction
+        if(!ProcessGate3_Supertrend())
+            return false;
+        
+        // Gate 4: Momentum (WAE → RSI)
+        if(!ProcessGate4_Momentum())
+            return false;
+        
+        // Gate 5: Currency Strength Context
+        if(!ProcessGate5_Context())
+            return false;
+        
+        // All gates passed
+        LogGateResults(true);
+        return true;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Log Gate Results                                                 |
+    //+------------------------------------------------------------------+
+    void LogGateResults(bool all_passed)
+    {
+        string gate_summary = "Gates: ";
+        for(int i = 0; i < 6; i++)
+        {
+            gate_summary += m_gate_messages[i];
+            if(i < 5) gate_summary += " ";
+        }
+        
+        if(all_passed)
+        {
+            m_core.LogMessage(2, StringFormat("✅ %s | %s %s | Score:%+d",
+                              gate_summary,
+                              EnumToString(m_signal_class),
+                              EnumToString(m_signal_direction),
+                              m_mtf_score));
+        }
+        else
+        {
+            // Find first failed gate
+            int failed_gate = -1;
+            for(int i = 0; i < 6; i++)
+            {
+                if(!m_gate_results[i])
+                {
+                    failed_gate = i;
+                    break;
+                }
+            }
+            
+            m_core.LogMessage(3, StringFormat("❌ Signal REJECTED at Gate %d", failed_gate));
+        }
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Getters                                                          |
+    //+------------------------------------------------------------------+
+    ENUM_SIGNAL_CLASS GetSignalClass(void) const { return m_signal_class; }
+    ENUM_SIGNAL_DIRECTION GetSignalDirection(void) const { return m_signal_direction; }
+    int GetMTFScore(void) const { return m_mtf_score; }
+};
+//+------------------------------------------------------------------+

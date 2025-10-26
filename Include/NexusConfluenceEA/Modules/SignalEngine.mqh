@@ -185,7 +185,7 @@ public:
             m_signal_direction = SIGNAL_DIR_NONE;
             
             m_gate_results[2] = false;
-            m_gate_messages[2] = StringFormat("G2✗ H4/H1 desalinhados");
+            m_gate_messages[2] = "G2✗ H4/H1 desalinhados";
             
             m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: H4/H1 não alinhados | H4:%+d H1:%+d M30:%+d M15:%+d",
                               gg_h4, gg_h1, gg_m30, gg_m15));
@@ -214,7 +214,7 @@ public:
             m_signal_direction = SIGNAL_DIR_NONE;
             
             m_gate_results[2] = false;
-            m_gate_messages[2] = StringFormat("G2✗ TF operacional oposto");
+            m_gate_messages[2] = "G2✗ TF operacional oposto";
             
             string opposite_tf = m30_opposite ? "M30" : "M15";
             m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: %s oposto aos macros | H4:%+d H1:%+d M30:%+d M15:%+d",

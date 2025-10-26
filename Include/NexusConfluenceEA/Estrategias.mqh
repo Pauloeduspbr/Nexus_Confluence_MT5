@@ -925,28 +925,28 @@ bool InitializeIndicators(string symbol)
    }
    
    // RSI OMA - Subwindow 2
+   {f(!ChartIndicatorAdd(0, 2, g_handles.rsi_oper))
+      PrintFormat("   ✅ Currency Strength anexado ao subwindow 1");
+   }  PrintFormat("⚠️ Aviso: Não foi possível anexar RSI OMA ao subwindow 2");
+   }
+   // RSI OMA - Subwindow 2
    if(!ChartIndicatorAdd(0, 2, g_handles.rsi_oper))
-   {
+   {  PrintFormat("   ✅ RSI OMA anexado ao subwindow 2");
       PrintFormat("⚠️ Aviso: Não foi possível anexar RSI OMA ao subwindow 2");
    }
-   else
-   {
+   elseAE - Subwindow 3
+   {f(!ChartIndicatorAdd(0, 3, g_handles.wae_oper))
       PrintFormat("   ✅ RSI OMA anexado ao subwindow 2");
+   }  PrintFormat("⚠️ Aviso: Não foi possível anexar WAE ao subwindow 3");
    }
-   
    // WAE - Subwindow 3
    if(!ChartIndicatorAdd(0, 3, g_handles.wae_oper))
-   {
+   {  PrintFormat("   ✅ WAE anexado ao subwindow 3");
       PrintFormat("⚠️ Aviso: Não foi possível anexar WAE ao subwindow 3");
    }
-   else
-   {
+   elsetFormat("════════════════════════════════════════════════════════════════");
+   {rintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS E ANEXADOS COM SUCESSO!");
       PrintFormat("   ✅ WAE anexado ao subwindow 3");
-   }
-   
-   PrintFormat("════════════════════════════════════════════════════════════════");
-   PrintFormat("✅ TODOS OS 5 INDICADORES INICIALIZADOS E ANEXADOS COM SUCESSO!");
-   PrintFormat("════════════════════════
    }
    
    PrintFormat("════════════════════════════════════════════════════════════════");

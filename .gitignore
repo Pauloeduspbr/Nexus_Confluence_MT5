@@ -64,3 +64,4 @@ rad.json
 .gitignore
 venv/
 venv/bin/activate
+log/log

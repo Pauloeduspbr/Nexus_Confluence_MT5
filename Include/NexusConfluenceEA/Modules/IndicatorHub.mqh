@@ -481,32 +481,22 @@ public:
               m_gg_buffer[4], m_gg_buffer[5], m_gg_buffer[6], m_gg_buffer[7], m_gg_buffer[8]));
         
         // 2. Copy Supertrend (2 candles for tolerance check)
-        // Robust fallback: some builds swap buffer orders
-        double temp_upper[2], temp_lower[2];
-        bool st_ok = (CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_upper) >= 1 &&
-                      CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_lower) >= 1);
-        if(!st_ok)
+        // 🔥 FIX v2.03: TrendMagic tem Buffer 0=UP (linha azul) e Buffer 1=DOWN (linha vermelha)
+        // Então: m_st_lower deve receber Buffer 0 (linha de ALTA)
+        //        m_st_upper deve receber Buffer 1 (linha de BAIXA)
+        double temp_up[2], temp_down[2];
+        if(CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_up) < 1 ||
+           CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_down) < 1)
         {
-            // Try swapped order
-            double temp_a[2], temp_b[2];
-            if(CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_a) >= 1 &&
-               CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_b) >= 1)
-            {
-                ArrayCopy(m_st_upper, temp_a);
-                ArrayCopy(m_st_lower, temp_b);
-                st_ok = true;
-            }
-        }
-        if(!st_ok)
-        {
-            Print("❌ ERROR: Failed to copy Supertrend buffers (all attempts)");
+            Print("❌ ERROR: Failed to copy Supertrend buffers");
             return false;
         }
-        else
-        {
-            if(st_ok && ArraySize(m_st_upper)==0) { ArrayCopy(m_st_upper, temp_upper); ArrayCopy(m_st_lower, temp_lower);} // ensure filled
-            else if(st_ok) { ArrayCopy(m_st_upper, temp_upper); ArrayCopy(m_st_lower, temp_lower);}            
-        }
+        
+        // Armazenar corretamente:
+        // m_st_lower = tendência de ALTA (buffer 0, linha azul)
+        // m_st_upper = tendência de BAIXA (buffer 1, linha vermelha)
+        ArrayCopy(m_st_lower, temp_up);    // Buffer 0 = linha BAIXA (suporte) quando tendência é ALTA
+        ArrayCopy(m_st_upper, temp_down);  // Buffer 1 = linha ALTA (resistência) quando tendência é BAIXA
         
         // 3. Copy WAE (shift=1, single value)
         double temp_wae[1];
@@ -627,26 +617,32 @@ public:
     //+------------------------------------------------------------------+
     int GetSupertrendSignal(void)
     {
-        double price = iClose(m_symbol, m_operational_tf, 1); // Closed bar price
+        // 🔥 FIX v2.03: Lógica corrigida para TrendMagic
+        // m_st_lower = Buffer 0 = linha de ALTA (azul) - ativa quando CCI >= 0
+        // m_st_upper = Buffer 1 = linha de BAIXA (vermelha) - ativa quando CCI <= 0
         
-        // Current candle (shift=1)
-        bool bullish_current = (m_st_lower[0] != EMPTY_VALUE && price > m_st_lower[0]);
-        bool bearish_current = (m_st_upper[0] != EMPTY_VALUE && price < m_st_upper[0]);
+        // Basta verificar qual buffer tem valor (!= EMPTY_VALUE):
+        // Se lower tem valor → tendência de ALTA → retorna +1
+        // Se upper tem valor → tendência de BAIXA → retorna -1
+        
+        // Current candle (shift=1, que está em índice [0] do array)
+        bool bullish_current = (m_st_lower[0] != EMPTY_VALUE);
+        bool bearish_current = (m_st_upper[0] != EMPTY_VALUE);
         
         if(bullish_current) return 1;
         if(bearish_current) return -1;
         
-        // Check previous candle (tolerance)
+        // Check previous candle (tolerance) - índice [1] = shift=2
         if(ArraySize(m_st_lower) > 1 && ArraySize(m_st_upper) > 1)
         {
-            bool bullish_prev = (m_st_lower[1] != EMPTY_VALUE && price > m_st_lower[1]);
-            bool bearish_prev = (m_st_upper[1] != EMPTY_VALUE && price < m_st_upper[1]);
+            bool bullish_prev = (m_st_lower[1] != EMPTY_VALUE);
+            bool bearish_prev = (m_st_upper[1] != EMPTY_VALUE);
             
             if(bullish_prev) return 1;
             if(bearish_prev) return -1;
         }
         
-        return 0; // Neutral/uncertain
+        return 0; // Neutral/uncertain (não deveria acontecer)
     }
     
     //+------------------------------------------------------------------+

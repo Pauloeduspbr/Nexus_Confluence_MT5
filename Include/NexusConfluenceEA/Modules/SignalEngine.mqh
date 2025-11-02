@@ -264,8 +264,9 @@ public:
     
     //+------------------------------------------------------------------+
     //| GATE 3: Supertrend Direction (with 1 candle tolerance)          |
-    //| TOLERÂNCIA: ST=0 permitido para GOOD e PREMIUM                  |
-    //|             ST oposto permitido APENAS para PREMIUM              |
+    //| ✅ LÓGICA CORRETA:                                               |
+    //|    PREMIUM = RIGOROSO (alinhamento perfeito)                     |
+    //|    GOOD = FLEXÍVEL (aceita 1 vela de atraso)                     |
     //+------------------------------------------------------------------+
     bool ProcessGate3_Supertrend(void)
     {
@@ -273,50 +274,74 @@ public:
         
         bool result = false;
         
-        // Check alignment with MTF direction
-        if(m_signal_direction == SIGNAL_DIR_BUY)
+        // ══════════════════════════════════════════════════════════════
+        // PREMIUM: Mais rigoroso - exige alinhamento PERFEITO
+        // ══════════════════════════════════════════════════════════════
+        if(m_signal_class == SIGNAL_PREMIUM)
         {
-            if(st_signal == 1)
+            // PREMIUM requer Supertrend perfeitamente alinhado
+            if(m_signal_direction == SIGNAL_DIR_BUY)
             {
-                // Perfect alignment
-                result = true;
+                result = (st_signal == 1);  // Apenas bullish aceito
             }
-            else if(st_signal == 0)
+            else if(m_signal_direction == SIGNAL_DIR_SELL)
             {
-                // Neutral Supertrend - allow for GOOD and PREMIUM (tolerance)
-                result = (m_signal_class == SIGNAL_GOOD || m_signal_class == SIGNAL_PREMIUM);
-            }
-            else if(st_signal == -1)
-            {
-                // Opposite - ONLY allow for PREMIUM (1 candle lag tolerance)
-                result = (m_signal_class == SIGNAL_PREMIUM);
+                result = (st_signal == -1);  // Apenas bearish aceito
             }
         }
-        else if(m_signal_direction == SIGNAL_DIR_SELL)
+        // ══════════════════════════════════════════════════════════════
+        // GOOD: Mais flexível - aceita 1 vela de atraso (tolerância)
+        // ══════════════════════════════════════════════════════════════
+        else if(m_signal_class == SIGNAL_GOOD)
         {
-            if(st_signal == -1)
+            if(m_signal_direction == SIGNAL_DIR_BUY)
             {
-                // Perfect alignment
-                result = true;
+                // GOOD aceita: Alinhado (+1) OU Neutro (0) OU Oposto recente (-1)
+                if(st_signal == 1)
+                {
+                    result = true;  // Perfeitamente alinhado
+                }
+                else if(st_signal == 0)
+                {
+                    result = true;  // Neutro (transição) - tolerado
+                }
+                else if(st_signal == -1)
+                {
+                    result = true;  // Oposto - tolerância de 1 vela de atraso
+                }
             }
-            else if(st_signal == 0)
+            else if(m_signal_direction == SIGNAL_DIR_SELL)
             {
-                // Neutral Supertrend - allow for GOOD and PREMIUM (tolerance)
-                result = (m_signal_class == SIGNAL_GOOD || m_signal_class == SIGNAL_PREMIUM);
-            }
-            else if(st_signal == 1)
-            {
-                // Opposite - ONLY allow for PREMIUM (1 candle lag tolerance)
-                result = (m_signal_class == SIGNAL_PREMIUM);
+                // GOOD aceita: Alinhado (-1) OU Neutro (0) OU Oposto recente (+1)
+                if(st_signal == -1)
+                {
+                    result = true;  // Perfeitamente alinhado
+                }
+                else if(st_signal == 0)
+                {
+                    result = true;  // Neutro (transição) - tolerado
+                }
+                else if(st_signal == 1)
+                {
+                    result = true;  // Oposto - tolerância de 1 vela de atraso
+                }
             }
         }
         
         m_gate_results[3] = result;
-        m_gate_messages[3] = StringFormat("G3%s ST:%+d", result ? "✓" : "✗", st_signal);
+        m_gate_messages[3] = StringFormat("G3%s ST:%+d [%s]", 
+                             result ? "✓" : "✗", 
+                             st_signal,
+                             EnumToString(m_signal_class));
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s (Class=%s)",
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito",
+                              st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
+        }
+        else
+        {
+            m_core.LogMessage(3, StringFormat("[DEBUG] ✅ Gate 3 PASSED: ST=%+d aligned with %s (Class: %s)",
                               st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         

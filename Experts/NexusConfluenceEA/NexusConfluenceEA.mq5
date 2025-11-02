@@ -1,16 +1,20 @@
 //+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.00   |
+//|                                      Nexus Confluence EA v2.01   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
+//|                                                                    |
+//| v2.01 (02/11/2025): CRITICAL FIX - Gate 3 logic corrected       |
+//|   - PREMIUM: Now requires PERFECT Supertrend alignment (rigorous)|
+//|   - GOOD: Now accepts 1 candle lag tolerance (flexible)          |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.00"
+#property version   "2.01"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.00: Asymmetric Risk + Break Even + Trailing Stop + DD Protection"
+#property description "v2.01: Gate 3 logic corrected (PREMIUM=rigorous, GOOD=flexible)"
 #property strict
 
 // Include MQL5 standard libraries
@@ -54,7 +58,8 @@ CDrawdownProtection  *g_dd_protection = NULL;
 int OnInit()
 {
     Print("==========================================");
-    Print("    NEXUS CONFLUENCE EA v2.00 STARTING    ");
+    Print("    NEXUS CONFLUENCE EA v2.01 STARTING    ");
+    Print("  🔴 CRITICAL UPDATE: Gate 3 logic fixed  ");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -158,7 +163,8 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.00 READY     ");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.01 READY     ");
+    Print("  📊 Gate 3: PREMIUM=rigorous GOOD=flex  ");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -170,7 +176,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.00 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.01 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -716,12 +722,12 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("═══════════════════════════════════════");
-    Print("=== EA CONFIGURATION v2.00 ===");
+    Print("\n=== EA CONFIGURATION v2.01 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
+    Print("🔴 v2.01: Gate 3 logic corrected (PREMIUM=rigorous)");
     
     Print("\n=== ASYMMETRIC RISK MANAGEMENT ===");
     Print("📈 BUY: ", (InpEnableBuy ? "ENABLED" : "DISABLED"));

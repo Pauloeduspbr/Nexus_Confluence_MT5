@@ -481,9 +481,17 @@ public:
               m_gg_buffer[4], m_gg_buffer[5], m_gg_buffer[6], m_gg_buffer[7], m_gg_buffer[8]));
         
         // 2. Copy Supertrend (2 candles for tolerance check)
-        // 🔥 FIX v2.03: TrendMagic tem Buffer 0=UP (linha azul) e Buffer 1=DOWN (linha vermelha)
-        // Então: m_st_lower deve receber Buffer 0 (linha de ALTA)
-        //        m_st_upper deve receber Buffer 1 (linha de BAIXA)
+        // 🔥 ATENÇÃO v2.03: INVERSÃO INTENCIONAL DOS NOMES!
+        // 
+        // TrendMagic_MT5.mq5 tem:
+        //   Buffer 0 = bufferUp (linha AZUL/verde) - tendência de ALTA
+        //   Buffer 1 = bufferDn (linha VERMELHA) - tendência de BAIXA
+        //
+        // Copiamos INVERTIDO para manter compatibilidade semântica interna:
+        //   m_st_lower = Buffer 0 (linha de ALTA)   ← inversão proposital
+        //   m_st_upper = Buffer 1 (linha de BAIXA)  ← inversão proposital
+        //
+        // A lógica em GetSupertrendSignal() compensa essa inversão!
         double temp_up[2], temp_down[2];
         if(CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_up) < 1 ||
            CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_down) < 1)
@@ -492,11 +500,9 @@ public:
             return false;
         }
         
-        // Armazenar corretamente:
-        // m_st_lower = tendência de ALTA (buffer 0, linha azul)
-        // m_st_upper = tendência de BAIXA (buffer 1, linha vermelha)
-        ArrayCopy(m_st_lower, temp_up);    // Buffer 0 = linha BAIXA (suporte) quando tendência é ALTA
-        ArrayCopy(m_st_upper, temp_down);  // Buffer 1 = linha ALTA (resistência) quando tendência é BAIXA
+        // Inversão intencional (compensada em GetSupertrendSignal):
+        ArrayCopy(m_st_lower, temp_up);    // Buffer 0 (ALTA) → m_st_lower
+        ArrayCopy(m_st_upper, temp_down);  // Buffer 1 (BAIXA) → m_st_upper
         
         // 3. Copy WAE (shift=1, single value)
         double temp_wae[1];
@@ -617,32 +623,48 @@ public:
     //+------------------------------------------------------------------+
     int GetSupertrendSignal(void)
     {
-        // 🔥 FIX v2.03: Lógica corrigida para TrendMagic
-        // m_st_lower = Buffer 0 = linha de ALTA (azul) - ativa quando CCI >= 0
-        // m_st_upper = Buffer 1 = linha de BAIXA (vermelha) - ativa quando CCI <= 0
+        // 🔥 FIX v2.03: CORREÇÃO CRÍTICA da inversão de buffers
+        // 
+        // TrendMagic_MT5.mq5 tem:
+        //   Buffer 0 = bufferUp (linha AZUL) - tendência de ALTA (CCI >= 0)
+        //   Buffer 1 = bufferDn (linha VERMELHA) - tendência de BAIXA (CCI <= 0)
+        //
+        // MAS na linha 520, a cópia está INVERTIDA:
+        //   ArrayCopy(m_st_lower, temp_up);    // m_st_lower recebe Buffer 0 (AZUL/ALTA)
+        //   ArrayCopy(m_st_upper, temp_down);  // m_st_upper recebe Buffer 1 (VERMELHA/BAIXA)
+        //
+        // PORTANTO: A lógica de teste deve considerar essa INVERSÃO!
         
-        // Basta verificar qual buffer tem valor (!= EMPTY_VALUE):
-        // Se lower tem valor → tendência de ALTA → retorna +1
-        // Se upper tem valor → tendência de BAIXA → retorna -1
-        
-        // Current candle (shift=1, que está em índice [0] do array)
-        bool bullish_current = (m_st_lower[0] != EMPTY_VALUE);
-        bool bearish_current = (m_st_upper[0] != EMPTY_VALUE);
-        
-        if(bullish_current) return 1;
-        if(bearish_current) return -1;
-        
-        // Check previous candle (tolerance) - índice [1] = shift=2
-        if(ArraySize(m_st_lower) > 1 && ArraySize(m_st_upper) > 1)
+        // Se m_st_lower tem valor (que é Buffer 0 = linha AZUL = ALTA)
+        if(m_st_lower[0] != EMPTY_VALUE && m_st_upper[0] == EMPTY_VALUE)
         {
-            bool bullish_prev = (m_st_lower[1] != EMPTY_VALUE);
-            bool bearish_prev = (m_st_upper[1] != EMPTY_VALUE);
-            
-            if(bullish_prev) return 1;
-            if(bearish_prev) return -1;
+            return 1;  // ✅ BULLISH - linha AZUL ativa
         }
         
-        return 0; // Neutral/uncertain (não deveria acontecer)
+        // Se m_st_upper tem valor (que é Buffer 1 = linha VERMELHA = BAIXA)
+        if(m_st_upper[0] != EMPTY_VALUE && m_st_lower[0] == EMPTY_VALUE)
+        {
+            return -1;  // ✅ BEARISH - linha VERMELHA ativa
+        }
+        
+        // Tolerância de 1 vela: verificar vela anterior se ambos estão EMPTY_VALUE
+        if(ArraySize(m_st_lower) > 1 && ArraySize(m_st_upper) > 1)
+        {
+            if(m_st_lower[0] == EMPTY_VALUE && m_st_upper[0] == EMPTY_VALUE)
+            {
+                // Verificar vela anterior [1] = shift=2
+                if(m_st_lower[1] != EMPTY_VALUE && m_st_upper[1] == EMPTY_VALUE)
+                {
+                    return 1;  // ✅ BULLISH na vela anterior
+                }
+                if(m_st_upper[1] != EMPTY_VALUE && m_st_lower[1] == EMPTY_VALUE)
+                {
+                    return -1;  // ✅ BEARISH na vela anterior
+                }
+            }
+        }
+        
+        return 0; // Neutro/incerto
     }
     
     //+------------------------------------------------------------------+

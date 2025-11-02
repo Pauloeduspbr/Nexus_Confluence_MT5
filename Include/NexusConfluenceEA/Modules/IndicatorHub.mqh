@@ -56,6 +56,46 @@ private:
     
     // Synchronization timestamp
     datetime        m_last_update_time;
+
+    // ──────────────────────────────────────────────────────────────
+    // Indicator input parameters (configuráveis via EA Inputs)
+    // ──────────────────────────────────────────────────────────────
+    // GG TrendBar
+    color               m_gg_up_color;
+    color               m_gg_down_color;
+    color               m_gg_flat_color;
+    color               m_gg_text_color;
+    ENUM_BASE_CORNER    m_gg_corner;
+    bool                m_gg_create_objects;
+    int                 m_gg_adx_period;
+    ENUM_APPLIED_PRICE  m_gg_adx_price;
+    double              m_gg_psar_step;
+    double              m_gg_psar_max;
+
+    // Supertrend (TrendMagic_MT5)
+    int                 m_st_cci_period;
+    int                 m_st_atr_period;
+    double              m_st_atr_multiplier;
+
+    // WAE
+    int                 m_wae_fast_ma;
+    int                 m_wae_slow_ma;
+    int                 m_wae_bb_length;
+    double              m_wae_bb_multiplier;
+    int                 m_wae_sensitivity;
+
+    // RSI OMA
+    int                 m_rsi_period;
+    int                 m_rsi_ma_period;
+    ENUM_MA_METHOD      m_rsi_ma_method;
+    double              m_rsi_high_level;
+    double              m_rsi_low_level;
+    bool                m_rsi_show_levels;
+
+    // Currency Strength
+    int                 m_cs_calc_period;
+    int                 m_cs_smoothing;
+    bool                m_cs_show_percent;
     
 public:
     //+------------------------------------------------------------------+
@@ -125,52 +165,217 @@ public:
     //+------------------------------------------------------------------+
     //| Initialization - Create all indicator handles                   |
     //+------------------------------------------------------------------+
-    bool Init(string symbol, ENUM_TIMEFRAMES operational_tf)
+    bool Init(string symbol, ENUM_TIMEFRAMES operational_tf,
+              // GG TrendBar
+              color gg_up_color, color gg_down_color, color gg_flat_color, color gg_text_color,
+              ENUM_BASE_CORNER gg_corner, bool gg_create_objects,
+              int gg_adx_period, ENUM_APPLIED_PRICE gg_adx_price, double gg_psar_step, double gg_psar_max,
+              // Supertrend (TrendMagic)
+              int st_cci_period, int st_atr_period, double st_atr_multiplier,
+              // WAE
+              int wae_fast_ma, int wae_slow_ma, int wae_bb_length, double wae_bb_multiplier, int wae_sensitivity,
+              // RSI OMA
+              int rsi_period, int rsi_ma_period, ENUM_MA_METHOD rsi_ma_method, double rsi_high_level, double rsi_low_level, bool rsi_show_levels,
+              // Currency Strength
+              int cs_calc_period, int cs_smoothing, bool cs_show_percent)
     {
         m_symbol = symbol;
         m_operational_tf = operational_tf;
         
+        // Store parameters
+        m_gg_up_color = gg_up_color;
+        m_gg_down_color = gg_down_color;
+        m_gg_flat_color = gg_flat_color;
+        m_gg_text_color = gg_text_color;
+        m_gg_corner = gg_corner;
+        m_gg_create_objects = gg_create_objects;
+        m_gg_adx_period = gg_adx_period;
+        m_gg_adx_price = gg_adx_price;
+        m_gg_psar_step = gg_psar_step;
+        m_gg_psar_max = gg_psar_max;
+        
+        m_st_cci_period = st_cci_period;
+        m_st_atr_period = st_atr_period;
+        m_st_atr_multiplier = st_atr_multiplier;
+        
+        m_wae_fast_ma = wae_fast_ma;
+        m_wae_slow_ma = wae_slow_ma;
+        m_wae_bb_length = wae_bb_length;
+        m_wae_bb_multiplier = wae_bb_multiplier;
+        m_wae_sensitivity = wae_sensitivity;
+        
+        m_rsi_period = rsi_period;
+        m_rsi_ma_period = rsi_ma_period;
+        m_rsi_ma_method = rsi_ma_method;
+        m_rsi_high_level = rsi_high_level;
+        m_rsi_low_level = rsi_low_level;
+        m_rsi_show_levels = rsi_show_levels;
+        
+        m_cs_calc_period = cs_calc_period;
+        m_cs_smoothing = cs_smoothing;
+        m_cs_show_percent = cs_show_percent;
+        
         Print("📊 Initializing IndicatorHub for ", m_symbol, " on ", EnumToString(operational_tf));
         Print("   Looking for indicators in MQL5\\Indicators\\NexusConfluenceEA\\");
         
-        // 1. GG TrendBar Indicator
-        m_gg_handle = LoadIndicator(m_symbol, operational_tf, "GG_TrendBar_Indicator.ex5", "GG TrendBar");
-        if(m_gg_handle == INVALID_HANDLE)
+        // 1. GG TrendBar Indicator (try multiple paths and names)
         {
-            return false;
+            string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
+            int handle = INVALID_HANDLE;
+            for(int i = 0; i < ArraySize(paths); i++)
+            {
+                string full_path = paths[i] + "GG_TrendBar_Indicator.ex5";
+                handle = iCustom(m_symbol, operational_tf, full_path,
+                                 m_gg_up_color, m_gg_down_color, m_gg_flat_color, m_gg_text_color,
+                                 m_gg_corner, m_gg_create_objects,
+                                 m_gg_adx_period, m_gg_adx_price, m_gg_psar_step, m_gg_psar_max);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_gg_handle = handle;
+                    Print("✅ GG TrendBar loaded from: ", full_path);
+                    break;
+                }
+                // Try without extension as some terminals require base name
+                string base_path = paths[i] + "GG_TrendBar_Indicator";
+                handle = iCustom(m_symbol, operational_tf, base_path,
+                                 m_gg_up_color, m_gg_down_color, m_gg_flat_color, m_gg_text_color,
+                                 m_gg_corner, m_gg_create_objects,
+                                 m_gg_adx_period, m_gg_adx_price, m_gg_psar_step, m_gg_psar_max);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_gg_handle = handle;
+                    Print("✅ GG TrendBar loaded from: ", base_path);
+                    break;
+                }
+                ResetLastError();
+            }
+            if(m_gg_handle == INVALID_HANDLE)
+                return false;
         }
         
-        // 2. TrendMagic (Supertrend)
-        m_supertrend_handle = LoadIndicator(m_symbol, operational_tf, "TrendMagic_MT5.ex5", "Supertrend");
-        if(m_supertrend_handle == INVALID_HANDLE)
+        // 2. TrendMagic (Supertrend) – try with and without extension
         {
-            return false;
+            string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
+            int handle = INVALID_HANDLE;
+            for(int i = 0; i < ArraySize(paths); i++)
+            {
+                string full_path = paths[i] + "TrendMagic_MT5.ex5";
+                handle = iCustom(m_symbol, operational_tf, full_path,
+                                 m_st_cci_period, m_st_atr_period, m_st_atr_multiplier);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_supertrend_handle = handle;
+                    Print("✅ Supertrend loaded from: ", full_path);
+                    break;
+                }
+                string base_path = paths[i] + "TrendMagic_MT5";
+                handle = iCustom(m_symbol, operational_tf, base_path,
+                                 m_st_cci_period, m_st_atr_period, m_st_atr_multiplier);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_supertrend_handle = handle;
+                    Print("✅ Supertrend loaded from: ", base_path);
+                    break;
+                }
+                ResetLastError();
+            }
+            if(m_supertrend_handle == INVALID_HANDLE)
+                return false;
         }
         
-        // 3. Waddah Attar Explosion
-        m_wae_handle = LoadIndicator(m_symbol, operational_tf, "WaddahAttarExplosion_Professional.ex5", "WAE");
-        if(m_wae_handle == INVALID_HANDLE)
+        // 3. Waddah Attar Explosion (WAE) – try with and without extension
         {
-            return false;
+            string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
+            int handle = INVALID_HANDLE;
+            for(int i = 0; i < ArraySize(paths); i++)
+            {
+                string full_path = paths[i] + "WaddahAttarExplosion_Professional.ex5";
+                handle = iCustom(m_symbol, operational_tf, full_path,
+                                 m_wae_fast_ma, m_wae_slow_ma, m_wae_bb_length, m_wae_bb_multiplier, m_wae_sensitivity);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_wae_handle = handle;
+                    Print("✅ WAE loaded from: ", full_path);
+                    break;
+                }
+                string base_path = paths[i] + "WaddahAttarExplosion_Professional";
+                handle = iCustom(m_symbol, operational_tf, base_path,
+                                 m_wae_fast_ma, m_wae_slow_ma, m_wae_bb_length, m_wae_bb_multiplier, m_wae_sensitivity);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_wae_handle = handle;
+                    Print("✅ WAE loaded from: ", base_path);
+                    break;
+                }
+                ResetLastError();
+            }
+            if(m_wae_handle == INVALID_HANDLE)
+                return false;
         }
         
-        // 4. RSI OMA
-        m_rsi_oma_handle = LoadIndicator(m_symbol, operational_tf, "RSIOMA_v2HHLSX_MT5.ex5", "RSI OMA");
-        if(m_rsi_oma_handle == INVALID_HANDLE)
+        // 4. RSI OMA – try with and without extension
         {
-            return false;
+            string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
+            int handle = INVALID_HANDLE;
+            for(int i = 0; i < ArraySize(paths); i++)
+            {
+                string full_path = paths[i] + "RSIOMA_v2HHLSX_MT5.ex5";
+                handle = iCustom(m_symbol, operational_tf, full_path,
+                                 m_rsi_period, m_rsi_ma_period, m_rsi_ma_method, m_rsi_high_level, m_rsi_low_level, m_rsi_show_levels);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_rsi_oma_handle = handle;
+                    Print("✅ RSI OMA loaded from: ", full_path);
+                    break;
+                }
+                string base_path = paths[i] + "RSIOMA_v2HHLSX_MT5";
+                handle = iCustom(m_symbol, operational_tf, base_path,
+                                 m_rsi_period, m_rsi_ma_period, m_rsi_ma_method, m_rsi_high_level, m_rsi_low_level, m_rsi_show_levels);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_rsi_oma_handle = handle;
+                    Print("✅ RSI OMA loaded from: ", base_path);
+                    break;
+                }
+                ResetLastError();
+            }
+            if(m_rsi_oma_handle == INVALID_HANDLE)
+                return false;
         }
         
-        // 5. Currency Strength (with fallback for indices)
-        m_currency_handle = LoadIndicator(m_symbol, operational_tf, "CurrencyStrengthMeter_MT5.ex5", "Currency Strength");
-        if(m_currency_handle == INVALID_HANDLE)
+        // 5. Currency Strength (with fallback for indices) – try with and without extension
         {
-            Print("⚠️ WARNING: Currency Strength not available - will skip Gate 5 for indices");
-            m_cs_available = false;
-        }
-        else
-        {
-            m_cs_available = true;
+            string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
+            int handle = INVALID_HANDLE;
+            for(int i = 0; i < ArraySize(paths); i++)
+            {
+                string full_path = paths[i] + "CurrencyStrengthMeter_MT5.ex5";
+                handle = iCustom(m_symbol, operational_tf, full_path,
+                                 m_cs_calc_period, m_cs_smoothing, m_cs_show_percent);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_currency_handle = handle;
+                    m_cs_available = true;
+                    Print("✅ Currency Strength loaded from: ", full_path);
+                    break;
+                }
+                string base_path = paths[i] + "CurrencyStrengthMeter_MT5";
+                handle = iCustom(m_symbol, operational_tf, base_path,
+                                 m_cs_calc_period, m_cs_smoothing, m_cs_show_percent);
+                if(handle != INVALID_HANDLE)
+                {
+                    m_currency_handle = handle;
+                    m_cs_available = true;
+                    Print("✅ Currency Strength loaded from: ", base_path);
+                    break;
+                }
+                ResetLastError();
+            }
+            if(m_currency_handle == INVALID_HANDLE)
+            {
+                Print("⚠️ WARNING: Currency Strength not available - will skip Gate 5 for indices");
+                m_cs_available = false;
+            }
         }
         
         // Wait for indicators to initialize
@@ -225,26 +430,83 @@ public:
     {
         m_last_update_time = sync_time;
         
-        // 1. Copy GG TrendBar (9 timeframes at shift=1)
-        // Buffer index 0-8 corresponds to M1, M5, M15, M30, H1, H4, D1, W1, MN1
-        double temp_gg[9];
-        if(CopyBuffer(m_gg_handle, 0, 1, 9, temp_gg) != 9)
+        // 1. Copy GG TrendBar (9 BUFFERS SEPARADOS at shift=1)
+        // ✅ FIX CRÍTICO v2.20: GG_TrendBar agora desenha NO PREÇO (visual)
+        // MAS os valores LÓGICOS -1/0/+1 ainda são acessíveis via buffers adicionais
+        // PORÉM: Como modificamos para desenhar no preço, precisamos CONVERTER de volta
+        // O buffer contém: EMPTY_VALUE (neutro) ou preço (com tendência)
+        // A COR do buffer indica a direção: 0=verde(+1), 1=vermelho(-1), 2=amarelo(0)
+        
+        double temp_gg_val[1];
+        double temp_gg_color[1];
+        
+        for(int i = 0; i < 9; i++)
         {
-            Print("❌ ERROR: Failed to copy GG TrendBar buffer");
-            return false;
+            // Copiar buffer de VALOR (contém preço ou EMPTY_VALUE)
+            if(CopyBuffer(m_gg_handle, i, 1, 1, temp_gg_val) != 1)
+            {
+                Print("❌ ERROR: Failed to copy GG TrendBar value buffer ", i);
+                return false;
+            }
+            
+            // Copiar buffer de COR (índice 9+i, contém 0/1/2)
+            if(CopyBuffer(m_gg_handle, 9 + i, 1, 1, temp_gg_color) != 1)
+            {
+                Print("❌ ERROR: Failed to copy GG TrendBar color buffer ", i);
+                return false;
+            }
+            
+            double val_raw = temp_gg_val[0];
+            double color_idx = temp_gg_color[0];
+            
+            // Converter COR de volta para valor lógico
+            double logical_val = 0.0;
+            if(val_raw != EMPTY_VALUE && val_raw > 0)  // Há tendência
+            {
+                if(color_idx == 0) logical_val = 1.0;      // Verde = +1
+                else if(color_idx == 1) logical_val = -1.0; // Vermelho = -1
+                else logical_val = 0.0;                    // Amarelo = 0
+            }
+            else
+            {
+                logical_val = 0.0;  // EMPTY_VALUE = sem tendência = 0
+            }
+            
+            m_gg_buffer[i] = logical_val;
         }
-        ArrayCopy(m_gg_buffer, temp_gg);
+        
+        // Log GG values for debugging synchronization
+        Print(StringFormat("📊 GG TrendBar [shift=1]: M1:%.0f M5:%.0f M15:%.0f M30:%.0f H1:%.0f H4:%.0f D1:%.0f W1:%.0f MN1:%.0f",
+              m_gg_buffer[0], m_gg_buffer[1], m_gg_buffer[2], m_gg_buffer[3],
+              m_gg_buffer[4], m_gg_buffer[5], m_gg_buffer[6], m_gg_buffer[7], m_gg_buffer[8]));
         
         // 2. Copy Supertrend (2 candles for tolerance check)
+        // Robust fallback: some builds swap buffer orders
         double temp_upper[2], temp_lower[2];
-        if(CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_upper) < 1 ||
-           CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_lower) < 1)
+        bool st_ok = (CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_upper) >= 1 &&
+                      CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_lower) >= 1);
+        if(!st_ok)
         {
-            Print("❌ ERROR: Failed to copy Supertrend buffers");
+            // Try swapped order
+            double temp_a[2], temp_b[2];
+            if(CopyBuffer(m_supertrend_handle, 1, 1, 2, temp_a) >= 1 &&
+               CopyBuffer(m_supertrend_handle, 0, 1, 2, temp_b) >= 1)
+            {
+                ArrayCopy(m_st_upper, temp_a);
+                ArrayCopy(m_st_lower, temp_b);
+                st_ok = true;
+            }
+        }
+        if(!st_ok)
+        {
+            Print("❌ ERROR: Failed to copy Supertrend buffers (all attempts)");
             return false;
         }
-        ArrayCopy(m_st_upper, temp_upper);
-        ArrayCopy(m_st_lower, temp_lower);
+        else
+        {
+            if(st_ok && ArraySize(m_st_upper)==0) { ArrayCopy(m_st_upper, temp_upper); ArrayCopy(m_st_lower, temp_lower);} // ensure filled
+            else if(st_ok) { ArrayCopy(m_st_upper, temp_upper); ArrayCopy(m_st_lower, temp_lower);}            
+        }
         
         // 3. Copy WAE (shift=1, single value)
         double temp_wae[1];
@@ -262,12 +524,26 @@ public:
         }
         m_wae_trend_down = temp_wae[0];
         
-        if(CopyBuffer(m_wae_handle, 2, 1, 1, temp_wae) != 1)
+        // Explosion line index may vary across WAE versions; try a set of candidates
+        int wae_explosion_candidates[3] = {2,3,4};
+        bool got_explosion = false;
+        for(int k=0; k<3 && !got_explosion; k++)
         {
-            Print("❌ ERROR: Failed to copy WAE Explosion Line buffer");
+            if(CopyBuffer(m_wae_handle, wae_explosion_candidates[k], 1, 1, temp_wae) == 1)
+            {
+                m_wae_explosion_line = temp_wae[0];
+                got_explosion = true;
+            }
+            else
+            {
+                ResetLastError();
+            }
+        }
+        if(!got_explosion)
+        {
+            Print("❌ ERROR: Failed to copy WAE Explosion Line buffer (2/3/4)");
             return false;
         }
-        m_wae_explosion_line = temp_wae[0];
         
         // 4. Copy RSI OMA (shift=1, single value)
         double temp_rsi[1];
@@ -404,6 +680,58 @@ public:
         if(m_rsi_red > m_rsi_blue) return 1;   // Buy signal
         if(m_rsi_red < m_rsi_blue) return -1;  // Sell signal
         return 0;
+    }
+
+    //+------------------------------------------------------------------+
+    //| Realtime (shift=0) accessors – guard right before placing order  |
+    //+------------------------------------------------------------------+
+    bool IsWAEExpandingRealtime(const int shift = 0)
+    {
+        double up[1], down[1], expl[1];
+        if(CopyBuffer(m_wae_handle, 0, shift, 1, up) != 1) return false;
+        if(CopyBuffer(m_wae_handle, 1, shift, 1, down) != 1) return false;
+        if(CopyBuffer(m_wae_handle, 2, shift, 1, expl) != 1) return false;
+        return (up[0] > expl[0]) || (down[0] > expl[0]);
+    }
+
+    int GetWAEDirectionRealtime(const int shift = 0)
+    {
+        double up[1], down[1];
+        if(CopyBuffer(m_wae_handle, 0, shift, 1, up) != 1) return 0;
+        if(CopyBuffer(m_wae_handle, 1, shift, 1, down) != 1) return 0;
+        if(up[0] > down[0]) return 1;
+        if(down[0] > up[0]) return -1;
+        return 0;
+    }
+
+    int GetRSIOMASignalRealtime(const int shift = 0)
+    {
+        double red[1], blue[1];
+        if(CopyBuffer(m_rsi_oma_handle, 0, shift, 1, red) != 1) return 0;
+        if(CopyBuffer(m_rsi_oma_handle, 1, shift, 1, blue) != 1) return 0;
+        if(red[0] > blue[0]) return 1;
+        if(red[0] < blue[0]) return -1;
+        return 0;
+    }
+
+    // Returns true when realtime momentum clearly opposes expected_dir
+    // expected_dir: +1=BUY, -1=SELL
+    bool IsRealtimeMomentumOppositeTo(const int expected_dir)
+    {
+        // If we cannot read, be conservative and return false (do not block)
+        int wae_dir = GetWAEDirectionRealtime(0);
+        bool wae_exp = IsWAEExpandingRealtime(0);
+        int rsi_dir = GetRSIOMASignalRealtime(0);
+
+        // Block if WAE is expanding strongly in the opposite direction
+        if(wae_exp && wae_dir != 0 && wae_dir == -expected_dir)
+            return true;
+
+        // Secondary guard: RSI also flipped opposite (optional confirm)
+        if(rsi_dir != 0 && rsi_dir == -expected_dir)
+            return true;
+
+        return false;
     }
     
     //+------------------------------------------------------------------+

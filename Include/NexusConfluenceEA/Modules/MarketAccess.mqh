@@ -42,7 +42,6 @@ private:
     
     // Market configuration
     ENUM_MARKET_TYPE m_market_type;
-    bool            m_skip_monday_open;
     int             m_max_spread_points;
     double          m_spread_multiplier;
     
@@ -53,9 +52,8 @@ private:
     int             m_end_hour;
     int             m_end_minute;
     
-    // Monday open protection
-    datetime        m_monday_open_time;
-    int             m_monday_skip_minutes;
+    // Weekly filter (individual days: Sunday=0, Monday=1, ..., Saturday=6)
+    bool            m_trade_on_days[7];
     
 public:
     //+------------------------------------------------------------------+
@@ -67,12 +65,13 @@ public:
         m_spread_period = 20;
         m_spread_index = 0;
         m_market_type = MARKET_UNKNOWN;
-        m_skip_monday_open = false;
         m_max_spread_points = 20;
         m_spread_multiplier = 1.5;
         m_use_time_filter = false;
-        m_monday_open_time = 0;
-        m_monday_skip_minutes = 30;
+        
+        // Initialize all days as enabled by default
+        for(int i = 0; i < 7; i++)
+            m_trade_on_days[i] = true;
     }
     
     //+------------------------------------------------------------------+
@@ -87,15 +86,25 @@ public:
     //| Initialization                                                   |
     //+------------------------------------------------------------------+
     bool Init(string symbol, int spread_period, double spread_multiplier, 
-              int max_spread, bool skip_monday, bool use_time_filter,
-              string start_time, string end_time)
+              int max_spread, bool use_time_filter, string start_time, 
+              string end_time, bool trade_sunday, bool trade_monday, 
+              bool trade_tuesday, bool trade_wednesday, bool trade_thursday,
+              bool trade_friday, bool trade_saturday)
     {
         m_symbol = symbol;
         m_spread_period = spread_period;
         m_spread_multiplier = spread_multiplier;
         m_max_spread_points = max_spread;
-        m_skip_monday_open = skip_monday;
         m_use_time_filter = use_time_filter;
+        
+        // Set weekly filter
+        m_trade_on_days[0] = trade_sunday;
+        m_trade_on_days[1] = trade_monday;
+        m_trade_on_days[2] = trade_tuesday;
+        m_trade_on_days[3] = trade_wednesday;
+        m_trade_on_days[4] = trade_thursday;
+        m_trade_on_days[5] = trade_friday;
+        m_trade_on_days[6] = trade_saturday;
         
         // Get symbol properties
         m_point = SymbolInfoDouble(m_symbol, SYMBOL_POINT);
@@ -133,6 +142,19 @@ public:
         
         Print(StringFormat("✅ MarketAccess initialized | Type: %s | Spread: %.1fx median | Max: %dpts",
               EnumToString(m_market_type), m_spread_multiplier, m_max_spread_points));
+        
+        // Log weekly filter settings
+        string days_enabled = "";
+        string day_names[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+        for(int i = 0; i < 7; i++)
+        {
+            if(m_trade_on_days[i])
+                days_enabled += day_names[i] + " ";
+        }
+        if(days_enabled != "")
+            Print("📅 Trading allowed on: ", days_enabled);
+        else
+            Print("⚠️ WARNING: No days enabled for trading!");
         
         return true;
     }
@@ -214,8 +236,8 @@ public:
             return false;
         }
         
-        // Check Monday Open skip (Forex/Metals/Indices)
-        if(m_skip_monday_open && ShouldSkipMondayOpen())
+        // Check weekly filter (individual days)
+        if(!IsDayTradingAllowed())
         {
             return false;
         }
@@ -291,51 +313,24 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| Skip Monday Open Protection                                     |
+    //| Check if current day of week is allowed for trading             |
     //+------------------------------------------------------------------+
-    bool ShouldSkipMondayOpen(void)
+    bool IsDayTradingAllowed(void)
     {
         MqlDateTime dt;
-        datetime current_time = TimeCurrent(dt);
+        TimeCurrent(dt);
         
-        // Only apply to Forex, Metals, and Indices
-        if(m_market_type != MARKET_FOREX && 
-           m_market_type != MARKET_METALS && 
-           m_market_type != MARKET_INDICES)
+        // day_of_week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
+        int day = dt.day_of_week;
+        
+        if(!m_trade_on_days[day])
         {
+            string day_names[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+            Print("⏸️ Trading disabled for ", day_names[day]);
             return false;
         }
         
-        // Check if it's Monday
-        if(dt.day_of_week != 1)
-        {
-            m_monday_open_time = 0; // Reset
-            return false;
-        }
-        
-        // Set Monday open time (00:00 Monday server time)
-        if(m_monday_open_time == 0)
-        {
-            MqlDateTime monday_dt = dt;
-            monday_dt.hour = 0;
-            monday_dt.min = 0;
-            monday_dt.sec = 0;
-            m_monday_open_time = StructToTime(monday_dt);
-            
-            Print("🗓️ Monday detected - Skip window active for ", m_monday_skip_minutes, " minutes");
-        }
-        
-        // Check if we're within skip window
-        int minutes_since_open = (int)((current_time - m_monday_open_time) / 60);
-        
-        if(minutes_since_open < m_monday_skip_minutes)
-        {
-            Print(StringFormat("⏸️ Monday Open skip active (%d/%d minutes)", 
-                  minutes_since_open, m_monday_skip_minutes));
-            return true;
-        }
-        
-        return false;
+        return true;
     }
     
     //+------------------------------------------------------------------+

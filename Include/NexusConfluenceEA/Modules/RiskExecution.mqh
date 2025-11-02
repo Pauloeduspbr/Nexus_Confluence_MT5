@@ -307,7 +307,7 @@ public:
             case TRADE_RETCODE_PRICE_CHANGED:
             case TRADE_RETCODE_TIMEOUT:
             case TRADE_RETCODE_PRICE_OFF:
-            case TRADE_RETCODE_SERVER_DISCARD_REQUEST:
+            case TRADE_RETCODE_REJECT:
                 return true;
                 
             default:

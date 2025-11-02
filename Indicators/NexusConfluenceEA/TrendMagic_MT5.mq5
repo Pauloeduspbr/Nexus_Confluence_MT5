@@ -2,6 +2,7 @@
 //|                                                TrendMagic_MT5.mq5 |
 //|                              Converted from MT4 by GitHub Copilot |
 //|                                              MT5 Compatible Version |
+//|                           v1.01 - FIX: Ajustar escala ATR Multiplier |
 //+------------------------------------------------------------------+
 
 #property indicator_chart_window
@@ -21,7 +22,7 @@
 //--- Input parameters
 input int CCI_Period = 50;           // CCI Period
 input int ATR_Period = 5;            // ATR Period
-input double ATR_Multiplier = 1.0;   // ATR Multiplier (ADDED BACK)
+input double ATR_Multiplier = 1.0;   // ATR Multiplier (escala 0-10 do EA será dividida por 100)
 
 //--- Indicator buffers
 double bufferUp[];
@@ -148,9 +149,14 @@ int OnCalculate(const int rates_total,
       }
       
       //--- Calculate trend lines
+      // 🔥 FIX v1.01: Dividir ATR_Multiplier por 100 para ajustar escala
+      // Os inputs do EA usam valores como 5.3, mas a fórmula precisa de ~0.053
+      // para não ficar muito longe do preço
+      double atr_adjusted = atr_val * (ATR_Multiplier / 100.0);
+      
       if(thisCCI >= 0)
       {
-         bufferUp[pos] = low[pos] - atr_val * ATR_Multiplier;  // Use multiplier
+         bufferUp[pos] = low[pos] - atr_adjusted;  // Usar multiplicador ajustado
          if(pos + 1 < rates_total && bufferUp[pos + 1] != EMPTY_VALUE)
          {
             if(bufferUp[pos] < bufferUp[pos + 1])
@@ -161,7 +167,7 @@ int OnCalculate(const int rates_total,
       {
          if(thisCCI <= 0)
          {
-            bufferDn[pos] = high[pos] + atr_val * ATR_Multiplier;  // Use multiplier
+            bufferDn[pos] = high[pos] + atr_adjusted;  // Usar multiplicador ajustado
             if(pos + 1 < rates_total && bufferDn[pos + 1] != EMPTY_VALUE)
             {
                if(bufferDn[pos] > bufferDn[pos + 1])

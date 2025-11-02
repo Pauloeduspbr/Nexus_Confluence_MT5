@@ -1,11 +1,12 @@
 //+------------------------------------------------------------------+
-//| WaddahAttarExplosion_Professional.mq5 v2.2 ROBUSTO              |
+//| WaddahAttarExplosion_Professional.mq5 v2.21 ROBUSTO              |
 //| WAE usando iMACD + iBands nativos - SEM ERROS                   |
 //| CORREÇÃO: Retry logic + validação inteligente de buffers        |
+//| FIX v2.21: Log de debug para verificar visualização             |
 //+------------------------------------------------------------------+
 #property copyright "Copyright 2025, Adaptive Flow Systems"
 #property link      "https://adaptiveflow.systems"
-#property version   "2.20"
+#property version   "2.21"
 #property strict
 
 #property indicator_separate_window
@@ -81,6 +82,9 @@ int OnInit()
       Print("ERROR: Failed to create WAE indicator handles");
       return(INIT_FAILED);
    }
+   
+   Print("✅ WAE v2.21 inicializado - Fast:", InpFastMA, " Slow:", InpSlowMA, " BB:", InpBBLength, "x", DoubleToString(InpBBMultiplier,1), " Sens:", InpSensitivity);
+   Print("   Buffer 0: Trend Up (verde) | Buffer 1: Trend Down (vermelho) | Buffer 2: Explosion Line (amarelo)");
 
    return(INIT_SUCCEEDED);
 }
@@ -193,6 +197,9 @@ int OnCalculate(const int rates_total,
     }
 
     //--- 🔥 LOOP CORRETO: De limit até 0 (mais recente para mais antigo)
+    static bool first_calc_logged = false;
+    double max_trend = 0, max_expl = 0;
+    
     for(int i = limit; i >= 0; i--)
     {
         //--- Garantir que índices estão dentro dos limites de TODOS os arrays
@@ -236,6 +243,22 @@ int OnCalculate(const int rates_total,
         {
             g_buf_dead_zone[i] = 0.0;
         }
+        
+        //--- 🔥 v2.21: Coletar max para debug
+        if(i == 0 && !first_calc_logged)
+        {
+            max_trend = MathMax(g_buf_trend_up[0], g_buf_trend_down[0]);
+            max_expl = g_buf_explosion_line[0];
+        }
+    }
+    
+    //--- Log primeira vez
+    if(!first_calc_logged && limit >= 0)
+    {
+        Print("✅ WAE v2.21 - Primeira execução completa");
+        Print(StringFormat("   [shift=0] Trend: %.2f | Explosion Line: %.2f | Expanding: %s",
+              max_trend, max_expl, (max_trend > max_expl ? "SIM" : "NÃO")));
+        first_calc_logged = true;
     }
 
     return(rates_total);

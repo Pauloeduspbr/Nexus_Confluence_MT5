@@ -234,13 +234,26 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             }
             
             // ═══════════════════════════════════════════════════════
-            // VALIDAÇÃO CRÍTICA: SL deve estar ABAIXO do preço atual
+            // VALIDAÇÃO CRÍTICA 2: SL deve estar ABAIXO do preço atual
             // ═══════════════════════════════════════════════════════
-            if(new_sl >= current_price)
+            double min_distance_for_be = (m_trigger_buy - m_step_buy) * point; // Distância segura
+            double current_distance = current_price - new_sl;
+            
+            if(current_distance <= 0)
             {
                 Print("⚠️ [BE] BUY #", ticket, ": SL alvo (", new_sl, ") está acima/igual ao preço atual (", current_price, "). Impossível ativar.");
-                Print("   📊 Entry: ", entry_price, " | Trigger: ", m_trigger_buy, " | Step: ", m_step_buy);
-                Print("   💡 Ajuste Step ou aguarde preço ultrapassar Entry+Step antes de ativar BE");
+                Print("   📊 Entry: ", entry_price, " | Profit: +", (int)profit_points, " pts | Trigger: ", m_trigger_buy, " | Step: ", m_step_buy);
+                Print("   💡 CAUSA: Step (", m_step_buy, ") muito pequeno. Preço já ultrapassou Entry+Step.");
+                Print("   🔧 SOLUÇÃO: Aumente BE_Buy_Step ou reduza BE_Buy_Trigger");
+                return false;
+            }
+            
+            if(current_distance < min_distance_for_be)
+            {
+                Print("⚠️ [BE] BUY #", ticket, ": Distância insuficiente entre SL e preço (", 
+                      NormalizeDouble(current_distance/point, 0), " pts < ", 
+                      NormalizeDouble(min_distance_for_be/point, 0), " pts necessários)");
+                Print("   💡 Aguardando preço se afastar mais do SL alvo antes de ativar");
                 return false;
             }
             
@@ -325,13 +338,26 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             }
             
             // ═══════════════════════════════════════════════════════
-            // VALIDAÇÃO CRÍTICA: SL deve estar ACIMA do preço atual
+            // VALIDAÇÃO CRÍTICA 2: SL deve estar ACIMA do preço atual
             // ═══════════════════════════════════════════════════════
-            if(new_sl <= current_price)
+            double min_distance_for_be = (m_trigger_sell - m_step_sell) * point; // Distância segura
+            double current_distance = new_sl - current_price;
+            
+            if(current_distance <= 0)
             {
                 Print("⚠️ [BE] SELL #", ticket, ": SL alvo (", new_sl, ") está abaixo/igual ao preço atual (", current_price, "). Impossível ativar.");
-                Print("   📊 Entry: ", entry_price, " | Trigger: ", m_trigger_sell, " | Step: ", m_step_sell);
-                Print("   💡 Ajuste Step ou aguarde preço ultrapassar Entry-Step antes de ativar BE");
+                Print("   📊 Entry: ", entry_price, " | Profit: +", (int)profit_points, " pts | Trigger: ", m_trigger_sell, " | Step: ", m_step_sell);
+                Print("   💡 CAUSA: Step (", m_step_sell, ") muito pequeno. Preço já ultrapassou Entry-Step.");
+                Print("   🔧 SOLUÇÃO: Aumente BE_Sell_Step ou reduza BE_Sell_Trigger");
+                return false;
+            }
+            
+            if(current_distance < min_distance_for_be)
+            {
+                Print("⚠️ [BE] SELL #", ticket, ": Distância insuficiente entre SL e preço (", 
+                      NormalizeDouble(current_distance/point, 0), " pts < ", 
+                      NormalizeDouble(min_distance_for_be/point, 0), " pts necessários)");
+                Print("   💡 Aguardando preço se afastar mais do SL alvo antes de ativar");
                 return false;
             }
             

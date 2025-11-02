@@ -332,7 +332,12 @@ void CDrawdownProtection::CheckDailyDrawdown(void)
             Print("🚨 [DD] DD DIÁRIO CRÍTICO: ", DoubleToString(dd_percent, 2), "% (limite: ",
                   m_daily_max_dd_percent, "%)");
             
-            ActivateCircuitBreaker("DD diário máximo excedido", 240);  // 4 horas
+            // Pausa progressiva: iniciar com 60 min; aumentar após múltiplas ativações
+            int pause_minutes = 60;
+            if(m_total_circuit_breaks > 2)
+                pause_minutes = 120;  // 2 horas após múltiplas ativações
+            
+            ActivateCircuitBreaker("DD diário máximo", pause_minutes);
         }
         else if(dd_percent >= m_daily_max_dd_percent * 0.75)
         {

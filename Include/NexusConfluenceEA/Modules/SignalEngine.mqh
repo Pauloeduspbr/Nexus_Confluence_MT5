@@ -266,7 +266,8 @@ public:
     //| GATE 3: Supertrend Direction (with 1 candle tolerance)          |
     //| ✅ LÓGICA CORRETA:                                               |
     //|    PREMIUM = RIGOROSO (alinhamento perfeito)                     |
-    //|    GOOD = FLEXÍVEL (aceita 1 vela de atraso)                     |
+    //|    GOOD = FLEXÍVEL (aceita neutro; tolerância já embutida        |
+    //|                        em GetSupertrendSignal via vela anterior) |
     //+------------------------------------------------------------------+
     bool ProcessGate3_Supertrend(void)
     {
@@ -290,41 +291,19 @@ public:
             }
         }
         // ══════════════════════════════════════════════════════════════
-        // GOOD: Mais flexível - aceita 1 vela de atraso (tolerância)
+        // GOOD: Flexível - aceita neutro (0). A tolerância de 1 vela
+        // já é aplicada dentro de GetSupertrendSignal(), que considera
+        // a vela anterior. Portanto, NÃO aceita direção oposta aqui.
         // ══════════════════════════════════════════════════════════════
         else if(m_signal_class == SIGNAL_GOOD)
         {
             if(m_signal_direction == SIGNAL_DIR_BUY)
             {
-                // GOOD aceita: Alinhado (+1) OU Neutro (0) OU Oposto recente (-1)
-                if(st_signal == 1)
-                {
-                    result = true;  // Perfeitamente alinhado
-                }
-                else if(st_signal == 0)
-                {
-                    result = true;  // Neutro (transição) - tolerado
-                }
-                else if(st_signal == -1)
-                {
-                    result = true;  // Oposto - tolerância de 1 vela de atraso
-                }
+                result = (st_signal == 1 || st_signal == 0);
             }
             else if(m_signal_direction == SIGNAL_DIR_SELL)
             {
-                // GOOD aceita: Alinhado (-1) OU Neutro (0) OU Oposto recente (+1)
-                if(st_signal == -1)
-                {
-                    result = true;  // Perfeitamente alinhado
-                }
-                else if(st_signal == 0)
-                {
-                    result = true;  // Neutro (transição) - tolerado
-                }
-                else if(st_signal == 1)
-                {
-                    result = true;  // Oposto - tolerância de 1 vela de atraso
-                }
+                result = (st_signal == -1 || st_signal == 0);
             }
         }
         
@@ -336,12 +315,12 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito",
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito; GOOD não aceita oposto",
                               st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         else
         {
-            m_core.LogMessage(3, StringFormat("[DEBUG] ✅ Gate 3 PASSED: ST=%+d aligned with %s (Class: %s)",
+            m_core.LogMessage(3, StringFormat("[DEBUG] ✅ Gate 3 PASSED: ST=%+d vs %s (Class: %s)",
                               st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         

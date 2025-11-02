@@ -48,7 +48,7 @@ public:
     
     //--- Métodos de validação
     bool IsDirectionAllowed(ENUM_POSITION_TYPE type);
-    bool IsScoreValid(ENUM_POSITION_TYPE type, int score);
+    bool IsScoreValid(ENUM_POSITION_TYPE type, int score, bool is_premium);
     
     //--- Getters de parâmetros
     int GetSL(ENUM_POSITION_TYPE type);
@@ -217,7 +217,7 @@ bool CAsymmetricRisk::IsDirectionAllowed(ENUM_POSITION_TYPE type)
 //+------------------------------------------------------------------+
 //| Valida se um score é suficiente para abrir operação              |
 //+------------------------------------------------------------------+
-bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score)
+bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score, bool is_premium)
 {
     if(!m_initialized)
     {
@@ -229,7 +229,8 @@ bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score)
     
     if(type == POSITION_TYPE_BUY)
     {
-        valid = (score >= m_min_score_buy);
+        int required = m_min_score_buy + (is_premium ? 1 : 0);
+        valid = (score >= required);
         
         if(valid)
             m_signals_buy_accepted++;
@@ -238,7 +239,8 @@ bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score)
     }
     else // SELL
     {
-        valid = (score >= m_min_score_sell);
+        int required = m_min_score_sell + (is_premium ? 1 : 0);
+        valid = (score >= required);
         
         if(valid)
             m_signals_sell_accepted++;

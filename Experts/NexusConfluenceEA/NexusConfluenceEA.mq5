@@ -1,20 +1,21 @@
 //+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.01   |
+//|                                      Nexus Confluence EA v2.02   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
 //|                                                                    |
-//| v2.01 (02/11/2025): CRITICAL FIX - Gate 3 logic corrected       |
-//|   - PREMIUM: Now requires PERFECT Supertrend alignment (rigorous)|
-//|   - GOOD: Now accepts 1 candle lag tolerance (flexible)          |
+//| v2.02 (02/11/2025): Quality fixes                                |
+//|   - Gate 3: GOOD no longer accepts opposite ST; PREMIUM strict   |
+//|   - AsymmetricRisk: Premium requires +1 score (per dir)          |
+//|   - BE/TS: Apply TS only after BE activation to avoid conflicts  |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.01"
+#property version   "2.02"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.01: Gate 3 logic corrected (PREMIUM=rigorous, GOOD=flexible)"
+#property description "v2.02: Gate3 tuned; Premium score; BE→TS ordering"
 #property strict
 
 // Include MQL5 standard libraries
@@ -58,8 +59,8 @@ CDrawdownProtection  *g_dd_protection = NULL;
 int OnInit()
 {
     Print("==========================================");
-    Print("    NEXUS CONFLUENCE EA v2.01 STARTING    ");
-    Print("  🔴 CRITICAL UPDATE: Gate 3 logic fixed  ");
+    Print("    NEXUS CONFLUENCE EA v2.02 STARTING    ");
+    Print("  � Fixes: Gate3, Premium score, BE→TS   ");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -163,8 +164,8 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.01 READY     ");
-    Print("  📊 Gate 3: PREMIUM=rigorous GOOD=flex  ");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.02 READY     ");
+    Print("  📊 Gate3, Score, BE→TS ordering fixed  ");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -176,7 +177,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.01 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.02 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -229,24 +230,30 @@ void OnTick()
         if(ticket > 0)
         {
             // ─────────────────────────────────────────────────────
-            // Apply Break Even (if enabled for this direction)
+            // Apply Break Even and Trailing Stop with ordering
+            // TS only after BE is active to avoid conflicts
             // ─────────────────────────────────────────────────────
-            if(g_break_even != NULL)
+            bool be_enabled = ((pos_type == POSITION_TYPE_BUY && InpBE_Buy_Enable) ||
+                               (pos_type == POSITION_TYPE_SELL && InpBE_Sell_Enable));
+            bool ts_enabled = ((pos_type == POSITION_TYPE_BUY && InpTS_Buy_Enable) ||
+                               (pos_type == POSITION_TYPE_SELL && InpTS_Sell_Enable));
+
+            bool be_active = false;
+            if(g_break_even != NULL && be_enabled)
             {
-                if((pos_type == POSITION_TYPE_BUY && InpBE_Buy_Enable) ||
-                   (pos_type == POSITION_TYPE_SELL && InpBE_Sell_Enable))
+                // First ensure BE is applied/active
+                be_active = g_break_even.IsBEActivated(ticket);
+                if(!be_active)
                 {
                     g_break_even.CheckAndApply(ticket);
+                    be_active = g_break_even.IsBEActivated(ticket);
                 }
             }
-            
-            // ─────────────────────────────────────────────────────
-            // Apply Trailing Stop (if enabled for this direction)
-            // ─────────────────────────────────────────────────────
-            if(g_trailing_stop != NULL)
+
+            if(g_trailing_stop != NULL && ts_enabled)
             {
-                if((pos_type == POSITION_TYPE_BUY && InpTS_Buy_Enable) ||
-                   (pos_type == POSITION_TYPE_SELL && InpTS_Sell_Enable))
+                // Only start/continue TS if BE is already active
+                if(be_active)
                 {
                     g_trailing_stop.Update(ticket);
                 }
@@ -402,11 +409,12 @@ void OnTick()
         }
         
         // Validate score
-        if(!g_asymmetric.IsScoreValid(trade_type, MathAbs(mtf_score)))
+        if(!g_asymmetric.IsScoreValid(trade_type, MathAbs(mtf_score), (signal_class == SIGNAL_PREMIUM)))
         {
-            int min_score = g_asymmetric.GetMinScore(trade_type);
-            g_core.LogMessage(2, StringFormat("⏭️ Score insufficient: %d (min: %d for %s)",
-                             MathAbs(mtf_score), min_score, EnumToString(trade_type)));
+            int base_min = g_asymmetric.GetMinScore(trade_type);
+            int required = base_min + ((signal_class == SIGNAL_PREMIUM) ? 1 : 0);
+            g_core.LogMessage(2, StringFormat("⏭️ Score insufficient: %d (required: %d for %s, class=%s)",
+                             MathAbs(mtf_score), required, EnumToString(trade_type), EnumToString(signal_class)));
             return;
         }
     }
@@ -722,12 +730,12 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("\n=== EA CONFIGURATION v2.01 ===");
+    Print("\n=== EA CONFIGURATION v2.02 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
-    Print("🔴 v2.01: Gate 3 logic corrected (PREMIUM=rigorous)");
+    Print("� v2.02: Gate3 tuned; Premium +1 score; BE→TS ordering");
     
     Print("\n=== ASYMMETRIC RISK MANAGEMENT ===");
     Print("📈 BUY: ", (InpEnableBuy ? "ENABLED" : "DISABLED"));

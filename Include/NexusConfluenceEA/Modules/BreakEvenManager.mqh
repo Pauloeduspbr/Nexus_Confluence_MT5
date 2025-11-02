@@ -232,8 +232,10 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 if(new_sl >= current_tp)
                 {
                     Print("⚠️ [BE] BUY #", ticket, ": BE Step levaria SL acima do TP. Ajustando...");
-                    // Ajustar para ficar 10 pontos abaixo do TP
-                    new_sl = NormalizeDouble(current_tp - (10 * point), digits);
+                    // Ajuste dinâmico: no mínimo 20 pontos OU 5% da distância até o TP
+                    double dist_to_tp = MathAbs(current_tp - entry_price);
+                    double min_distance = MathMax(20 * point, dist_to_tp * 0.05);
+                    new_sl = NormalizeDouble(current_tp - min_distance, digits);
                     
                     // Se ainda assim não é válido, cancelar
                     if(new_sl <= entry_price)
@@ -321,8 +323,10 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 if(new_sl <= current_tp)
                 {
                     Print("⚠️ [BE] SELL #", ticket, ": BE Step levaria SL abaixo do TP. Ajustando...");
-                    // Ajustar para ficar 10 pontos acima do TP
-                    new_sl = NormalizeDouble(current_tp + (10 * point), digits);
+                    // Ajuste dinâmico: no mínimo 20 pontos OU 5% da distância até o TP
+                    double dist_to_tp = MathAbs(entry_price - current_tp);
+                    double min_distance = MathMax(20 * point, dist_to_tp * 0.05);
+                    new_sl = NormalizeDouble(current_tp + min_distance, digits);
                     
                     // Se ainda assim não é válido, cancelar
                     if(new_sl >= entry_price)

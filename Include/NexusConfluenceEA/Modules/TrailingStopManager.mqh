@@ -245,12 +245,19 @@ bool CTrailingStopManager::Update(ulong ticket)
                 double last_price = m_trailing_records[record_idx].last_price;
                 double price_change = MathAbs(current_price - last_price) / point;
                 
-                // Só atualizar se preço moveu pelo menos 50% do step
-                if(price_change < step * 0.5)
+                // Só atualizar se preço moveu pelo menos 75% do step
+                if(price_change < step * 0.75)
+                {
+                    // Se o preço não moveu o suficiente, bloquear updates
+                    // inclusive na mesma barra
+                    if(m_trailing_records[record_idx].last_update == bar_time)
+                        return false;
+                    
                     return false;
+                }
                 
-                // Limitar a 1 atualização por barra
-                if(m_trailing_records[record_idx].last_update == bar_time)
+                // Permitir update na mesma barra se movimento significativo (>=75% step)
+                if(m_trailing_records[record_idx].last_update == bar_time && price_change < step * 0.75)
                     return false;
             }
             
@@ -372,12 +379,19 @@ bool CTrailingStopManager::Update(ulong ticket)
                 double last_price = m_trailing_records[record_idx].last_price;
                 double price_change = MathAbs(current_price - last_price) / point;
                 
-                // Só atualizar se preço moveu pelo menos 50% do step
-                if(price_change < step * 0.5)
+                // Só atualizar se preço moveu pelo menos 75% do step
+                if(price_change < step * 0.75)
+                {
+                    // Se o preço não moveu o suficiente, bloquear updates
+                    // inclusive na mesma barra
+                    if(m_trailing_records[record_idx].last_update == bar_time)
+                        return false;
+                    
                     return false;
+                }
                 
-                // Limitar a 1 atualização por barra
-                if(m_trailing_records[record_idx].last_update == bar_time)
+                // Permitir update na mesma barra se movimento significativo (>=75% step)
+                if(m_trailing_records[record_idx].last_update == bar_time && price_change < step * 0.75)
                     return false;
             }
             

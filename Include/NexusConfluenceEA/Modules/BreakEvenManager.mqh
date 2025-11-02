@@ -223,20 +223,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Calcular novo SL (entry + step)
             double new_sl = NormalizeDouble(entry_price + (m_step_buy * point), digits);
 
-            // ═══════════════════════════════════════════════════════
-            // CAP MÁXIMO: SL NUNCA PODE FICAR ACIMA DE (preço atual - distância mínima)
-            // Distância mínima considera STOPS_LEVEL e FREEZE_LEVEL
-            // ═══════════════════════════════════════════════════════
-            long stop_level_pts  = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-            long freeze_level_pts= SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
-            int min_level_pts = (int)MathMax( (double)stop_level_pts, (double)freeze_level_pts );
-            if(min_level_pts <= 0) min_level_pts = 1; // pelo menos 1 ponto de folga
-            double min_distance = min_level_pts * point;
-            
-            // Limite superior permitido para SL de BUY
-            double sl_max_allowed = NormalizeDouble(current_price - min_distance, digits);
-            if(new_sl > sl_max_allowed)
-                new_sl = sl_max_allowed; // cap para evitar INVALID_STOPS
+            // NOTA: Não capar pelo preço atual — usar SL alvo como referência
             
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em BUY
@@ -264,14 +251,16 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Verificar se novo SL é melhor que o atual
             if(new_sl > current_sl || current_sl == 0)
             {
-                // Verificar distância mínima (STOPS_LEVEL)
+                // Verificar distâncias mínimas (STOPS_LEVEL / FREEZE_LEVEL)
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-                if(stop_level > 0)
+                long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+                int min_level = (int)MathMax((double)stop_level, (double)freeze_level);
+                if(min_level > 0)
                 {
                     double distance_to_price = (current_price - new_sl) / point;
-                    if(distance_to_price < stop_level)
+                    if(distance_to_price < min_level)
                     {
-                        Print("⚠️ [BE] BUY #", ticket, ": SL muito próximo do preço (stops_level=", stop_level, ")");
+                        Print("⚠️ [BE] BUY #", ticket, ": SL muito próximo do preço (min_level=", min_level, ")");
                         return false;
                     }
                 }
@@ -329,20 +318,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Calcular novo SL (entry - step)
             double new_sl = NormalizeDouble(entry_price - (m_step_sell * point), digits);
 
-            // ═══════════════════════════════════════════════════════
-            // CAP MÍNIMO: SL NUNCA PODE FICAR ABAIXO DE (preço atual + distância mínima)
-            // Distância mínima considera STOPS_LEVEL e FREEZE_LEVEL
-            // ═══════════════════════════════════════════════════════
-            long stop_level_pts  = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-            long freeze_level_pts= SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
-            int min_level_pts = (int)MathMax( (double)stop_level_pts, (double)freeze_level_pts );
-            if(min_level_pts <= 0) min_level_pts = 1; // pelo menos 1 ponto de folga
-            double min_distance = min_level_pts * point;
-            
-            // Limite inferior permitido para SL de SELL
-            double sl_min_allowed = NormalizeDouble(current_price + min_distance, digits);
-            if(new_sl < sl_min_allowed)
-                new_sl = sl_min_allowed; // cap para evitar INVALID_STOPS
+            // NOTA: Não capar pelo preço atual — usar SL alvo como referência
             
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em SELL
@@ -370,14 +346,16 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Verificar se novo SL é melhor que o atual (menor para SELL)
             if(new_sl < current_sl || current_sl == 0)
             {
-                // Verificar distância mínima (STOPS_LEVEL)
+                // Verificar distâncias mínimas (STOPS_LEVEL / FREEZE_LEVEL)
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-                if(stop_level > 0)
+                long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+                int min_level = (int)MathMax((double)stop_level, (double)freeze_level);
+                if(min_level > 0)
                 {
                     double distance_to_price = (new_sl - current_price) / point;
-                    if(distance_to_price < stop_level)
+                    if(distance_to_price < min_level)
                     {
-                        Print("⚠️ [BE] SELL #", ticket, ": SL muito próximo do preço (stops_level=", stop_level, ")");
+                        Print("⚠️ [BE] SELL #", ticket, ": SL muito próximo do preço (min_level=", min_level, ")");
                         return false;
                     }
                 }
@@ -435,19 +413,24 @@ bool CBreakEvenManager::IsBEActivated(ulong ticket)
     double entry = PositionGetDouble(POSITION_PRICE_OPEN);
     double sl = PositionGetDouble(POSITION_SL);
     ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-    string symbol = PositionGetString(POSITION_SYMBOL);
-    
     if(sl == 0)
         return false;
     
-    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-    double distance = MathAbs(sl - entry) / point;
-    
-    // Determinar threshold baseado na direção
+    // Referência APENAS no valor de SL vs Entry ± Step (com tolerância pequena)
     int step_threshold = (type == POSITION_TYPE_BUY) ? m_step_buy : m_step_sell;
+    double point = SymbolInfoDouble(PositionGetString(POSITION_SYMBOL), SYMBOL_POINT);
+    double tol = 2 * point; // 2 pontos de tolerância para arredondamentos
     
-    // Considerar BE ativo se SL está próximo ao entry (dentro do step com tolerância)
-    return (distance <= step_threshold * 1.5); // 50% de tolerância
+    if(type == POSITION_TYPE_BUY)
+    {
+        double target = entry + (step_threshold * point);
+        return (sl >= (target - tol));
+    }
+    else // SELL
+    {
+        double target = entry - (step_threshold * point);
+        return (sl <= (target + tol));
+    }
 }
 
 //+------------------------------------------------------------------+

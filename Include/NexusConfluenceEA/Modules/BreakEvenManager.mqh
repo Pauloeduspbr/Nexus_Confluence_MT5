@@ -10,6 +10,44 @@
 #include <Trade\Trade.mqh>
 
 //+------------------------------------------------------------------+
+//| Helper: Descrição de retcodes do MT5                             |
+//+------------------------------------------------------------------+
+string GetRetcodeDescription(uint retcode)
+{
+    switch(retcode)
+    {
+        case TRADE_RETCODE_DONE:           return "Requisição completada";
+        case TRADE_RETCODE_PLACED:         return "Ordem colocada";
+        case TRADE_RETCODE_DONE_PARTIAL:   return "Preenchimento parcial";
+        case TRADE_RETCODE_ERROR:          return "Erro na requisição";
+        case TRADE_RETCODE_TIMEOUT:        return "Timeout";
+        case TRADE_RETCODE_INVALID:        return "Requisição inválida";
+        case TRADE_RETCODE_INVALID_VOLUME: return "Volume inválido";
+        case TRADE_RETCODE_INVALID_PRICE:  return "Preço inválido";
+        case TRADE_RETCODE_INVALID_STOPS:  return "Stop Loss/Take Profit inválido";
+        case TRADE_RETCODE_TRADE_DISABLED: return "Trading desabilitado";
+        case TRADE_RETCODE_MARKET_CLOSED:  return "Mercado fechado";
+        case TRADE_RETCODE_NO_MONEY:       return "Fundos insuficientes";
+        case TRADE_RETCODE_PRICE_CHANGED:  return "Preço mudou (requote)";
+        case TRADE_RETCODE_PRICE_OFF:      return "Sem preço";
+        case TRADE_RETCODE_INVALID_EXPIRATION: return "Expiração inválida";
+        case TRADE_RETCODE_ORDER_CHANGED:  return "Ordem foi modificada";
+        case TRADE_RETCODE_TOO_MANY_REQUESTS: return "Muitas requisições";
+        case TRADE_RETCODE_NO_CHANGES:     return "Sem mudanças na modificação";
+        case TRADE_RETCODE_SERVER_DISABLES_AT: return "AutoTrading desabilitado pelo servidor";
+        case TRADE_RETCODE_CLIENT_DISABLES_AT: return "AutoTrading desabilitado pelo cliente";
+        case TRADE_RETCODE_LOCKED:         return "Requisição bloqueada";
+        case TRADE_RETCODE_FROZEN:         return "Ordem/Posição congelada";
+        case TRADE_RETCODE_INVALID_FILL:   return "Tipo de preenchimento inválido";
+        case TRADE_RETCODE_CONNECTION:     return "Sem conexão";
+        case TRADE_RETCODE_ONLY_REAL:      return "Permitido apenas em conta real";
+        case TRADE_RETCODE_LIMIT_ORDERS:   return "Limite de ordens pendentes";
+        case TRADE_RETCODE_LIMIT_VOLUME:   return "Limite de volume de ordens/posições";
+        default:                           return "Retcode desconhecido: " + IntegerToString(retcode);
+    }
+}
+
+//+------------------------------------------------------------------+
 //| Classe de Gerenciamento de Break Even                            |
 //+------------------------------------------------------------------+
 class CBreakEvenManager
@@ -274,30 +312,60 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                     }
                 }
                 
-                // Modificar posição (usar símbolo em MT5)
-                if(m_trade.PositionModify(symbol, new_sl, current_tp))
+                // 🔥 FIX: Selecionar posição antes de modificar
+                if(!PositionSelectByTicket(ticket))
                 {
-                    // Registrar ativação
-                    int size = ArraySize(m_activated_tickets);
-                    ArrayResize(m_activated_tickets, size + 1);
-                    m_activated_tickets[size] = ticket;
-                    
-                    m_total_activations_buy++;
-                    
-                    double protected_points = (new_sl - entry_price) / point;
-                    
-                    Print("✅ [BE] Break Even ativado para BUY #", ticket);
-                    Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
-                    Print("   🎯 Novo SL: ", new_sl, " (+", (int)protected_points, " pontos protegidos)");
-                    Print("   📈 Entry: ", entry_price, " | TP: ", current_tp);
-                    
-                    return true;
+                    Print("❌ [BE] Posição #", ticket, " perdida durante processamento");
+                    return false;
+                }
+                
+                // 🎯 SOLUÇÃO: Usar diretamente OrderSend com MqlTradeRequest
+                MqlTradeRequest request = {};
+                MqlTradeResult result = {};
+                
+                request.action = TRADE_ACTION_SLTP;
+                request.position = ticket;
+                request.symbol = symbol;
+                request.sl = new_sl;
+                request.tp = current_tp;
+                request.magic = m_trade.RequestMagic();
+                
+                if(OrderSend(request, result))
+                {
+                    if(result.retcode == TRADE_RETCODE_DONE)
+                    {
+                        // Registrar ativação
+                        int size = ArraySize(m_activated_tickets);
+                        ArrayResize(m_activated_tickets, size + 1);
+                        m_activated_tickets[size] = ticket;
+                        
+                        m_total_activations_buy++;
+                        
+                        double protected_points = (new_sl - entry_price) / point;
+                        
+                        Print("✅ [BE] Break Even ativado para BUY #", ticket);
+                        Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
+                        Print("   🎯 Novo SL: ", new_sl, " (+", (int)protected_points, " pontos protegidos)");
+                        Print("   📈 Entry: ", entry_price, " | TP: ", current_tp);
+                        
+                        return true;
+                    }
+                    else
+                    {
+                        Print("❌ [BE] Falha ao modificar BUY #", ticket, 
+                              " - Retcode: ", result.retcode, 
+                              " (", GetRetcodeDescription(result.retcode), ")");
+                        Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, 
+                              " | Price=", current_price, " | Entry=", entry_price);
+                        return false;
+                    }
                 }
                 else
                 {
-                    int ret = (int)m_trade.ResultRetcode();
-                    Print("❌ [BE] Falha ao modificar BUY #", ticket, " - Retcode: ", ret, " (", m_trade.ResultRetcodeDescription(), ")");
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Price=", current_price, " | Entry=", entry_price);
+                    int error = GetLastError();
+                    Print("❌ [BE] Erro ao enviar ordem para BUY #", ticket, " - Error: ", error);
+                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, 
+                          " | Price=", current_price, " | Entry=", entry_price);
                     return false;
                 }
             }
@@ -378,30 +446,60 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                     }
                 }
                 
-                // Modificar posição (usar símbolo em MT5)
-                if(m_trade.PositionModify(symbol, new_sl, current_tp))
+                // 🔥 FIX: Selecionar posição antes de modificar
+                if(!PositionSelectByTicket(ticket))
                 {
-                    // Registrar ativação
-                    int size = ArraySize(m_activated_tickets);
-                    ArrayResize(m_activated_tickets, size + 1);
-                    m_activated_tickets[size] = ticket;
-                    
-                    m_total_activations_sell++;
-                    
-                    double protected_points = (entry_price - new_sl) / point;
-                    
-                    Print("✅ [BE] Break Even ativado para SELL #", ticket);
-                    Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
-                    Print("   🎯 Novo SL: ", new_sl, " (+", (int)protected_points, " pontos protegidos)");
-                    Print("   📉 Entry: ", entry_price, " | TP: ", current_tp);
-                    
-                    return true;
+                    Print("❌ [BE] Posição #", ticket, " perdida durante processamento");
+                    return false;
+                }
+                
+                // 🎯 SOLUÇÃO: Usar diretamente OrderSend com MqlTradeRequest
+                MqlTradeRequest request = {};
+                MqlTradeResult result = {};
+                
+                request.action = TRADE_ACTION_SLTP;
+                request.position = ticket;
+                request.symbol = symbol;
+                request.sl = new_sl;
+                request.tp = current_tp;
+                request.magic = m_trade.RequestMagic();
+                
+                if(OrderSend(request, result))
+                {
+                    if(result.retcode == TRADE_RETCODE_DONE)
+                    {
+                        // Registrar ativação
+                        int size = ArraySize(m_activated_tickets);
+                        ArrayResize(m_activated_tickets, size + 1);
+                        m_activated_tickets[size] = ticket;
+                        
+                        m_total_activations_sell++;
+                        
+                        double protected_points = (entry_price - new_sl) / point;
+                        
+                        Print("✅ [BE] Break Even ativado para SELL #", ticket);
+                        Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
+                        Print("   🎯 Novo SL: ", new_sl, " (+", (int)protected_points, " pontos protegidos)");
+                        Print("   📉 Entry: ", entry_price, " | TP: ", current_tp);
+                        
+                        return true;
+                    }
+                    else
+                    {
+                        Print("❌ [BE] Falha ao modificar SELL #", ticket, 
+                              " - Retcode: ", result.retcode, 
+                              " (", GetRetcodeDescription(result.retcode), ")");
+                        Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, 
+                              " | Price=", current_price, " | Entry=", entry_price);
+                        return false;
+                    }
                 }
                 else
                 {
-                    int ret = (int)m_trade.ResultRetcode();
-                    Print("❌ [BE] Falha ao modificar SELL #", ticket, " - Retcode: ", ret, " (", m_trade.ResultRetcodeDescription(), ")");
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Price=", current_price, " | Entry=", entry_price);
+                    int error = GetLastError();
+                    Print("❌ [BE] Erro ao enviar ordem para SELL #", ticket, " - Error: ", error);
+                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, 
+                          " | Price=", current_price, " | Entry=", entry_price);
                     return false;
                 }
             }

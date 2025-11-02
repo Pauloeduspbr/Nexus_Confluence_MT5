@@ -223,29 +223,25 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Calcular novo SL (entry + step)
             double new_sl = NormalizeDouble(entry_price + (m_step_buy * point), digits);
 
-            // NOTA: Não capar pelo preço atual — usar SL alvo como referência
+            // ═══════════════════════════════════════════════════════
+            // VALIDAÇÃO 1: SL não pode ultrapassar TP em BUY
+            // ═══════════════════════════════════════════════════════
+            if(current_tp > 0 && new_sl >= current_tp)
+            {
+                Print("❌ [BE] BUY #", ticket, ": SL alvo (", new_sl, ") ultrapassaria TP (", current_tp, "). Configuração inválida.");
+                Print("   💡 Ajuste BE_Buy_Step para valor menor que distância até TP");
+                return false;
+            }
             
             // ═══════════════════════════════════════════════════════
-            // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em BUY
+            // VALIDAÇÃO CRÍTICA: SL deve estar ABAIXO do preço atual
             // ═══════════════════════════════════════════════════════
-            if(current_tp > 0)
+            if(new_sl >= current_price)
             {
-                // Para BUY: SL deve estar ABAIXO do TP
-                if(new_sl >= current_tp)
-                {
-                    Print("⚠️ [BE] BUY #", ticket, ": BE Step levaria SL acima do TP. Ajustando...");
-                    // Ajuste dinâmico: no mínimo 20 pontos OU 5% da distância até o TP
-                    double dist_to_tp = MathAbs(current_tp - entry_price);
-                    double min_distance = MathMax(20 * point, dist_to_tp * 0.05);
-                    new_sl = NormalizeDouble(current_tp - min_distance, digits);
-                    
-                    // Se ainda assim não é válido, cancelar
-                    if(new_sl <= entry_price)
-                    {
-                        Print("❌ [BE] BUY #", ticket, ": Impossível ativar BE sem ultrapassar TP");
-                        return false;
-                    }
-                }
+                Print("⚠️ [BE] BUY #", ticket, ": SL alvo (", new_sl, ") está acima/igual ao preço atual (", current_price, "). Impossível ativar.");
+                Print("   📊 Entry: ", entry_price, " | Trigger: ", m_trigger_buy, " | Step: ", m_step_buy);
+                Print("   💡 Ajuste Step ou aguarde preço ultrapassar Entry+Step antes de ativar BE");
+                return false;
             }
             
             // Verificar se novo SL é melhor que o atual
@@ -260,7 +256,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                     double distance_to_price = (current_price - new_sl) / point;
                     if(distance_to_price < min_level)
                     {
-                        Print("⚠️ [BE] BUY #", ticket, ": SL muito próximo do preço (min_level=", min_level, ")");
+                        Print("⚠️ [BE] BUY #", ticket, ": SL muito próximo do preço (min_level=", min_level, " | distância: ", (int)distance_to_price, " pontos)");
                         return false;
                     }
                 }
@@ -318,29 +314,25 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Calcular novo SL (entry - step)
             double new_sl = NormalizeDouble(entry_price - (m_step_sell * point), digits);
 
-            // NOTA: Não capar pelo preço atual — usar SL alvo como referência
+            // ═══════════════════════════════════════════════════════
+            // VALIDAÇÃO 1: SL não pode ultrapassar TP em SELL
+            // ═══════════════════════════════════════════════════════
+            if(current_tp > 0 && new_sl <= current_tp)
+            {
+                Print("❌ [BE] SELL #", ticket, ": SL alvo (", new_sl, ") ultrapassaria TP (", current_tp, "). Configuração inválida.");
+                Print("   💡 Ajuste BE_Sell_Step para valor menor que distância até TP");
+                return false;
+            }
             
             // ═══════════════════════════════════════════════════════
-            // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em SELL
+            // VALIDAÇÃO CRÍTICA: SL deve estar ACIMA do preço atual
             // ═══════════════════════════════════════════════════════
-            if(current_tp > 0)
+            if(new_sl <= current_price)
             {
-                // Para SELL: SL deve estar ACIMA do TP
-                if(new_sl <= current_tp)
-                {
-                    Print("⚠️ [BE] SELL #", ticket, ": BE Step levaria SL abaixo do TP. Ajustando...");
-                    // Ajuste dinâmico: no mínimo 20 pontos OU 5% da distância até o TP
-                    double dist_to_tp = MathAbs(entry_price - current_tp);
-                    double min_distance = MathMax(20 * point, dist_to_tp * 0.05);
-                    new_sl = NormalizeDouble(current_tp + min_distance, digits);
-                    
-                    // Se ainda assim não é válido, cancelar
-                    if(new_sl >= entry_price)
-                    {
-                        Print("❌ [BE] SELL #", ticket, ": Impossível ativar BE sem ultrapassar TP");
-                        return false;
-                    }
-                }
+                Print("⚠️ [BE] SELL #", ticket, ": SL alvo (", new_sl, ") está abaixo/igual ao preço atual (", current_price, "). Impossível ativar.");
+                Print("   📊 Entry: ", entry_price, " | Trigger: ", m_trigger_sell, " | Step: ", m_step_sell);
+                Print("   💡 Ajuste Step ou aguarde preço ultrapassar Entry-Step antes de ativar BE");
+                return false;
             }
             
             // Verificar se novo SL é melhor que o atual (menor para SELL)
@@ -355,7 +347,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                     double distance_to_price = (new_sl - current_price) / point;
                     if(distance_to_price < min_level)
                     {
-                        Print("⚠️ [BE] SELL #", ticket, ": SL muito próximo do preço (min_level=", min_level, ")");
+                        Print("⚠️ [BE] SELL #", ticket, ": SL muito próximo do preço (min_level=", min_level, " | distância: ", (int)distance_to_price, " pontos)");
                         return false;
                     }
                 }

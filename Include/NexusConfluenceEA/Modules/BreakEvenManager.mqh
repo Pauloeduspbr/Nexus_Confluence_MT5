@@ -222,6 +222,21 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
         {
             // Calcular novo SL (entry + step)
             double new_sl = NormalizeDouble(entry_price + (m_step_buy * point), digits);
+
+            // ═══════════════════════════════════════════════════════
+            // CAP MÁXIMO: SL NUNCA PODE FICAR ACIMA DE (preço atual - distância mínima)
+            // Distância mínima considera STOPS_LEVEL e FREEZE_LEVEL
+            // ═══════════════════════════════════════════════════════
+            long stop_level_pts  = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
+            long freeze_level_pts= SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+            int min_level_pts = (int)MathMax( (double)stop_level_pts, (double)freeze_level_pts );
+            if(min_level_pts <= 0) min_level_pts = 1; // pelo menos 1 ponto de folga
+            double min_distance = min_level_pts * point;
+            
+            // Limite superior permitido para SL de BUY
+            double sl_max_allowed = NormalizeDouble(current_price - min_distance, digits);
+            if(new_sl > sl_max_allowed)
+                new_sl = sl_max_allowed; // cap para evitar INVALID_STOPS
             
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em BUY
@@ -282,9 +297,9 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 }
                 else
                 {
-                    int error = GetLastError();
-                    Print("❌ [BE] Falha ao modificar BUY #", ticket, " - Erro: ", error);
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Entry=", entry_price);
+                    int ret = (int)m_trade.ResultRetcode();
+                    Print("❌ [BE] Falha ao modificar BUY #", ticket, " - Retcode: ", ret, " (", m_trade.ResultRetcodeDescription(), ")");
+                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Price=", current_price, " | Entry=", entry_price);
                     return false;
                 }
             }
@@ -313,6 +328,21 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
         {
             // Calcular novo SL (entry - step)
             double new_sl = NormalizeDouble(entry_price - (m_step_sell * point), digits);
+
+            // ═══════════════════════════════════════════════════════
+            // CAP MÍNIMO: SL NUNCA PODE FICAR ABAIXO DE (preço atual + distância mínima)
+            // Distância mínima considera STOPS_LEVEL e FREEZE_LEVEL
+            // ═══════════════════════════════════════════════════════
+            long stop_level_pts  = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
+            long freeze_level_pts= SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+            int min_level_pts = (int)MathMax( (double)stop_level_pts, (double)freeze_level_pts );
+            if(min_level_pts <= 0) min_level_pts = 1; // pelo menos 1 ponto de folga
+            double min_distance = min_level_pts * point;
+            
+            // Limite inferior permitido para SL de SELL
+            double sl_min_allowed = NormalizeDouble(current_price + min_distance, digits);
+            if(new_sl < sl_min_allowed)
+                new_sl = sl_min_allowed; // cap para evitar INVALID_STOPS
             
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: SL não pode ultrapassar TP em SELL
@@ -373,9 +403,9 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 }
                 else
                 {
-                    int error = GetLastError();
-                    Print("❌ [BE] Falha ao modificar SELL #", ticket, " - Erro: ", error);
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Entry=", entry_price);
+                    int ret = (int)m_trade.ResultRetcode();
+                    Print("❌ [BE] Falha ao modificar SELL #", ticket, " - Retcode: ", ret, " (", m_trade.ResultRetcodeDescription(), ")");
+                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Price=", current_price, " | Entry=", entry_price);
                     return false;
                 }
             }

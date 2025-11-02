@@ -229,7 +229,18 @@ bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score, bool is_p
     
     if(type == POSITION_TYPE_BUY)
     {
-        int required = m_min_score_buy + (is_premium ? 1 : 0);
+        // 🔥 FIX v2.03: REMOVIDO o incremento +1 para PREMIUM
+        // PROBLEMA ANTERIOR: required = m_min_score_buy + (is_premium ? 1 : 0)
+        // Com InpMinScoreBuy=4 e score máximo=4:
+        //   - PREMIUM: exigia 4+1=5 → IMPOSSÍVEL! ❌
+        //   - GOOD: exigia 4 → possível com score=4
+        //
+        // CORREÇÃO: O score mínimo já define o filtro necessário.
+        // A classificação PREMIUM/GOOD é feita ANTES no SignalEngine.
+        // PREMIUM (score=4) já indica TODOS os timeframes alinhados!
+        // Adicionar +1 para PREMIUM é contraditório e torna impossível trades PREMIUM.
+        
+        int required = m_min_score_buy;  // ✅ Sem incremento adicional
         valid = (score >= required);
         
         if(valid)
@@ -239,7 +250,8 @@ bool CAsymmetricRisk::IsScoreValid(ENUM_POSITION_TYPE type, int score, bool is_p
     }
     else // SELL
     {
-        int required = m_min_score_sell + (is_premium ? 1 : 0);
+        // 🔥 FIX v2.03: Mesma correção para SELL
+        int required = m_min_score_sell;  // ✅ Sem incremento adicional
         valid = (score >= required);
         
         if(valid)

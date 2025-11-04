@@ -376,11 +376,10 @@ bool CTrailingStopManager::Update(ulong ticket)
                     m_total_updates_buy++;
                     
                     // ═══════════════════════════════════════════════════════
-                    // CRÍTICO: Gravar preço equivalente do SL aplicado
-                    // Para BUY: new_sl + step = preço de referência do próximo passo
+                    // CORREÇÃO CRÍTICA: Gravar preço ATUAL, não new_sl + step
+                    // Isso permite que o próximo trailing seja baseado no preço real
                     // ═══════════════════════════════════════════════════════
-                    double reference_price = new_sl + (step * point);
-                    UpdateRecord(ticket, reference_price, bar_time);
+                    UpdateRecord(ticket, current_price, bar_time);
                     
                     double protected_profit = (new_sl - entry_price) / point;
                     
@@ -534,11 +533,10 @@ bool CTrailingStopManager::Update(ulong ticket)
                     m_total_updates_sell++;
                     
                     // ═══════════════════════════════════════════════════════
-                    // CRÍTICO: Gravar preço equivalente do SL aplicado
-                    // Para SELL: new_sl - step = próximo preço de ativação
+                    // CORREÇÃO CRÍTICA: Gravar preço ATUAL, não new_sl - step
+                    // Isso permite que o próximo trailing seja baseado no preço real
                     // ═══════════════════════════════════════════════════════
-                    double reference_price = new_sl - (step * point);
-                    UpdateRecord(ticket, reference_price, bar_time);
+                    UpdateRecord(ticket, current_price, bar_time);
                     
                     double protected_profit = (entry_price - new_sl) / point;
                     

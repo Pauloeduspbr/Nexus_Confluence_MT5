@@ -421,33 +421,70 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| GATE 5: Currency Strength Context (with fallback for indices)   |
+    //| GATE 5: Currency Strength Context (market-aware)                |
+    //| Required: Forex, Metals | Skipped: Indices/B3 | Optional: Crypto|
     //+------------------------------------------------------------------+
     bool ProcessGate5_Context(void)
     {
-        // Check if Currency Strength is available
-        if(!m_indicators.IsCurrencyStrengthAvailable())
+        ENUM_MARKET_TYPE mtype = m_market.GetMarketType();
+
+        // Indices/B3: skip Gate 5 (not applicable)
+        if(mtype == MARKET_INDICES || mtype == MARKET_B3)
         {
-            // Fallback for indices - automatically pass
             m_gate_results[5] = true;
-            m_gate_messages[5] = "G5✓ CS N/A";
-            m_core.LogMessage(3, "Gate 5: Currency Strength not available (Index) - PASS");
+            m_gate_messages[5] = "G5✓ Skipped (Index)";
+            m_core.LogMessage(3, "Gate 5: Skipped for Indices/B3");
             return true;
         }
-        
-        // Get Currency Strength values
+
+        // Optional for Crypto: if not available, pass; if available, evaluate
+        // Required for Forex/Metals: must be available and valid
+        bool cs_available = m_indicators.IsCurrencyStrengthAvailable();
+
+        if((mtype == MARKET_FOREX || mtype == MARKET_METALS))
+        {
+            if(!cs_available)
+            {
+                m_gate_results[5] = false;
+                m_gate_messages[5] = "G5✗ CS required";
+                m_core.LogMessage(2, "❌ Gate 5 REJECTED: Currency Strength REQUIRED for Forex/Metals but not available");
+                return false;
+            }
+        }
+        else if(mtype == MARKET_CRYPTO)
+        {
+            if(!cs_available)
+            {
+                m_gate_results[5] = true;
+                m_gate_messages[5] = "G5✓ CS N/A (Crypto)";
+                m_core.LogMessage(3, "Gate 5: Currency Strength not available (Crypto) - PASS");
+                return true;
+            }
+        }
+
+        // If we reach here, we should attempt to read CS values (available)
         double base_strength, quote_strength;
         if(!m_indicators.GetCurrencyStrength(base_strength, quote_strength))
         {
-            // If failed to get values, skip gate (fallback)
-            m_gate_results[5] = true;
-            m_gate_messages[5] = "G5✓ CS Skip";
-            m_core.LogMessage(2, "⚠️ Gate 5: Failed to get CS values - SKIP");
-            return true;
+            // For Forex/Metals treat as reject; for Crypto treat as skip/pass
+            if(mtype == MARKET_FOREX || mtype == MARKET_METALS)
+            {
+                m_gate_results[5] = false;
+                m_gate_messages[5] = "G5✗ CS read fail";
+                m_core.LogMessage(2, "❌ Gate 5 REJECTED: Failed to get CS values (Forex/Metals)");
+                return false;
+            }
+            else
+            {
+                m_gate_results[5] = true;
+                m_gate_messages[5] = "G5✓ CS Skip";
+                m_core.LogMessage(3, "Gate 5: Failed to get CS values (non-required) - SKIP");
+                return true;
+            }
         }
-        
+
         bool result = false;
-        
+
         // Validate strength alignment with direction
         if(m_signal_direction == SIGNAL_DIR_BUY)
         {
@@ -459,18 +496,18 @@ public:
             // SELL: Quote currency should be stronger than base
             result = (quote_strength > 0 && quote_strength > base_strength);
         }
-        
+
         m_gate_results[5] = result;
         m_gate_messages[5] = StringFormat("G5%s Base:%.2f Quote:%.2f", 
                              result ? "✓" : "✗", 
                              base_strength, quote_strength);
-        
+
         if(!result)
         {
             m_core.LogMessage(2, StringFormat("❌ Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
                               base_strength, quote_strength, EnumToString(m_signal_direction)));
         }
-        
+
         return result;
     }
     

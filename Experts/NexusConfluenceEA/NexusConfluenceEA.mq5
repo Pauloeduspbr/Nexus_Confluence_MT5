@@ -115,7 +115,7 @@ int OnInit()
     if(!g_indicators.Init(_Symbol, InpOperationalTF,
                           // GG TrendBar
                           InpGG_UpColor, InpGG_DownColor, InpGG_FlatColor, InpGG_TextColor,
-                          InpGG_Corner, InpGG_CreateObjects,
+                          InpGG_Corner, (InpGG_CreateObjects && InpShowPanel),
                           InpGG_ADX_Period, InpGG_ADX_Price, InpGG_PSAR_Step, InpGG_PSAR_Max,
                           // Supertrend (TrendMagic)
                           InpST_CCI_Period, InpST_ATR_Period, InpST_ATR_Multiplier,
@@ -183,18 +183,21 @@ void OnDeinit(const int reason)
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
-    // Print statistics from v2.00 modules
-    if(g_break_even != NULL)
-        g_break_even.PrintStats();
-    
-    if(g_trailing_stop != NULL)
-        g_trailing_stop.PrintStats();
-    
-    if(g_asymmetric != NULL)
-        g_asymmetric.PrintStats();
-    
-    if(g_dd_protection != NULL)
-        g_dd_protection.PrintStats();
+    // Print statistics from v2.00 modules (controlled by InpSaveStats)
+    if(InpSaveStats)
+    {
+        if(g_break_even != NULL)
+            g_break_even.PrintStats();
+        
+        if(g_trailing_stop != NULL)
+            g_trailing_stop.PrintStats();
+        
+        if(g_asymmetric != NULL)
+            g_asymmetric.PrintStats();
+        
+        if(g_dd_protection != NULL)
+            g_dd_protection.PrintStats();
+    }
     
     CleanupModules();
     
@@ -525,6 +528,18 @@ void OnTick()
         g_core.LogMessage(1, StringFormat("📐 R:R: 1:%.2f", (double)tp_points / sl_points));
         g_core.LogMessage(1, "════════════════════════════════════");
         
+        // Optional user notifications
+        string dir_text = (trade_type == POSITION_TYPE_BUY ? "BUY" : "SELL");
+        string class_text = EnumToString(signal_class);
+        string msg = StringFormat("%s %s | %s | Lot: %.2f | Score:%+d | SL:%d TP:%d",
+                                  _Symbol, dir_text, class_text, lot_size, mtf_score, sl_points, tp_points);
+        if(InpEnableAlerts)
+            Alert("Nexus EA: ", msg);
+        if(InpEnablePush)
+            SendNotification(StringFormat("Nexus EA ▶ %s", msg));
+        if(InpEnableEmail)
+            SendMail("Nexus EA - Trade Executed", msg);
+        
         // Update state
         g_core.UpdateStateMachine(STATE_WAITING_CLOSE);
     }
@@ -583,6 +598,16 @@ void OnTradeTransaction(const MqlTradeTransaction& trans,
                          (is_win ? "✅" : "❌"),
                          total_pl,
                          (is_win ? "WIN" : "LOSS")));
+
+        // Optional user notifications on close
+        string res_msg = StringFormat("%s Closed | P/L: $%.2f | %s",
+                                      _Symbol, total_pl, (is_win ? "WIN" : "LOSS"));
+        if(InpEnableAlerts)
+            Alert("Nexus EA: ", res_msg);
+        if(InpEnablePush)
+            SendNotification(StringFormat("Nexus EA ⏹ %s", res_msg));
+        if(InpEnableEmail)
+            SendMail("Nexus EA - Trade Closed", res_msg);
     }
 }
 

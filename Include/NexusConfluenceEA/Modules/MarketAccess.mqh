@@ -58,6 +58,9 @@ private:
     // Log throttling for weekly filter to avoid repetitive messages
     int             m_last_print_day;        // last day-of-week seen (0..6)
     bool            m_last_day_block_logged; // whether 'disabled' was already logged for the current day
+
+    // Throttle for Monday-open skip message
+    bool            m_monday_skip_logged;
     
 public:
     //+------------------------------------------------------------------+
@@ -80,6 +83,7 @@ public:
     // Initialize log throttling
     m_last_print_day = -1;
     m_last_day_block_logged = false;
+    m_monday_skip_logged = false;
     }
     
     //+------------------------------------------------------------------+
@@ -249,6 +253,17 @@ public:
         {
             return false;
         }
+
+        // Skip Monday Open for Forex (gap protection): first 60 minutes
+        if(ShouldSkipMondayOpen())
+        {
+            if(!m_monday_skip_logged)
+            {
+                Print("⏸️ Monday open skip (Forex): skipping first 60 minutes after weekly open");
+                m_monday_skip_logged = true;
+            }
+            return false;
+        }
         
         // Check time filter
         if(m_use_time_filter && !IsWithinTradingHours())
@@ -386,6 +401,7 @@ public:
         {
             m_last_print_day = day;
             m_last_day_block_logged = false;
+            m_monday_skip_logged = false; // reset Monday skip throttle on day change
         }
         
         if(!m_trade_on_days[day])
@@ -401,6 +417,25 @@ public:
         }
         
         return true;
+    }
+
+    //+------------------------------------------------------------------+
+    //| Skip Monday Open (Forex only)                                     |
+    //| Rationale: avoid opening trades during spread/gap instability     |
+    //| Window: first 60 minutes of Monday (server time)                  |
+    //+------------------------------------------------------------------+
+    bool ShouldSkipMondayOpen(void)
+    {
+        if(m_market_type != MARKET_FOREX)
+            return false;
+
+        MqlDateTime dt;
+        TimeCurrent(dt);
+        if(dt.day_of_week != 1) // 1 = Monday
+            return false;
+
+        int minutes = dt.hour * 60 + dt.min;
+        return (minutes < 60);
     }
     
     //+------------------------------------------------------------------+

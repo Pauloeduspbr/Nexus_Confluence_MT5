@@ -245,7 +245,19 @@ public:
             m_signal_class = SIGNAL_GOOD;
         }
         
-        // PASSO 4: PASSED - Log com ordem hierárquica (H4 → H1 → M30 → M15)
+        // PASSO 4: Validar MinScore absoluto, se configurado
+        if(MathAbs(m_mtf_score) < m_min_score)
+        {
+            m_signal_class = SIGNAL_REJECT;
+            m_signal_direction = SIGNAL_DIR_NONE;
+            m_gate_results[2] = false;
+            m_gate_messages[2] = StringFormat("G2✗ MinScore(%d) < Req(%d)", MathAbs(m_mtf_score), m_min_score);
+            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
+                              m_mtf_score, m_min_score, gg_h4, gg_h1, gg_m30, gg_m15));
+            return false;
+        }
+
+        // PASSO 5: PASSED - Log com ordem hierárquica (H4 → H1 → M30 → M15)
         bool result = true;
         
         m_gate_results[2] = result;
@@ -297,14 +309,11 @@ public:
         // ══════════════════════════════════════════════════════════════
         else if(m_signal_class == SIGNAL_GOOD)
         {
+            // GOOD: exigir alinhamento direto (sem aceitar neutro)
             if(m_signal_direction == SIGNAL_DIR_BUY)
-            {
-                result = (st_signal == 1 || st_signal == 0);
-            }
+                result = (st_signal == 1);
             else if(m_signal_direction == SIGNAL_DIR_SELL)
-            {
-                result = (st_signal == -1 || st_signal == 0);
-            }
+                result = (st_signal == -1);
         }
         
         m_gate_results[3] = result;

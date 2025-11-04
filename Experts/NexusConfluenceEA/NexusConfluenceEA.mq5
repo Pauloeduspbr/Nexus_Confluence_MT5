@@ -1,21 +1,23 @@
 //+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.02   |
+//|                                      Nexus Confluence EA v2.03   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
 //|                                                                    |
-//| v2.02 (02/11/2025): Quality fixes                                |
-//|   - Gate 3: GOOD no longer accepts opposite ST; PREMIUM strict   |
-//|   - AsymmetricRisk: Premium requires +1 score (per dir)          |
-//|   - BE/TS: Apply TS only after BE activation to avoid conflicts  |
+//| v2.03 (04/11/2025): Robustness fixes                             |
+//|   - Gate 3: GOOD requires ST aligned (sem neutro); PREMIUM strict|
+//|   - AsymmetricRisk: removido +1 p/ PREMIUM (alinhado ao módulo)  |
+//|   - Execução: usar RiskExecution (retry + lote normalizado)      |
+//|   - MarketAccess: spread dinâmico com aquecimento + hora wrap    |
+//|   - Entrada: removido realtime momentum guard (shift=0)          |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.02"
+#property version   "2.03"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.02: Gate3 tuned; Premium score; BE→TS ordering"
+#property description "v2.03: Gate3 stricter; RiskExec; spread warm-up; no RT guard"
 #property strict
 
 // Include MQL5 standard libraries
@@ -59,8 +61,8 @@ CDrawdownProtection  *g_dd_protection = NULL;
 int OnInit()
 {
     Print("==========================================");
-    Print("    NEXUS CONFLUENCE EA v2.02 STARTING    ");
-    Print("  � Fixes: Gate3, Premium score, BE→TS   ");
+    Print("    NEXUS CONFLUENCE EA v2.03 STARTING    ");
+    Print("  • Fixes: Gate3 stricter, Exec retry, MA  ");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -164,8 +166,8 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.02 READY     ");
-    Print("  📊 Gate3, Score, BE→TS ordering fixed  ");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.03 READY     ");
+    Print("  📊 Gate3 stricter; Exec via RiskExec    ");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -177,7 +179,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.02 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.03 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -486,38 +488,21 @@ void OnTick()
     // PART D: EXECUTE TRADE (Using CTrade directly for v2.00)
     // ══════════════════════════════════════════════════════════════
     
-    // Final realtime momentum guard: avoid entering if the current
-    // (shift=0) WAE/RSI have already flipped against the intended
-    // direction right at the candle open. This preserves shift=1
-    // logic for signal generation but prevents obvious wrong-side
-    // entries on sudden reversals (like the 14:15 example).
-    if(g_indicators != NULL)
-    {
-        int expected_dir = (trade_type == POSITION_TYPE_BUY ? 1 : -1);
-        if(g_indicators.IsRealtimeMomentumOppositeTo(expected_dir))
-        {
-            g_core.LogMessage(1, StringFormat("⏭️ Entry skipped: realtime momentum opposite to %s (WAE/RSI RT guard)",
-                             EnumToString(trade_type)));
-            // Reset state back to IDLE since we won't trade this candle
-            g_core.UpdateStateMachine(STATE_IDLE);
-            return; 
-        }
-    }
+    // Entrada: removido realtime momentum guard (shift=0) para manter
+    // consistência com a regra de shift=1 em toda a geração do sinal.
 
-    CTrade trade;
-    trade.SetExpertMagicNumber(InpMagicNumber);
-    trade.SetDeviationInPoints(InpMaxSlippage);
-    
+    // Execução robusta via RiskExecution (retry + normalização de lote)
+    // Normalizar lote antes de enviar
+    lot_size = g_market.NormalizeLot(lot_size);
+    g_executor.SetLotSize(lot_size);
+    g_executor.SetStopLoss(sl_points);
+    g_executor.SetTakeProfit(tp_points);
+
     bool trade_result = false;
-    
     if(trade_type == POSITION_TYPE_BUY)
-    {
-        trade_result = trade.Buy(lot_size, _Symbol, current_price, sl_price, tp_price, comment);
-    }
+        trade_result = g_executor.ExecuteBuy(comment);
     else
-    {
-        trade_result = trade.Sell(lot_size, _Symbol, current_price, sl_price, tp_price, comment);
-    }
+        trade_result = g_executor.ExecuteSell(comment);
     
     // ══════════════════════════════════════════════════════════════
     // PART E: LOG RESULT
@@ -525,7 +510,7 @@ void OnTick()
     
     if(trade_result)
     {
-        ulong ticket = trade.ResultOrder();
+    ulong ticket = g_executor.GetLastTicket();
         
         g_core.LogMessage(1, "════════════════════════════════════");
         g_core.LogMessage(1, "✅ TRADE EXECUTED SUCCESSFULLY");
@@ -536,8 +521,7 @@ void OnTick()
                          EnumToString(trade_type)));
         g_core.LogMessage(1, StringFormat("💰 Lot: %.2f", lot_size));
         g_core.LogMessage(1, StringFormat("📊 Score: %+d", mtf_score));
-        g_core.LogMessage(1, StringFormat("🎯 SL: %.5f (%d points)", sl_price, sl_points));
-        g_core.LogMessage(1, StringFormat("🎯 TP: %.5f (%d points)", tp_price, tp_points));
+    g_core.LogMessage(1, StringFormat("🎯 SL: %d points | TP: %d points", sl_points, tp_points));
         g_core.LogMessage(1, StringFormat("📐 R:R: 1:%.2f", (double)tp_points / sl_points));
         g_core.LogMessage(1, "════════════════════════════════════");
         
@@ -552,9 +536,7 @@ void OnTick()
         g_core.LogMessage(1, "════════════════════════════════════");
         g_core.LogMessage(1, "❌ TRADE EXECUTION FAILED");
         g_core.LogMessage(1, "════════════════════════════════════");
-        g_core.LogMessage(1, StringFormat("Error: %d - %s", 
-                         trade.ResultRetcode(), 
-                         trade.ResultRetcodeDescription()));
+    // O módulo RiskExecution já loga o retcode ao falhar
         g_core.LogMessage(1, "════════════════════════════════════");
     }
 }
@@ -660,6 +642,12 @@ bool InitializeNewModules()
     }
     
     Print("✅ All v2.00 modules initialized successfully!");
+
+    // Avisos de consistência BE/TS: TS só roda após BE ativo
+    if((InpBE_Buy_Enable && InpTS_Buy_Enable) && (InpTS_Buy_Trigger < InpBE_Buy_Trigger))
+        Print("⚠️ AVISO: TS_Buy_Trigger (", InpTS_Buy_Trigger, ") < BE_Buy_Trigger (", InpBE_Buy_Trigger, ") — TS só inicia após BE estar ativo; verifique se pretende este comportamento.");
+    if((InpBE_Sell_Enable && InpTS_Sell_Enable) && (InpTS_Sell_Trigger < InpBE_Sell_Trigger))
+        Print("⚠️ AVISO: TS_Sell_Trigger (", InpTS_Sell_Trigger, ") < BE_Sell_Trigger (", InpBE_Sell_Trigger, ") — TS só inicia após BE estar ativo; verifique se pretende este comportamento.");
     return true;
 }
 
@@ -730,12 +718,12 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("\n=== EA CONFIGURATION v2.02 ===");
+    Print("\n=== EA CONFIGURATION v2.03 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
-    Print("� v2.02: Gate3 tuned; Premium +1 score; BE→TS ordering");
+    Print("• v2.03: Gate3 stricter; RiskExec; spread warm-up; no RT guard");
     
     Print("\n=== ASYMMETRIC RISK MANAGEMENT ===");
     Print("📈 BUY: ", (InpEnableBuy ? "ENABLED" : "DISABLED"));

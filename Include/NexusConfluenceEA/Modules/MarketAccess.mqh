@@ -268,18 +268,33 @@ public:
         m_spread_array[m_spread_index] = current_spread;
         m_spread_index = (m_spread_index + 1) % m_spread_period;
         
-        // Calculate median spread
-        double median_spread = GetMedianSpread();
-        
-        // Check against multiplier
-        double max_allowed = median_spread * m_spread_multiplier;
-        
-        // Also check absolute maximum
+        // Absolute maximum in points (always enforced)
         double max_absolute = m_max_spread_points * m_point;
-        
+
+        // Warm-up: require at least half of the window filled with non-zero values
+        int valid_count = 0;
+        for(int i=0;i<m_spread_period;i++)
+            if(m_spread_array[i] > 0.0) valid_count++;
+
+        if(valid_count < (m_spread_period/2))
+        {
+            // During warm-up, only enforce absolute max to avoid blocking all trades
+            if(current_spread > max_absolute)
+            {
+                Print(StringFormat("⚠️ Spread too high (warm-up): %.1f pts | AbsLimit: %d",
+                      current_spread / m_point, m_max_spread_points));
+                return false;
+            }
+            return true;
+        }
+
+        // Calculate median spread once warmed up
+        double median_spread = GetMedianSpread();
+        double max_allowed = median_spread * m_spread_multiplier;
+
         if(current_spread > max_allowed || current_spread > max_absolute)
         {
-            Print(StringFormat("⚠️ Spread too high: %.1f pts (Median: %.1f | Max: %.1f | Limit: %d)",
+            Print(StringFormat("⚠️ Spread too high: %.1f pts (Median: %.1f | DynMax: %.1f | AbsLimit: %d)",
                   current_spread / m_point, median_spread / m_point, 
                   max_allowed / m_point, m_max_spread_points));
             return false;
@@ -344,13 +359,17 @@ public:
         int current_minutes = dt.hour * 60 + dt.min;
         int start_minutes = m_start_hour * 60 + m_start_minute;
         int end_minutes = m_end_hour * 60 + m_end_minute;
-        
-        if(current_minutes < start_minutes || current_minutes >= end_minutes)
+
+        // Handle windows that do not cross midnight
+        if(start_minutes <= end_minutes)
         {
-            return false;
+            return !(current_minutes < start_minutes || current_minutes >= end_minutes);
         }
-        
-        return true;
+
+        // Window crosses midnight: allow if after start OR before end
+        if(current_minutes >= start_minutes || current_minutes < end_minutes)
+            return true;
+        return false;
     }
     
     //+------------------------------------------------------------------+

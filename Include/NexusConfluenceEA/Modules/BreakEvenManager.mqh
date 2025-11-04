@@ -48,6 +48,41 @@ string GetRetcodeDescription(uint retcode)
 }
 
 //+------------------------------------------------------------------+
+//| Helper: Verifica se o símbolo está em sessão de negociação       |
+//| Usa sessões via SymbolInfoSessionTrade com suporte a跨-meia-noite |
+//+------------------------------------------------------------------+
+bool IsMarketOpenNow(const string symbol)
+{
+    MqlDateTime dt; TimeCurrent(dt);
+    datetime from=0, to=0;
+    bool has_sessions=false;
+    for(int i=0; SymbolInfoSessionTrade(symbol, dt.day_of_week, i, from, to); i++)
+    {
+        has_sessions=true;
+        MqlDateTime f; TimeToStruct(from, f);
+        MqlDateTime t; TimeToStruct(to, t);
+        int nowMin = dt.hour*60 + dt.min;
+        int fromMin = f.hour*60 + f.min;
+        int toMin   = t.hour*60 + t.min;
+        if(fromMin <= toMin)
+        {
+            if(nowMin >= fromMin && nowMin < toMin)
+                return true;
+        }
+        else
+        {
+            // janela cruza meia-noite
+            if(nowMin >= fromMin || nowMin < toMin)
+                return true;
+        }
+    }
+    // Se não houver sessões definidas, assumir ABERTO (evita falsos negativos)
+    if(!has_sessions)
+        return true;
+    return false;
+}
+
+//+------------------------------------------------------------------+
 //| Classe de Gerenciamento de Break Even                            |
 //+------------------------------------------------------------------+
 class CBreakEvenManager
@@ -66,6 +101,7 @@ private:
     // Controle interno
     bool     m_initialized;
     CTrade   m_trade;
+    datetime m_last_market_closed_log;
     
     // Log de ativações (evita múltiplas ativações)
     ulong    m_activated_tickets[];
@@ -116,6 +152,7 @@ CBreakEvenManager::CBreakEvenManager(void)
     m_total_saves = 0;
     
     ArrayResize(m_activated_tickets, 0);
+    m_last_market_closed_log = 0;
 }
 
 //+------------------------------------------------------------------+
@@ -222,6 +259,18 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
     double current_sl = PositionGetDouble(POSITION_SL);
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
+
+    // Bloquear modificações quando o mercado estiver fechado
+    if(!IsMarketOpenNow(symbol))
+    {
+        datetime now = TimeCurrent();
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 60)
+        {
+            Print("⏸️ [BE] Mercado fechado para ", symbol, " - aguardando sessão abrir para modificar SL/TP");
+            m_last_market_closed_log = now;
+        }
+        return false;
+    }
     
     // Obter preço atual
     double current_price;

@@ -28,6 +28,7 @@ private:
     // Controle interno
     bool     m_initialized;
     CTrade   m_trade;
+    datetime m_last_market_closed_log;
     
     // Registro de última atualização (evita updates excessivos)
     struct TrailingRecord
@@ -69,6 +70,7 @@ private:
     //--- Métodos internos
     int FindRecordIndex(ulong ticket);
     void UpdateRecord(ulong ticket, double price, datetime bar_time);
+    bool IsMarketOpenNow(const string symbol);
 };
 
 //+------------------------------------------------------------------+
@@ -89,6 +91,7 @@ CTrailingStopManager::CTrailingStopManager(void)
     m_total_profits_protected = 0;
     
     ArrayResize(m_trailing_records, 0);
+    m_last_market_closed_log = 0;
 }
 
 //+------------------------------------------------------------------+
@@ -209,6 +212,17 @@ bool CTrailingStopManager::Update(ulong ticket)
     double current_sl = PositionGetDouble(POSITION_SL);
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
+    // Bloquear modificações quando o mercado estiver fechado
+    if(!IsMarketOpenNow(symbol))
+    {
+        datetime now = TimeCurrent();
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 60)
+        {
+            Print("⏸️ [TS] Mercado fechado para ", symbol, " - aguardando sessão abrir para trailing");
+            m_last_market_closed_log = now;
+        }
+        return false;
+    }
     
     // Obter preço atual
     double current_price;
@@ -570,6 +584,37 @@ void CTrailingStopManager::UpdateRecord(ulong ticket, double price, datetime bar
         m_trailing_records[size].last_price = price;
         m_trailing_records[size].last_update = bar_time;
     }
+}
+
+//+------------------------------------------------------------------+
+//| Helper: Verifica se o símbolo está em sessão de negociação       |
+//+------------------------------------------------------------------+
+bool CTrailingStopManager::IsMarketOpenNow(const string symbol)
+{
+    MqlDateTime dt; TimeCurrent(dt);
+    datetime from=0, to=0;
+    bool has_sessions=false;
+    for(int i=0; SymbolInfoSessionTrade(symbol, dt.day_of_week, i, from, to); i++)
+    {
+        has_sessions=true;
+        MqlDateTime f; TimeToStruct(from, f);
+        MqlDateTime t; TimeToStruct(to, t);
+        int nowMin = dt.hour*60 + dt.min;
+        int fromMin = f.hour*60 + f.min;
+        int toMin   = t.hour*60 + t.min;
+        if(fromMin <= toMin)
+        {
+            if(nowMin >= fromMin && nowMin < toMin)
+                return true;
+        }
+        else
+        {
+            if(nowMin >= fromMin || nowMin < toMin)
+                return true;
+        }
+    }
+    if(!has_sessions) return true;
+    return false;
 }
 
 //+------------------------------------------------------------------+

@@ -9,6 +9,9 @@
 
 #include <Trade\Trade.mqh>
 
+// Declaração externa da variável global de log (definida em Core.mqh)
+extern int g_log_level;
+
 //+------------------------------------------------------------------+
 //| Classe de Gerenciamento de Trailing Stop                         |
 //+------------------------------------------------------------------+

@@ -276,8 +276,8 @@ public:
         m_spread_array[m_spread_index] = current_spread;
         m_spread_index = (m_spread_index + 1) % m_spread_period;
         
-        // Absolute maximum in points (always enforced)
-        double max_absolute = m_max_spread_points * m_point;
+    // Absolute maximum in points (always enforced)
+    double max_absolute = m_max_spread_points * m_point;
 
         // Warm-up: require at least half of the window filled with non-zero values
         int valid_count = 0;
@@ -296,8 +296,23 @@ public:
             return true;
         }
 
-        // Calculate median spread once warmed up
-        double median_spread = GetMedianSpread();
+        // Calculate median spread from NON-ZERO samples once warmed up
+        int nz_count = 0;
+        double median_spread = GetMedianSpreadNonZero(nz_count);
+
+        // If after warm-up we still don't have enough non-zero samples,
+        // fallback to absolute cap only (don't use dynamic threshold yet)
+        if(nz_count < (m_spread_period/2) || median_spread <= 0.0)
+        {
+            if(current_spread > max_absolute)
+            {
+                Print(StringFormat("⚠️ Spread too high: %.1f pts (AbsLimit: %d)",
+                      current_spread / m_point, m_max_spread_points));
+                return false;
+            }
+            return true;
+        }
+
         double max_allowed = median_spread * m_spread_multiplier;
 
         if(current_spread > max_allowed || current_spread > max_absolute)
@@ -324,14 +339,34 @@ public:
     //+------------------------------------------------------------------+
     //| Calculate Median Spread                                         |
     //+------------------------------------------------------------------+
-    double GetMedianSpread(void)
+    // Calculate median considering only non-zero entries. Returns 0 if none.
+    double GetMedianSpreadNonZero(int &non_zero_count)
     {
+        // Count non-zero entries
+        non_zero_count = 0;
+        for(int i=0;i<m_spread_period;i++)
+        {
+            if(m_spread_array[i] > 0.0)
+                non_zero_count++;
+        }
+
+        if(non_zero_count == 0)
+            return 0.0;
+
+        // Copy non-zero values into a temp array
         double temp_array[];
-        ArrayResize(temp_array, m_spread_period);
-        ArrayCopy(temp_array, m_spread_array);
+        ArrayResize(temp_array, non_zero_count);
+        int idx = 0;
+        for(int i=0;i<m_spread_period;i++)
+        {
+            if(m_spread_array[i] > 0.0)
+            {
+                temp_array[idx++] = m_spread_array[i];
+            }
+        }
+
         ArraySort(temp_array);
-        
-        int middle = m_spread_period / 2;
+        int middle = non_zero_count / 2;
         return temp_array[middle];
     }
     

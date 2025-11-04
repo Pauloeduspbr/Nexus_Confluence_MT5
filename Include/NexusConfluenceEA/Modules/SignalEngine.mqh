@@ -187,7 +187,7 @@ public:
             m_gate_results[2] = false;
             m_gate_messages[2] = "G2✗ H4/H1 desalinhados";
             
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: H4/H1 não alinhados | H4:%+d H1:%+d M30:%+d M15:%+d",
+            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: H4/H1 não alinhados | H4:%+d H1:%+d M30:%+d M15:%+d",
                               gg_h4, gg_h1, gg_m30, gg_m15));
             return false;
         }
@@ -217,7 +217,7 @@ public:
             m_gate_messages[2] = "G2✗ TF operacional oposto";
             
             string opposite_tf = m30_opposite ? "M30" : "M15";
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: %s oposto aos macros | H4:%+d H1:%+d M30:%+d M15:%+d",
+            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s oposto aos macros | H4:%+d H1:%+d M30:%+d M15:%+d",
                               opposite_tf, gg_h4, gg_h1, gg_m30, gg_m15));
             return false;
         }
@@ -252,7 +252,7 @@ public:
             m_signal_direction = SIGNAL_DIR_NONE;
             m_gate_results[2] = false;
             m_gate_messages[2] = StringFormat("G2✗ MinScore(%d) < Req(%d)", MathAbs(m_mtf_score), m_min_score);
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
+            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
                               m_mtf_score, m_min_score, gg_h4, gg_h1, gg_m30, gg_m15));
             return false;
         }
@@ -324,12 +324,12 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito; GOOD não aceita oposto",
+            m_core.LogMessage(2, StringFormat("❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito; GOOD não aceita oposto",
                               st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         else
         {
-            m_core.LogMessage(3, StringFormat("[DEBUG] ✅ Gate 3 PASSED: ST=%+d vs %s (Class: %s)",
+            m_core.LogMessage(3, StringFormat("✅ Gate 3 PASSED: ST=%+d vs %s (Class: %s)",
                               st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         
@@ -348,7 +348,7 @@ public:
         {
             m_gate_results[4] = false;
             m_gate_messages[4] = "G4✗ WAE flat";
-            m_core.LogMessage(2, "[OPERACIONAL] ❌ Gate 4 REJECTED: WAE not expanding (lateral market)");
+            m_core.LogMessage(2, "❌ Gate 4 REJECTED: WAE not expanding (lateral market)");
             return false;
         }
         
@@ -377,7 +377,7 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
                               wae_direction, rsi_signal, EnumToString(m_signal_direction)));
         }
         
@@ -431,7 +431,7 @@ public:
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("[OPERACIONAL] ❌ Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
+            m_core.LogMessage(2, StringFormat("❌ Gate 5 REJECTED: Base=%.2f Quote=%.2f vs Direction=%s",
                               base_strength, quote_strength, EnumToString(m_signal_direction)));
         }
         

@@ -212,13 +212,31 @@ bool CTrailingStopManager::Update(ulong ticket)
     double current_sl = PositionGetDouble(POSITION_SL);
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
-    // Bloquear modificações quando o mercado estiver fechado
+
+    // ═══════════════════════════════════════════════════════
+    // CRITICAL: Bloquear modificações quando mercado fechado
+    // ═══════════════════════════════════════════════════════
+    
+    // Verificação 1: Trade mode do símbolo
+    int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
+    if(trade_mode == SYMBOL_TRADE_MODE_DISABLED || trade_mode == SYMBOL_TRADE_MODE_CLOSEONLY)
+    {
+        datetime now = TimeCurrent();
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+        {
+            Print("⏸️ [TS] Mercado FECHADO/CLOSEONLY para ", symbol, " (trade_mode=", trade_mode, ") - aguardando reabertura");
+            m_last_market_closed_log = now;
+        }
+        return false;
+    }
+    
+    // Verificação 2: Sessão de negociação
     if(!IsMarketOpenNow(symbol))
     {
         datetime now = TimeCurrent();
-        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 60)
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
         {
-            Print("⏸️ [TS] Mercado fechado para ", symbol, " - aguardando sessão abrir para trailing");
+            Print("⏸️ [TS] Fora do horário de negociação para ", symbol, " - aguardando sessão abrir");
             m_last_market_closed_log = now;
         }
         return false;
@@ -365,8 +383,22 @@ bool CTrailingStopManager::Update(ulong ticket)
                 }
                 else
                 {
+                    uint retcode = m_trade.ResultRetcode();
                     int error = GetLastError();
-                    Print("❌ [TS] Falha ao modificar BUY #", ticket, " - Erro: ", error);
+                    
+                    // Tratamento especial para mercado fechado
+                    if(retcode == TRADE_RETCODE_MARKET_CLOSED)
+                    {
+                        datetime now = TimeCurrent();
+                        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+                        {
+                            Print("⏸️ [TS] BUY #", ticket, ": Mercado fechado (retcode=", retcode, ") - aguardando reabertura");
+                            m_last_market_closed_log = now;
+                        }
+                        return false;
+                    }
+                    
+                    Print("❌ [TS] Falha ao modificar BUY #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
                     Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
                     return false;
                 }
@@ -499,8 +531,22 @@ bool CTrailingStopManager::Update(ulong ticket)
                 }
                 else
                 {
+                    uint retcode = m_trade.ResultRetcode();
                     int error = GetLastError();
-                    Print("❌ [TS] Falha ao modificar SELL #", ticket, " - Erro: ", error);
+                    
+                    // Tratamento especial para mercado fechado
+                    if(retcode == TRADE_RETCODE_MARKET_CLOSED)
+                    {
+                        datetime now = TimeCurrent();
+                        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+                        {
+                            Print("⏸️ [TS] SELL #", ticket, ": Mercado fechado (retcode=", retcode, ") - aguardando reabertura");
+                            m_last_market_closed_log = now;
+                        }
+                        return false;
+                    }
+                    
+                    Print("❌ [TS] Falha ao modificar SELL #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
                     Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
                     return false;
                 }

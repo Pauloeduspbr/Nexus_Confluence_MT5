@@ -260,13 +260,30 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
 
-    // Bloquear modificações quando o mercado estiver fechado
+    // ═══════════════════════════════════════════════════════
+    // CRITICAL: Bloquear modificações quando mercado fechado
+    // ═══════════════════════════════════════════════════════
+    
+    // Verificação 1: Trade mode do símbolo
+    int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
+    if(trade_mode == SYMBOL_TRADE_MODE_DISABLED || trade_mode == SYMBOL_TRADE_MODE_CLOSEONLY)
+    {
+        datetime now = TimeCurrent();
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+        {
+            Print("⏸️ [BE] Mercado FECHADO/CLOSEONLY para ", symbol, " (trade_mode=", trade_mode, ") - aguardando reabertura");
+            m_last_market_closed_log = now;
+        }
+        return false;
+    }
+    
+    // Verificação 2: Sessão de negociação
     if(!IsMarketOpenNow(symbol))
     {
         datetime now = TimeCurrent();
-        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 60)
+        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
         {
-            Print("⏸️ [BE] Mercado fechado para ", symbol, " - aguardando sessão abrir para modificar SL/TP");
+            Print("⏸️ [BE] Fora do horário de negociação para ", symbol, " - aguardando sessão abrir");
             m_last_market_closed_log = now;
         }
         return false;
@@ -399,6 +416,17 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                         Print("   📈 Entry: ", entry_price, " | TP: ", current_tp);
                         
                         return true;
+                    }
+                    else if(result.retcode == TRADE_RETCODE_MARKET_CLOSED)
+                    {
+                        // Mercado fechado - não repetir tentativas
+                        datetime now = TimeCurrent();
+                        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+                        {
+                            Print("⏸️ [BE] BUY #", ticket, ": Mercado fechado (retcode=", result.retcode, ") - aguardando reabertura");
+                            m_last_market_closed_log = now;
+                        }
+                        return false;
                     }
                     else
                     {
@@ -534,6 +562,17 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                         Print("   📉 Entry: ", entry_price, " | TP: ", current_tp);
                         
                         return true;
+                    }
+                    else if(result.retcode == TRADE_RETCODE_MARKET_CLOSED)
+                    {
+                        // Mercado fechado - não repetir tentativas
+                        datetime now = TimeCurrent();
+                        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
+                        {
+                            Print("⏸️ [BE] SELL #", ticket, ": Mercado fechado (retcode=", result.retcode, ") - aguardando reabertura");
+                            m_last_market_closed_log = now;
+                        }
+                        return false;
                     }
                     else
                     {

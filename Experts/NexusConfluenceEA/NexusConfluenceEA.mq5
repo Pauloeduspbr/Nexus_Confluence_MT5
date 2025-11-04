@@ -55,6 +55,10 @@ CTrailingStopManager *g_trailing_stop = NULL;
 CAsymmetricRisk      *g_asymmetric = NULL;
 CDrawdownProtection  *g_dd_protection = NULL;
 
+// Throttling control for position management (avoid spam when market closed)
+datetime g_last_position_check = 0;
+int g_position_check_interval = 5; // Check every 5 seconds minimum
+
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -218,6 +222,21 @@ void OnTick()
     // Check if already has open position
     if(g_executor.HasOpenPosition())
     {
+        // Throttle position checks to avoid spamming when market is closed
+        datetime current_time = TimeCurrent();
+        if(current_time - g_last_position_check < g_position_check_interval)
+            return;
+        
+        g_last_position_check = current_time;
+        
+        // Verify market is actually open before trying to modify positions
+        int trade_mode = (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_MODE);
+        if(trade_mode == SYMBOL_TRADE_MODE_DISABLED || trade_mode == SYMBOL_TRADE_MODE_CLOSEONLY)
+        {
+            // Market closed - skip position management silently (modules already log)
+            return;
+        }
+        
         // Get current position for this EA on this symbol (robust selection)
         ulong ticket = 0;
         ENUM_POSITION_TYPE pos_type = POSITION_TYPE_BUY;

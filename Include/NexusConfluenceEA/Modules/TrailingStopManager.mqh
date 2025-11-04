@@ -212,6 +212,15 @@ bool CTrailingStopManager::Update(ulong ticket)
     double current_sl = PositionGetDouble(POSITION_SL);
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
+    
+    // DEBUG: Log do SL atual lido do broker
+    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+    if(g_log_level >= 3)
+    {
+        Print("🔍 [TS DEBUG] #", ticket, " | current_sl lido do broker: ", DoubleToString(current_sl, digits),
+              " | entry: ", DoubleToString(entry_price, digits), 
+              " | tp: ", DoubleToString(current_tp, digits));
+    }
 
     // ═══════════════════════════════════════════════════════
     // CRITICAL: Bloquear modificações quando mercado fechado
@@ -309,10 +318,26 @@ bool CTrailingStopManager::Update(ulong ticket)
             double new_sl = MathMax(current_sl, MathMin(target_sl, candidate_sl));
             new_sl = NormalizeDouble(new_sl, digits);
             
+            // DEBUG: Log do cálculo do trailing
+            if(g_log_level >= 3)
+            {
+                Print("🔍 [TS DEBUG CALC] #", ticket, " BUY:");
+                Print("   current_sl: ", DoubleToString(current_sl, digits));
+                Print("   target_sl: ", DoubleToString(target_sl, digits), " (preço - step)");
+                Print("   candidate_sl: ", DoubleToString(candidate_sl, digits), " (current + step)");
+                Print("   new_sl calculado: ", DoubleToString(new_sl, digits));
+                Print("   Diferença |new_sl - current_sl|: ", DoubleToString(MathAbs(new_sl - current_sl), digits + 3));
+                Print("   point: ", DoubleToString(point, digits + 3));
+            }
+            
             // Garantir que SL só SOBE (nunca desce em BUY)
             if(current_sl > 0 && new_sl <= current_sl)
             {
                 // Preço não moveu o suficiente, manter SL atual
+                if(g_log_level >= 3)
+                {
+                    Print("⏸️ [TS DEBUG] #", ticket, " BUY: new_sl <= current_sl, bloqueando");
+                }
                 return false;
             }
             
@@ -322,6 +347,14 @@ bool CTrailingStopManager::Update(ulong ticket)
             if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
             {
                 // SL já está no valor calculado, não modificar
+                if(g_log_level >= 3)
+                {
+                    Print("⏸️ [TS DEBUG] #", ticket, " BUY: SL idêntico detectado!");
+                    Print("   new_sl: ", DoubleToString(new_sl, digits));
+                    Print("   current_sl: ", DoubleToString(current_sl, digits));
+                    Print("   Diferença: ", DoubleToString(MathAbs(new_sl - current_sl), digits + 3));
+                    Print("   Limite (point): ", DoubleToString(point, digits + 3));
+                }
                 return false;
             }
             
@@ -466,10 +499,26 @@ bool CTrailingStopManager::Update(ulong ticket)
             double new_sl = MathMin(current_sl, MathMax(target_sl, candidate_sl));
             new_sl = NormalizeDouble(new_sl, digits);
             
+            // DEBUG: Log do cálculo do trailing
+            if(g_log_level >= 3)
+            {
+                Print("🔍 [TS DEBUG CALC] #", ticket, " SELL:");
+                Print("   current_sl: ", DoubleToString(current_sl, digits));
+                Print("   target_sl: ", DoubleToString(target_sl, digits), " (preço + step)");
+                Print("   candidate_sl: ", DoubleToString(candidate_sl, digits), " (current - step)");
+                Print("   new_sl calculado: ", DoubleToString(new_sl, digits));
+                Print("   Diferença |new_sl - current_sl|: ", DoubleToString(MathAbs(new_sl - current_sl), digits + 3));
+                Print("   point: ", DoubleToString(point, digits + 3));
+            }
+            
             // Garantir que SL só DESCE (nunca sobe em SELL)
             if(current_sl > 0 && new_sl >= current_sl)
             {
                 // Preço não moveu o suficiente, manter SL atual
+                if(g_log_level >= 3)
+                {
+                    Print("⏸️ [TS DEBUG] #", ticket, " SELL: new_sl >= current_sl, bloqueando");
+                }
                 return false;
             }
             
@@ -479,6 +528,14 @@ bool CTrailingStopManager::Update(ulong ticket)
             if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
             {
                 // SL já está no valor calculado, não modificar
+                if(g_log_level >= 3)
+                {
+                    Print("⏸️ [TS DEBUG] #", ticket, " SELL: SL idêntico detectado!");
+                    Print("   new_sl: ", DoubleToString(new_sl, digits));
+                    Print("   current_sl: ", DoubleToString(current_sl, digits));
+                    Print("   Diferença: ", DoubleToString(MathAbs(new_sl - current_sl), digits + 3));
+                    Print("   Limite (point): ", DoubleToString(point, digits + 3));
+                }
                 return false;
             }
             

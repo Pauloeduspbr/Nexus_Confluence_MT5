@@ -699,56 +699,9 @@ public:
     }
 
     //+------------------------------------------------------------------+
-    //| Realtime (shift=0) accessors – guard right before placing order  |
-    //+------------------------------------------------------------------+
-    bool IsWAEExpandingRealtime(const int shift = 0)
-    {
-        double up[1], down[1], expl[1];
-        if(CopyBuffer(m_wae_handle, 0, shift, 1, up) != 1) return false;
-        if(CopyBuffer(m_wae_handle, 1, shift, 1, down) != 1) return false;
-        if(CopyBuffer(m_wae_handle, 2, shift, 1, expl) != 1) return false;
-        return (up[0] > expl[0]) || (down[0] > expl[0]);
-    }
-
-    int GetWAEDirectionRealtime(const int shift = 0)
-    {
-        double up[1], down[1];
-        if(CopyBuffer(m_wae_handle, 0, shift, 1, up) != 1) return 0;
-        if(CopyBuffer(m_wae_handle, 1, shift, 1, down) != 1) return 0;
-        if(up[0] > down[0]) return 1;
-        if(down[0] > up[0]) return -1;
-        return 0;
-    }
-
-    int GetRSIOMASignalRealtime(const int shift = 0)
-    {
-        double red[1], blue[1];
-        if(CopyBuffer(m_rsi_oma_handle, 0, shift, 1, red) != 1) return 0;
-        if(CopyBuffer(m_rsi_oma_handle, 1, shift, 1, blue) != 1) return 0;
-        if(red[0] > blue[0]) return 1;
-        if(red[0] < blue[0]) return -1;
-        return 0;
-    }
-
-    // Returns true when realtime momentum clearly opposes expected_dir
-    // expected_dir: +1=BUY, -1=SELL
-    bool IsRealtimeMomentumOppositeTo(const int expected_dir)
-    {
-        // If we cannot read, be conservative and return false (do not block)
-        int wae_dir = GetWAEDirectionRealtime(0);
-        bool wae_exp = IsWAEExpandingRealtime(0);
-        int rsi_dir = GetRSIOMASignalRealtime(0);
-
-        // Block if WAE is expanding strongly in the opposite direction
-        if(wae_exp && wae_dir != 0 && wae_dir == -expected_dir)
-            return true;
-
-        // Secondary guard: RSI also flipped opposite (optional confirm)
-        if(rsi_dir != 0 && rsi_dir == -expected_dir)
-            return true;
-
-        return false;
-    }
+    // NOTE: Realtime (shift=0) accessors were intentionally removed to enforce
+    // the project rule: ALWAYS use shift=1 (closed bar) across the system.
+    // This avoids repaint and keeps Gate processing consistent and reproducible.
     
     //+------------------------------------------------------------------+
     //| Get Currency Strength values                                     |

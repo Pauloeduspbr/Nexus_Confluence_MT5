@@ -24,7 +24,7 @@
 #include <Trade\Trade.mqh>
 
 // Include Nexus Confluence v2.00 INPUT CONFIG (MUST BE FIRST!)
-#include <NexusConfluenceEA\NexusInputsConfig.mqh>
+#include <NexusConfluenceEA\Modules\NexusInputsConfig.mqh>
 
 // Include Nexus Confluence ORIGINAL modules
 #include <NexusConfluenceEA\Modules\Core.mqh>

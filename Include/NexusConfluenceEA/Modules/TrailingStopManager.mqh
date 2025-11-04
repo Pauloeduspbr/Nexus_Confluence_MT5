@@ -591,10 +591,10 @@ void CTrailingStopManager::UpdateRecord(ulong ticket, double price, datetime bar
 //+------------------------------------------------------------------+
 bool CTrailingStopManager::IsMarketOpenNow(const string symbol)
 {
-    MqlDateTime dt; TimeCurrent(dt);
+    MqlDateTime dt; TimeToStruct(TimeCurrent(), dt);
     datetime from=0, to=0;
     bool has_sessions=false;
-    for(int i=0; SymbolInfoSessionTrade(symbol, dt.day_of_week, i, from, to); i++)
+    for(uint i=0; SymbolInfoSessionTrade(symbol, (ENUM_DAY_OF_WEEK)dt.day_of_week, i, from, to); i++)
     {
         has_sessions=true;
         MqlDateTime f; TimeToStruct(from, f);

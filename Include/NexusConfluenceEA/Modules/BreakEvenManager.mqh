@@ -53,10 +53,10 @@ string GetRetcodeDescription(uint retcode)
 //+------------------------------------------------------------------+
 bool IsMarketOpenNow(const string symbol)
 {
-    MqlDateTime dt; TimeCurrent(dt);
+    MqlDateTime dt; TimeToStruct(TimeCurrent(), dt);
     datetime from=0, to=0;
     bool has_sessions=false;
-    for(int i=0; SymbolInfoSessionTrade(symbol, dt.day_of_week, i, from, to); i++)
+    for(uint i=0; SymbolInfoSessionTrade(symbol, (ENUM_DAY_OF_WEEK)dt.day_of_week, i, from, to); i++)
     {
         has_sessions=true;
         MqlDateTime f; TimeToStruct(from, f);
@@ -377,7 +377,8 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 request.symbol = symbol;
                 request.sl = new_sl;
                 request.tp = current_tp;
-                request.magic = m_trade.RequestMagic();
+                // Atribuir o magic da própria posição (garante associação correta)
+                request.magic = (uint)PositionGetInteger(POSITION_MAGIC);
                 
                 if(OrderSend(request, result))
                 {
@@ -511,7 +512,8 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 request.symbol = symbol;
                 request.sl = new_sl;
                 request.tp = current_tp;
-                request.magic = m_trade.RequestMagic();
+                // Atribuir o magic da própria posição (garante associação correta)
+                request.magic = (uint)PositionGetInteger(POSITION_MAGIC);
                 
                 if(OrderSend(request, result))
                 {

@@ -136,7 +136,7 @@ public:
         double lot = m_market.NormalizeLot(m_lot_size);
         if(lot <= 0)
         {
-            m_core.LogMessage(1, "❌ ERROR: Invalid lot size");
+            m_core->LogMessage(1, "❌ ERROR: Invalid lot size");
             return false;
         }
         
@@ -150,7 +150,7 @@ public:
         double tp = m_market.NormalizePrice(bid + (m_take_profit_points * point));
         
         // Log trade attempt
-        m_core.LogMessage(2, StringFormat("🔵 Attempting BUY | Lot: %.2f | Entry: %.5f | SL: %.5f | TP: %.5f",
+    m_core->LogMessage(2, StringFormat("🔵 Attempting BUY | Lot: %.2f | Entry: %.5f | SL: %.5f | TP: %.5f",
                           lot, ask, sl, tp));
         
         // Execute with retry logic
@@ -160,17 +160,17 @@ public:
         {
             m_last_ticket = m_trade.ResultOrder();
             m_last_trade_time = TimeCurrent();
-            m_core.SetLastTradeTime(m_last_trade_time);
+            m_core->SetLastTradeTime(m_last_trade_time);
             
-            m_core.LogMessage(1, StringFormat("✅ BUY EXECUTED | Ticket: %llu | %s | Entry: %.5f",
+            m_core->LogMessage(1, StringFormat("✅ BUY EXECUTED | Ticket: %llu | %s | Entry: %.5f",
                               m_last_ticket, comment, ask));
             
             // Update state machine
-            m_core.UpdateStateMachine(STATE_ORDER_SENT);
+            m_core->UpdateStateMachine(STATE_ORDER_SENT);
         }
         else
         {
-            m_core.LogMessage(1, StringFormat("❌ BUY FAILED | Error: %d | %s",
+            m_core->LogMessage(1, StringFormat("❌ BUY FAILED | Error: %d | %s",
                               GetLastError(), m_trade.ResultRetcodeDescription()));
         }
         
@@ -194,7 +194,7 @@ public:
         double lot = m_market.NormalizeLot(m_lot_size);
         if(lot <= 0)
         {
-            m_core.LogMessage(1, "❌ ERROR: Invalid lot size");
+            m_core->LogMessage(1, "❌ ERROR: Invalid lot size");
             return false;
         }
         
@@ -208,7 +208,7 @@ public:
         double tp = m_market.NormalizePrice(ask - (m_take_profit_points * point));
         
         // Log trade attempt
-        m_core.LogMessage(2, StringFormat("🔴 Attempting SELL | Lot: %.2f | Entry: %.5f | SL: %.5f | TP: %.5f",
+    m_core->LogMessage(2, StringFormat("🔴 Attempting SELL | Lot: %.2f | Entry: %.5f | SL: %.5f | TP: %.5f",
                           lot, bid, sl, tp));
         
         // Execute with retry logic
@@ -218,17 +218,17 @@ public:
         {
             m_last_ticket = m_trade.ResultOrder();
             m_last_trade_time = TimeCurrent();
-            m_core.SetLastTradeTime(m_last_trade_time);
+            m_core->SetLastTradeTime(m_last_trade_time);
             
-            m_core.LogMessage(1, StringFormat("✅ SELL EXECUTED | Ticket: %llu | %s | Entry: %.5f",
+            m_core->LogMessage(1, StringFormat("✅ SELL EXECUTED | Ticket: %llu | %s | Entry: %.5f",
                               m_last_ticket, comment, bid));
             
             // Update state machine
-            m_core.UpdateStateMachine(STATE_ORDER_SENT);
+            m_core->UpdateStateMachine(STATE_ORDER_SENT);
         }
         else
         {
-            m_core.LogMessage(1, StringFormat("❌ SELL FAILED | Error: %d | %s",
+            m_core->LogMessage(1, StringFormat("❌ SELL FAILED | Error: %d | %s",
                               GetLastError(), m_trade.ResultRetcodeDescription()));
         }
         
@@ -274,7 +274,7 @@ public:
                     // Check if error is recoverable
                     if(IsRecoverableError(m_trade.ResultRetcode()))
                     {
-                        m_core.LogMessage(2, StringFormat("⚠️ Recoverable error on attempt %d: %s",
+                        m_core->LogMessage(2, StringFormat("⚠️ Recoverable error on attempt %d: %s",
                                           attempts, m_trade.ResultRetcodeDescription()));
                         
                         Sleep(m_retry_delay_ms);
@@ -295,7 +295,7 @@ public:
                 
                 if(IsRecoverableError(error_code))
                 {
-                    m_core.LogMessage(2, StringFormat("⚠️ Recoverable error on attempt %d: %d",
+                    m_core->LogMessage(2, StringFormat("⚠️ Recoverable error on attempt %d: %d",
                                       attempts, error_code));
                     
                     Sleep(m_retry_delay_ms);
@@ -351,7 +351,7 @@ public:
     //+------------------------------------------------------------------+
     bool CanTradeOnNewCandle(datetime current_candle_time)
     {
-        return m_core.IsNewCandleForTrade(current_candle_time);
+    return m_core->IsNewCandleForTrade(current_candle_time);
     }
     
     //+------------------------------------------------------------------+
@@ -368,14 +368,14 @@ public:
         
         if(result)
         {
-            m_core.LogMessage(1, StringFormat("✅ Position CLOSED | Ticket: %llu | Reason: %s",
+            m_core->LogMessage(1, StringFormat("✅ Position CLOSED | Ticket: %llu | Reason: %s",
                               ticket, reason));
             
-            m_core.UpdateStateMachine(STATE_IDLE);
+            m_core->UpdateStateMachine(STATE_IDLE);
         }
         else
         {
-            m_core.LogMessage(1, StringFormat("❌ Position CLOSE FAILED | Ticket: %llu | Error: %s",
+            m_core->LogMessage(1, StringFormat("❌ Position CLOSE FAILED | Ticket: %llu | Error: %s",
                               ticket, m_trade.ResultRetcodeDescription()));
         }
         

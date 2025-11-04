@@ -54,6 +54,10 @@ private:
     
     // Weekly filter (individual days: Sunday=0, Monday=1, ..., Saturday=6)
     bool            m_trade_on_days[7];
+
+    // Log throttling for weekly filter to avoid repetitive messages
+    int             m_last_print_day;        // last day-of-week seen (0..6)
+    bool            m_last_day_block_logged; // whether 'disabled' was already logged for the current day
     
 public:
     //+------------------------------------------------------------------+
@@ -72,6 +76,10 @@ public:
         // Initialize all days as enabled by default
         for(int i = 0; i < 7; i++)
             m_trade_on_days[i] = true;
+
+    // Initialize log throttling
+    m_last_print_day = -1;
+    m_last_day_block_logged = false;
     }
     
     //+------------------------------------------------------------------+
@@ -337,11 +345,23 @@ public:
         
         // day_of_week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday
         int day = dt.day_of_week;
+
+        // Reset daily throttling when day changes
+        if(day != m_last_print_day)
+        {
+            m_last_print_day = day;
+            m_last_day_block_logged = false;
+        }
         
         if(!m_trade_on_days[day])
         {
             string day_names[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
-            Print("⏸️ Trading disabled for ", day_names[day]);
+            // Print only once per day to avoid log pollution
+            if(!m_last_day_block_logged)
+            {
+                Print("⏸️ Trading disabled for ", day_names[day]);
+                m_last_day_block_logged = true;
+            }
             return false;
         }
         

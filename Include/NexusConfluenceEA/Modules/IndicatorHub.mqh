@@ -475,10 +475,8 @@ public:
             m_gg_buffer[i] = logical_val;
         }
         
-        // Log GG values for debugging synchronization
-        Print(StringFormat("📊 GG TrendBar [shift=1]: M1:%.0f M5:%.0f M15:%.0f M30:%.0f H1:%.0f H4:%.0f D1:%.0f W1:%.0f MN1:%.0f",
-              m_gg_buffer[0], m_gg_buffer[1], m_gg_buffer[2], m_gg_buffer[3],
-              m_gg_buffer[4], m_gg_buffer[5], m_gg_buffer[6], m_gg_buffer[7], m_gg_buffer[8]));
+      // Debug printing of GG values removed to avoid log pollution.
+      // Use PrintDebugInfo() on-demand if necessary.
         
         // 2. Copy Supertrend (2 candles for tolerance check)
         // 🔥 ATENÇÃO v2.03: INVERSÃO INTENCIONAL DOS NOMES!

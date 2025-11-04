@@ -305,13 +305,23 @@ bool CTrailingStopManager::Update(ulong ticket)
             else
                 candidate_sl = NormalizeDouble(entry_price + ((trigger - step) * point), digits);
             
-            double new_sl = MathMin(target_sl, candidate_sl);
+            // CORREÇÃO CRÍTICA: Usar MathMax para BUY (SL deve SUBIR)
+            double new_sl = MathMax(current_sl, MathMin(target_sl, candidate_sl));
             new_sl = NormalizeDouble(new_sl, digits);
             
             // Garantir que SL só SOBE (nunca desce em BUY)
             if(current_sl > 0 && new_sl <= current_sl)
             {
                 // Preço não moveu o suficiente, manter SL atual
+                return false;
+            }
+            
+            // ═══════════════════════════════════════════════════════
+            // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
+            // ═══════════════════════════════════════════════════════
+            if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+            {
+                // SL já está no valor calculado, não modificar
                 return false;
             }
             
@@ -453,13 +463,23 @@ bool CTrailingStopManager::Update(ulong ticket)
             else
                 candidate_sl = NormalizeDouble(entry_price - ((trigger - step) * point), digits);
             
-            double new_sl = MathMax(target_sl, candidate_sl);
+            // CORREÇÃO CRÍTICA: Usar MathMin para SELL (SL deve DESCER)
+            double new_sl = MathMin(current_sl, MathMax(target_sl, candidate_sl));
             new_sl = NormalizeDouble(new_sl, digits);
             
             // Garantir que SL só DESCE (nunca sobe em SELL)
             if(current_sl > 0 && new_sl >= current_sl)
             {
                 // Preço não moveu o suficiente, manter SL atual
+                return false;
+            }
+            
+            // ═══════════════════════════════════════════════════════
+            // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
+            // ═══════════════════════════════════════════════════════
+            if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+            {
+                // SL já está no valor calculado, não modificar
                 return false;
             }
             

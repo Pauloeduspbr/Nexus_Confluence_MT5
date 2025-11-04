@@ -364,6 +364,15 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Verificar se novo SL é melhor que o atual
             if(new_sl > current_sl || current_sl == 0)
             {
+                // ═══════════════════════════════════════════════════════
+                // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
+                // ═══════════════════════════════════════════════════════
+                if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+                {
+                    // SL já está no valor calculado, não modificar
+                    return false;
+                }
+                
                 // Verificar distâncias mínimas (STOPS_LEVEL / FREEZE_LEVEL)
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
                 long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
@@ -510,6 +519,15 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // Verificar se novo SL é melhor que o atual (menor para SELL)
             if(new_sl < current_sl || current_sl == 0)
             {
+                // ═══════════════════════════════════════════════════════
+                // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
+                // ═══════════════════════════════════════════════════════
+                if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+                {
+                    // SL já está no valor calculado, não modificar
+                    return false;
+                }
+                
                 // Verificar distâncias mínimas (STOPS_LEVEL / FREEZE_LEVEL)
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
                 long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);

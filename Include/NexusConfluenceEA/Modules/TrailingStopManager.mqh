@@ -212,15 +212,6 @@ bool CTrailingStopManager::Update(ulong ticket)
     double current_sl = PositionGetDouble(POSITION_SL);
     double current_tp = PositionGetDouble(POSITION_TP);
     string symbol = PositionGetString(POSITION_SYMBOL);
-    
-    // DEBUG: Log do SL atual lido do broker
-    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-    if(g_log_level >= 3)
-    {
-        Print("🔍 [TS DEBUG] #", ticket, " | current_sl lido do broker: ", DoubleToString(current_sl, digits),
-              " | entry: ", DoubleToString(entry_price, digits), 
-              " | tp: ", DoubleToString(current_tp, digits));
-    }
 
     // ═══════════════════════════════════════════════════════
     // CRITICAL: Bloquear modificações quando mercado fechado
@@ -261,6 +252,14 @@ bool CTrailingStopManager::Update(ulong ticket)
     // Informações do símbolo
     double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
     int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+    
+    // DEBUG: Log do SL atual lido do broker (usar digits aqui)
+    if(g_log_level >= 3)
+    {
+        Print("🔍 [TS DEBUG] #", ticket, " | current_sl lido do broker: ", DoubleToString(current_sl, digits),
+              " | entry: ", DoubleToString(entry_price, digits), 
+              " | tp: ", DoubleToString(current_tp, digits));
+    }
     
     // Calcular lucro em pontos/pips
     double profit_points;

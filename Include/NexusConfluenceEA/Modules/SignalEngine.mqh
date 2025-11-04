@@ -59,6 +59,9 @@ private:
     
     // Minimum score threshold
     int             m_min_score;
+
+    // Throttle for repetitive Gate 2 rejections (reduce log noise)
+    string          m_last_gate2_reason;
     
 public:
     //+------------------------------------------------------------------+
@@ -81,6 +84,7 @@ public:
         m_min_score = 2;
         
         ArrayInitialize(m_gate_results, false);
+        m_last_gate2_reason = "";
     }
     
     //+------------------------------------------------------------------+
@@ -186,9 +190,20 @@ public:
             
             m_gate_results[2] = false;
             m_gate_messages[2] = "G2✗ H4/H1 desalinhados";
-            
-            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: H4/H1 não alinhados | H4:%+d H1:%+d M30:%+d M15:%+d",
-                              gg_h4, gg_h1, gg_m30, gg_m15));
+
+            string reason = "H4/H1 desalinhados";
+            if(m_last_gate2_reason != reason)
+            {
+                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | H4:%+d H1:%+d M30:%+d M15:%+d",
+                                  reason, gg_h4, gg_h1, gg_m30, gg_m15));
+                m_last_gate2_reason = reason;
+            }
+            else
+            {
+                // Demote repeated messages to Debug to reduce spam
+                m_core.LogMessage(3, StringFormat("❌ Gate 2 REJECTED: %s",
+                                  reason));
+            }
             return false;
         }
         
@@ -217,8 +232,17 @@ public:
             m_gate_messages[2] = "G2✗ TF operacional oposto";
             
             string opposite_tf = m30_opposite ? "M30" : "M15";
-            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s oposto aos macros | H4:%+d H1:%+d M30:%+d M15:%+d",
-                              opposite_tf, gg_h4, gg_h1, gg_m30, gg_m15));
+            string reason = StringFormat("%s oposto aos macros", opposite_tf);
+            if(m_last_gate2_reason != reason)
+            {
+                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | H4:%+d H1:%+d M30:%+d M15:%+d",
+                                  reason, gg_h4, gg_h1, gg_m30, gg_m15));
+                m_last_gate2_reason = reason;
+            }
+            else
+            {
+                m_core.LogMessage(3, StringFormat("❌ Gate 2 REJECTED: %s", reason));
+            }
             return false;
         }
         
@@ -252,8 +276,18 @@ public:
             m_signal_direction = SIGNAL_DIR_NONE;
             m_gate_results[2] = false;
             m_gate_messages[2] = StringFormat("G2✗ MinScore(%d) < Req(%d)", MathAbs(m_mtf_score), m_min_score);
-            m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
-                              m_mtf_score, m_min_score, gg_h4, gg_h1, gg_m30, gg_m15));
+            string reason = "MinScore";
+            if(m_last_gate2_reason != reason)
+            {
+                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
+                                  m_mtf_score, m_min_score, gg_h4, gg_h1, gg_m30, gg_m15));
+                m_last_gate2_reason = reason;
+            }
+            else
+            {
+                m_core.LogMessage(3, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d",
+                                  m_mtf_score, m_min_score));
+            }
             return false;
         }
 
@@ -265,11 +299,13 @@ public:
                              EnumToString(m_signal_class),
                              m_mtf_score);
         
-        m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s %s | Score:%+d | H4:%+d → H1:%+d → M30:%+d → M15:%+d",
+    m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s %s | Score:%+d | H4:%+d → H1:%+d → M30:%+d → M15:%+d",
                           EnumToString(m_signal_class),
                           EnumToString(m_signal_direction),
                           m_mtf_score,
                           gg_h4, gg_h1, gg_m30, gg_m15));
+    // Reset last rejection reason after a pass
+    m_last_gate2_reason = "";
         
         return result;
     }

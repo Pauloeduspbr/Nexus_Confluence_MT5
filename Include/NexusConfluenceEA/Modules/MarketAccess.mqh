@@ -474,5 +474,36 @@ public:
     ENUM_MARKET_TYPE GetMarketType(void) const { return m_market_type; }
     double GetPoint(void) const { return m_point; }
     int GetDigits(void) const { return m_digits; }
+
+    // ──────────────────────────────────────────────────────────────
+    // Trade mode helpers: check if opening new positions is allowed
+    // and whether a specific direction is permitted (handles
+    // DISABLED, CLOSEONLY, LONGONLY, SHORTONLY).
+    // ──────────────────────────────────────────────────────────────
+    int GetTradeMode(void) const
+    {
+        return (int)SymbolInfoInteger(m_symbol, SYMBOL_TRADE_MODE);
+    }
+
+    bool IsBuyAllowedNow(void) const
+    {
+        int mode = GetTradeMode();
+        // 0: DISABLED, 1: LONGONLY, 2: SHORTONLY, 3: CLOSEONLY, 4: FULL
+        if(mode == SYMBOL_TRADE_MODE_DISABLED || mode == SYMBOL_TRADE_MODE_CLOSEONLY)
+            return false;
+        if(mode == SYMBOL_TRADE_MODE_SHORTONLY)
+            return false; // Can't open BUY in short-only
+        return true;
+    }
+
+    bool IsSellAllowedNow(void) const
+    {
+        int mode = GetTradeMode();
+        if(mode == SYMBOL_TRADE_MODE_DISABLED || mode == SYMBOL_TRADE_MODE_CLOSEONLY)
+            return false;
+        if(mode == SYMBOL_TRADE_MODE_LONGONLY)
+            return false; // Can't open SELL in long-only
+        return true;
+    }
 };
 //+------------------------------------------------------------------+

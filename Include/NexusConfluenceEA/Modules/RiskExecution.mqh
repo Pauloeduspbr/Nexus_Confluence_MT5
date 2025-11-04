@@ -124,6 +124,14 @@ public:
     //+------------------------------------------------------------------+
     bool ExecuteBuy(string comment)
     {
+        // Validate trade mode allows opening BUY
+        if(!m_market->IsBuyAllowedNow())
+        {
+            int mode = m_market->GetTradeMode();
+            m_core->LogMessage(2, StringFormat("⏸️ BUY blocked by trade mode | Mode:%d (DISABLED/CLOSEONLY/SHORTONLY)", mode));
+            return false;
+        }
+
         // Validate lot size
         double lot = m_market.NormalizeLot(m_lot_size);
         if(lot <= 0)
@@ -174,6 +182,14 @@ public:
     //+------------------------------------------------------------------+
     bool ExecuteSell(string comment)
     {
+        // Validate trade mode allows opening SELL
+        if(!m_market->IsSellAllowedNow())
+        {
+            int mode = m_market->GetTradeMode();
+            m_core->LogMessage(2, StringFormat("⏸️ SELL blocked by trade mode | Mode:%d (DISABLED/CLOSEONLY/LONGONLY)", mode));
+            return false;
+        }
+
         // Validate lot size
         double lot = m_market.NormalizeLot(m_lot_size);
         if(lot <= 0)

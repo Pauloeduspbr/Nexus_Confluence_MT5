@@ -36,6 +36,11 @@ private:
         ulong    ticket;
         double   last_price;
         datetime last_update; // armazenará o horário da barra em que o último trailing foi aplicado
+        // Controle de falhas/deduplicação por candle
+        uint     last_retcode;
+        int      last_error;
+        double   last_attempt_sl;
+        datetime last_failure_log_time;
     };
     TrailingRecord m_trailing_records[];
     
@@ -370,6 +375,40 @@ bool CTrailingStopManager::Update(ulong ticket)
                     }
                 }
                 
+                // Verificar FREEZE_LEVEL do broker (bloqueia modificações muito próximas)
+                long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+                if(freeze_level > 0)
+                {
+                    double freeze_distance = (current_price - new_sl) / point;
+                    if(freeze_distance <= freeze_level)
+                    {
+                        // Logar no máximo uma vez por barra/valor de SL
+                        int ridx = FindRecordIndex(ticket);
+                        bool should_log = true;
+                        if(ridx >= 0)
+                        {
+                            if(m_trailing_records[ridx].last_update == bar_time && MathAbs(m_trailing_records[ridx].last_attempt_sl - new_sl) < point)
+                                should_log = false;
+                        }
+                        if(should_log)
+                        {
+                            Print("⛔ [TS] BUY #", ticket, ": Dentro do FREEZE_LEVEL (", freeze_level, ") | distance=", DoubleToString(freeze_distance, 1), " pontos");
+                            Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                        }
+                        // Bloquear novas tentativas nesta barra
+                        UpdateRecord(ticket, current_price, bar_time);
+                        int idxf = FindRecordIndex(ticket);
+                        if(idxf >= 0)
+                        {
+                            m_trailing_records[idxf].last_attempt_sl = new_sl;
+                            m_trailing_records[idxf].last_retcode = 0;
+                            m_trailing_records[idxf].last_error = 0;
+                            m_trailing_records[idxf].last_failure_log_time = TimeCurrent();
+                        }
+                        return false;
+                    }
+                }
+                
                 // Modificar posição (usar símbolo em MT5)
                 if(m_trade.PositionModify(symbol, new_sl, current_tp))
                 {
@@ -380,6 +419,14 @@ bool CTrailingStopManager::Update(ulong ticket)
                     // Isso permite que o próximo trailing seja baseado no preço real
                     // ═══════════════════════════════════════════════════════
                     UpdateRecord(ticket, current_price, bar_time);
+                    int idxs = FindRecordIndex(ticket);
+                    if(idxs >= 0)
+                    {
+                        m_trailing_records[idxs].last_attempt_sl = new_sl;
+                        m_trailing_records[idxs].last_retcode = TRADE_RETCODE_DONE;
+                        m_trailing_records[idxs].last_error = 0;
+                        m_trailing_records[idxs].last_failure_log_time = 0;
+                    }
                     
                     double protected_profit = (new_sl - entry_price) / point;
                     
@@ -407,8 +454,34 @@ bool CTrailingStopManager::Update(ulong ticket)
                         return false;
                     }
                     
-                    Print("❌ [TS] Falha ao modificar BUY #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                    // Deduplicação: logar no máximo uma vez por barra/SL/erro
+                    int ridx = FindRecordIndex(ticket);
+                    bool should_log = true;
+                    if(ridx >= 0)
+                    {
+                        if(m_trailing_records[ridx].last_update == bar_time &&
+                           MathAbs(m_trailing_records[ridx].last_attempt_sl - new_sl) < point &&
+                           m_trailing_records[ridx].last_retcode == retcode &&
+                           m_trailing_records[ridx].last_error == error)
+                        {
+                            should_log = false;
+                        }
+                    }
+                    if(should_log)
+                    {
+                        Print("❌ [TS] Falha ao modificar BUY #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
+                        Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                    }
+                    // Bloquear novas tentativas nesta barra e registrar falha
+                    UpdateRecord(ticket, current_price, bar_time);
+                    int idxf = FindRecordIndex(ticket);
+                    if(idxf >= 0)
+                    {
+                        m_trailing_records[idxf].last_attempt_sl = new_sl;
+                        m_trailing_records[idxf].last_retcode = retcode;
+                        m_trailing_records[idxf].last_error = error;
+                        m_trailing_records[idxf].last_failure_log_time = TimeCurrent();
+                    }
                     return false;
                 }
             }
@@ -527,6 +600,38 @@ bool CTrailingStopManager::Update(ulong ticket)
                     }
                 }
                 
+                // Verificar FREEZE_LEVEL
+                long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+                if(freeze_level > 0)
+                {
+                    double freeze_distance = (new_sl - current_price) / point;
+                    if(freeze_distance <= freeze_level)
+                    {
+                        int ridx = FindRecordIndex(ticket);
+                        bool should_log = true;
+                        if(ridx >= 0)
+                        {
+                            if(m_trailing_records[ridx].last_update == bar_time && MathAbs(m_trailing_records[ridx].last_attempt_sl - new_sl) < point)
+                                should_log = false;
+                        }
+                        if(should_log)
+                        {
+                            Print("⛔ [TS] SELL #", ticket, ": Dentro do FREEZE_LEVEL (", freeze_level, ") | distance=", DoubleToString(freeze_distance, 1), " pontos");
+                            Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                        }
+                        UpdateRecord(ticket, current_price, bar_time);
+                        int idxf = FindRecordIndex(ticket);
+                        if(idxf >= 0)
+                        {
+                            m_trailing_records[idxf].last_attempt_sl = new_sl;
+                            m_trailing_records[idxf].last_retcode = 0;
+                            m_trailing_records[idxf].last_error = 0;
+                            m_trailing_records[idxf].last_failure_log_time = TimeCurrent();
+                        }
+                        return false;
+                    }
+                }
+                
                 // Modificar posição (usar símbolo em MT5)
                 if(m_trade.PositionModify(symbol, new_sl, current_tp))
                 {
@@ -537,6 +642,14 @@ bool CTrailingStopManager::Update(ulong ticket)
                     // Isso permite que o próximo trailing seja baseado no preço real
                     // ═══════════════════════════════════════════════════════
                     UpdateRecord(ticket, current_price, bar_time);
+                    int idxs = FindRecordIndex(ticket);
+                    if(idxs >= 0)
+                    {
+                        m_trailing_records[idxs].last_attempt_sl = new_sl;
+                        m_trailing_records[idxs].last_retcode = TRADE_RETCODE_DONE;
+                        m_trailing_records[idxs].last_error = 0;
+                        m_trailing_records[idxs].last_failure_log_time = 0;
+                    }
                     
                     double protected_profit = (entry_price - new_sl) / point;
                     
@@ -564,8 +677,33 @@ bool CTrailingStopManager::Update(ulong ticket)
                         return false;
                     }
                     
-                    Print("❌ [TS] Falha ao modificar SELL #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
-                    Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                    // Deduplicação: logar no máximo uma vez por barra/SL/erro
+                    int ridx = FindRecordIndex(ticket);
+                    bool should_log = true;
+                    if(ridx >= 0)
+                    {
+                        if(m_trailing_records[ridx].last_update == bar_time &&
+                           MathAbs(m_trailing_records[ridx].last_attempt_sl - new_sl) < point &&
+                           m_trailing_records[ridx].last_retcode == retcode &&
+                           m_trailing_records[ridx].last_error == error)
+                        {
+                            should_log = false;
+                        }
+                    }
+                    if(should_log)
+                    {
+                        Print("❌ [TS] Falha ao modificar SELL #", ticket, " - Retcode: ", retcode, " | Erro: ", error);
+                        Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                    }
+                    UpdateRecord(ticket, current_price, bar_time);
+                    int idxf = FindRecordIndex(ticket);
+                    if(idxf >= 0)
+                    {
+                        m_trailing_records[idxf].last_attempt_sl = new_sl;
+                        m_trailing_records[idxf].last_retcode = retcode;
+                        m_trailing_records[idxf].last_error = error;
+                        m_trailing_records[idxf].last_failure_log_time = TimeCurrent();
+                    }
                     return false;
                 }
             }
@@ -647,6 +785,10 @@ void CTrailingStopManager::UpdateRecord(ulong ticket, double price, datetime bar
         m_trailing_records[size].ticket = ticket;
         m_trailing_records[size].last_price = price;
         m_trailing_records[size].last_update = bar_time;
+        m_trailing_records[size].last_retcode = 0;
+        m_trailing_records[size].last_error = 0;
+        m_trailing_records[size].last_attempt_sl = 0.0;
+        m_trailing_records[size].last_failure_log_time = 0;
     }
 }
 

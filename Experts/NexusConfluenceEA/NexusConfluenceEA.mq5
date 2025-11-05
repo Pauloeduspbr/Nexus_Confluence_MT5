@@ -134,6 +134,11 @@ int OnInit()
         CleanupModules();
         return(INIT_FAILED);
     }
+    // Attach indicators visually to chart if requested
+    if(InpAttachIndicatorsToChart)
+    {
+        g_indicators.AttachToChart(true);
+    }
     
     if(!g_signals.Init(g_core, g_market, g_indicators, 
                        InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF,
@@ -768,6 +773,9 @@ void PrintConfiguration()
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
     Print("• v2.03: Gate3 stricter; RiskExec; spread warm-up; no RT guard");
+    Print("");
+    Print("=== VISUALIZAÇÃO ===");
+    Print("Attach Indicators To Chart: ", (InpAttachIndicatorsToChart ? "ON" : "OFF"));
     
     Print("\n=== ASYMMETRIC RISK MANAGEMENT ===");
     Print("📈 BUY: ", (InpEnableBuy ? "ENABLED" : "DISABLED"));

@@ -57,6 +57,16 @@ private:
     // Synchronization timestamp
     datetime        m_last_update_time;
 
+    // Visualization control
+    bool            m_attached_to_chart;
+    int             m_win_wae;
+    int             m_win_rsi;
+    int             m_win_cs;
+    string          m_name_supertrend;
+    string          m_name_wae;
+    string          m_name_rsi;
+    string          m_name_cs;
+
     // ──────────────────────────────────────────────────────────────
     // Indicator input parameters (configuráveis via EA Inputs)
     // ──────────────────────────────────────────────────────────────
@@ -114,6 +124,9 @@ public:
         
         m_cs_available = false;
         m_last_update_time = 0;
+    m_attached_to_chart = false;
+    m_win_wae = 1; m_win_rsi = 2; m_win_cs = 3;
+    m_name_supertrend = ""; m_name_wae = ""; m_name_rsi = ""; m_name_cs = "";
         
         ArrayInitialize(m_gg_buffer, 0);
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
@@ -386,10 +399,94 @@ public:
     }
     
     //+------------------------------------------------------------------+
+    //| Attach or detach indicators visually from the current chart      |
+    //+------------------------------------------------------------------+
+    bool AttachToChart(bool attach)
+    {
+        long chart_id = ChartID();
+        if(attach)
+        {
+            if(m_attached_to_chart)
+                return true; // already attached
+
+            int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
+            // Get short names for delete operations
+            if(m_supertrend_handle != INVALID_HANDLE)
+                m_name_supertrend = IndicatorGetString(m_supertrend_handle, INDICATOR_SHORTNAME);
+            if(m_wae_handle != INVALID_HANDLE)
+                m_name_wae = IndicatorGetString(m_wae_handle, INDICATOR_SHORTNAME);
+            if(m_rsi_oma_handle != INVALID_HANDLE)
+                m_name_rsi = IndicatorGetString(m_rsi_oma_handle, INDICATOR_SHORTNAME);
+            if(m_currency_handle != INVALID_HANDLE)
+                m_name_cs = IndicatorGetString(m_currency_handle, INDICATOR_SHORTNAME);
+
+            bool ok = true;
+            // Supertrend overlays main chart (window 0)
+            if(m_supertrend_handle != INVALID_HANDLE)
+            {
+                if(!ChartIndicatorAdd(chart_id, 0, m_supertrend_handle))
+                {
+                    Print("⚠️ Could not attach Supertrend to chart (window 0)");
+                    ok = false;
+                }
+            }
+            // WAE in subwindow 1
+            if(m_wae_handle != INVALID_HANDLE)
+            {
+                if(!ChartIndicatorAdd(chart_id, m_win_wae, m_wae_handle))
+                {
+                    Print("⚠️ Could not attach WAE to chart (window ", m_win_wae, ")");
+                    ok = false;
+                }
+            }
+            // RSI OMA in subwindow 2
+            if(m_rsi_oma_handle != INVALID_HANDLE)
+            {
+                if(!ChartIndicatorAdd(chart_id, m_win_rsi, m_rsi_oma_handle))
+                {
+                    Print("⚠️ Could not attach RSI OMA to chart (window ", m_win_rsi, ")");
+                    ok = false;
+                }
+            }
+            // Currency Strength in subwindow 3 (if available)
+            if(m_cs_available && m_currency_handle != INVALID_HANDLE)
+            {
+                if(!ChartIndicatorAdd(chart_id, m_win_cs, m_currency_handle))
+                {
+                    Print("⚠️ Could not attach Currency Strength to chart (window ", m_win_cs, ")");
+                    ok = false;
+                }
+            }
+            if(ok)
+                Print("🎨 Indicators attached to chart (Supertrend:main, WAE:#", m_win_wae, ", RSI:#", m_win_rsi, ", CS:#", m_win_cs, ")");
+            m_attached_to_chart = true;
+            return ok;
+        }
+        else
+        {
+            if(!m_attached_to_chart)
+                return true; // nothing to do
+            // Delete by short names if available
+            if(m_name_supertrend != "") ChartIndicatorDelete(chart_id, 0, m_name_supertrend);
+            if(m_name_wae != "") ChartIndicatorDelete(chart_id, m_win_wae, m_name_wae);
+            if(m_name_rsi != "") ChartIndicatorDelete(chart_id, m_win_rsi, m_name_rsi);
+            if(m_name_cs != "") ChartIndicatorDelete(chart_id, m_win_cs, m_name_cs);
+            m_attached_to_chart = false;
+            Print("🧹 Indicators detached from chart");
+            return true;
+        }
+    }
+    
+    //+------------------------------------------------------------------+
     //| Deinitialization - Release all handles                          |
     //+------------------------------------------------------------------+
     void Deinit(void)
     {
+        // Ensure indicators are removed from chart if we attached them
+        if(m_attached_to_chart)
+        {
+            AttachToChart(false);
+        }
         if(m_gg_handle != INVALID_HANDLE)
         {
             IndicatorRelease(m_gg_handle);

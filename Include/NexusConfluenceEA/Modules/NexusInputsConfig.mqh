@@ -147,6 +147,12 @@ input bool     InpEnableEmail    = false;      // Enviar Email em Operações
 input bool     InpEnablePush     = false;      // Enviar Notificação Push
 
 //+------------------------------------------------------------------+
+//| SEÇÃO 15.1: VISUALIZAÇÃO NO GRÁFICO                             |
+//+------------------------------------------------------------------+
+input group "═══════════ 🎨 VISUALIZAÇÃO ═══════════"
+input bool     InpAttachIndicatorsToChart = true; // Anexar indicadores visuais ao gráfico
+
+//+------------------------------------------------------------------+
 //| SEÇÃO 16: LOGS E DEBUG                                           |
 //+------------------------------------------------------------------+
 

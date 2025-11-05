@@ -66,6 +66,67 @@ private:
     string          m_name_wae;
     string          m_name_rsi;
     string          m_name_cs;
+    // Remember actual windows we attached to (for robust detach)
+    int             m_attached_win_supertrend;
+    int             m_attached_win_wae;
+    int             m_attached_win_rsi;
+    int             m_attached_win_cs;
+
+    // Helper: delete indicator by short name, trying preferred window first then scanning all
+    bool DeleteIndicatorFromChart(const long chart_id, const string name, const int preferred_win)
+    {
+        if(name == "")
+            return true;
+
+        if(preferred_win >= 0)
+        {
+            if(ChartIndicatorDelete(chart_id, preferred_win, name))
+                return true;
+        }
+
+        long total_windows_long = 0;
+        if(!ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL, 0, total_windows_long))
+            total_windows_long = 1; // fallback
+
+        int total_windows = (int)total_windows_long;
+        for(int w=0; w<total_windows; ++w)
+        {
+            int tot = ChartIndicatorsTotal(chart_id, w);
+            for(int idx=0; idx<tot; ++idx)
+            {
+                string nm = ChartIndicatorName(chart_id, w, idx);
+                if(nm == name)
+                {
+                    if(ChartIndicatorDelete(chart_id, w, name))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    bool DeleteIndicatorFromChartByPattern(const long chart_id, const string pattern)
+    {
+        if(pattern == "") return false;
+        long total_windows_long = 0;
+        if(!ChartGetInteger(chart_id, CHART_WINDOWS_TOTAL, 0, total_windows_long))
+            total_windows_long = 1;
+        int total_windows = (int)total_windows_long;
+        for(int w=0; w<total_windows; ++w)
+        {
+            int tot = ChartIndicatorsTotal(chart_id, w);
+            for(int idx=0; idx<tot; ++idx)
+            {
+                string nm = ChartIndicatorName(chart_id, w, idx);
+                if(StringFind(nm, pattern) >= 0)
+                {
+                    if(ChartIndicatorDelete(chart_id, w, nm))
+                        return true;
+                }
+            }
+        }
+        return false;
+    }
 
     // ──────────────────────────────────────────────────────────────
     // Indicator input parameters (configuráveis via EA Inputs)
@@ -127,6 +188,7 @@ public:
     m_attached_to_chart = false;
     m_win_wae = 1; m_win_rsi = 2; m_win_cs = 3;
     m_name_supertrend = ""; m_name_wae = ""; m_name_rsi = ""; m_name_cs = "";
+    m_attached_win_supertrend = -1; m_attached_win_wae = -1; m_attached_win_rsi = -1; m_attached_win_cs = -1;
         
         ArrayInitialize(m_gg_buffer, 0);
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
@@ -427,7 +489,10 @@ public:
                 {
                     int tot_after = ChartIndicatorsTotal(chart_id, 0);
                     if(tot_after > tot_main_before)
+                    {
                         m_name_supertrend = ChartIndicatorName(chart_id, 0, tot_after - 1);
+                        m_attached_win_supertrend = 0;
+                    }
                 }
             }
             // WAE in subwindow 1
@@ -442,7 +507,10 @@ public:
                 {
                     int tot_after = ChartIndicatorsTotal(chart_id, m_win_wae);
                     if(tot_after > tot_wae_before)
+                    {
                         m_name_wae = ChartIndicatorName(chart_id, m_win_wae, tot_after - 1);
+                        m_attached_win_wae = m_win_wae;
+                    }
                 }
             }
             // RSI OMA in subwindow 2
@@ -457,7 +525,10 @@ public:
                 {
                     int tot_after = ChartIndicatorsTotal(chart_id, m_win_rsi);
                     if(tot_after > tot_rsi_before)
+                    {
                         m_name_rsi = ChartIndicatorName(chart_id, m_win_rsi, tot_after - 1);
+                        m_attached_win_rsi = m_win_rsi;
+                    }
                 }
             }
             // Currency Strength in subwindow 3 (if available)
@@ -472,7 +543,10 @@ public:
                 {
                     int tot_after = ChartIndicatorsTotal(chart_id, m_win_cs);
                     if(tot_after > tot_cs_before)
+                    {
                         m_name_cs = ChartIndicatorName(chart_id, m_win_cs, tot_after - 1);
+                        m_attached_win_cs = m_win_cs;
+                    }
                 }
             }
             if(ok)
@@ -484,11 +558,21 @@ public:
         {
             if(!m_attached_to_chart)
                 return true; // nothing to do
-            // Delete by short names if available
-            if(m_name_supertrend != "") ChartIndicatorDelete(chart_id, 0, m_name_supertrend);
-            if(m_name_wae != "") ChartIndicatorDelete(chart_id, m_win_wae, m_name_wae);
-            if(m_name_rsi != "") ChartIndicatorDelete(chart_id, m_win_rsi, m_name_rsi);
-            if(m_name_cs != "") ChartIndicatorDelete(chart_id, m_win_cs, m_name_cs);
+            bool d1 = DeleteIndicatorFromChart(chart_id, m_name_supertrend, m_attached_win_supertrend)
+                      || DeleteIndicatorFromChartByPattern(chart_id, "TrendMagic_MT5");
+            bool d2 = DeleteIndicatorFromChart(chart_id, m_name_wae,        m_attached_win_wae)
+                      || DeleteIndicatorFromChartByPattern(chart_id, "WaddahAttarExplosion_Professional");
+            bool d3 = DeleteIndicatorFromChart(chart_id, m_name_rsi,        m_attached_win_rsi)
+                      || DeleteIndicatorFromChartByPattern(chart_id, "RSIOMA_v2HHLSX_MT5");
+            bool d4 = DeleteIndicatorFromChart(chart_id, m_name_cs,         m_attached_win_cs)
+                      || DeleteIndicatorFromChartByPattern(chart_id, "CurrencyStrengthMeter_MT5");
+
+            if(!(d1 && d2 && d3 && d4))
+                Print("⚠️ Some indicators could not be auto-removed; they may have been moved/renamed manually.");
+
+            // Reset names and window trackers
+            m_name_supertrend = ""; m_name_wae = ""; m_name_rsi = ""; m_name_cs = "";
+            m_attached_win_supertrend = -1; m_attached_win_wae = -1; m_attached_win_rsi = -1; m_attached_win_cs = -1;
             m_attached_to_chart = false;
             Print("🧹 Indicators detached from chart");
             return true;

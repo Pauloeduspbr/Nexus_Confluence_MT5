@@ -409,18 +409,12 @@ public:
             if(m_attached_to_chart)
                 return true; // already attached
 
-            int digits = (int)SymbolInfoInteger(m_symbol, SYMBOL_DIGITS);
-            // Get short names for delete operations
-            if(m_supertrend_handle != INVALID_HANDLE)
-                m_name_supertrend = IndicatorGetString(m_supertrend_handle, INDICATOR_SHORTNAME);
-            if(m_wae_handle != INVALID_HANDLE)
-                m_name_wae = IndicatorGetString(m_wae_handle, INDICATOR_SHORTNAME);
-            if(m_rsi_oma_handle != INVALID_HANDLE)
-                m_name_rsi = IndicatorGetString(m_rsi_oma_handle, INDICATOR_SHORTNAME);
-            if(m_currency_handle != INVALID_HANDLE)
-                m_name_cs = IndicatorGetString(m_currency_handle, INDICATOR_SHORTNAME);
-
             bool ok = true;
+            // Capture current totals to recover names after attach
+            int tot_main_before = ChartIndicatorsTotal(chart_id, 0);
+            int tot_wae_before  = ChartIndicatorsTotal(chart_id, m_win_wae);
+            int tot_rsi_before  = ChartIndicatorsTotal(chart_id, m_win_rsi);
+            int tot_cs_before   = ChartIndicatorsTotal(chart_id, m_win_cs);
             // Supertrend overlays main chart (window 0)
             if(m_supertrend_handle != INVALID_HANDLE)
             {
@@ -428,6 +422,12 @@ public:
                 {
                     Print("⚠️ Could not attach Supertrend to chart (window 0)");
                     ok = false;
+                }
+                else
+                {
+                    int tot_after = ChartIndicatorsTotal(chart_id, 0);
+                    if(tot_after > tot_main_before)
+                        m_name_supertrend = ChartIndicatorName(chart_id, 0, tot_after - 1);
                 }
             }
             // WAE in subwindow 1
@@ -438,6 +438,12 @@ public:
                     Print("⚠️ Could not attach WAE to chart (window ", m_win_wae, ")");
                     ok = false;
                 }
+                else
+                {
+                    int tot_after = ChartIndicatorsTotal(chart_id, m_win_wae);
+                    if(tot_after > tot_wae_before)
+                        m_name_wae = ChartIndicatorName(chart_id, m_win_wae, tot_after - 1);
+                }
             }
             // RSI OMA in subwindow 2
             if(m_rsi_oma_handle != INVALID_HANDLE)
@@ -447,6 +453,12 @@ public:
                     Print("⚠️ Could not attach RSI OMA to chart (window ", m_win_rsi, ")");
                     ok = false;
                 }
+                else
+                {
+                    int tot_after = ChartIndicatorsTotal(chart_id, m_win_rsi);
+                    if(tot_after > tot_rsi_before)
+                        m_name_rsi = ChartIndicatorName(chart_id, m_win_rsi, tot_after - 1);
+                }
             }
             // Currency Strength in subwindow 3 (if available)
             if(m_cs_available && m_currency_handle != INVALID_HANDLE)
@@ -455,6 +467,12 @@ public:
                 {
                     Print("⚠️ Could not attach Currency Strength to chart (window ", m_win_cs, ")");
                     ok = false;
+                }
+                else
+                {
+                    int tot_after = ChartIndicatorsTotal(chart_id, m_win_cs);
+                    if(tot_after > tot_cs_before)
+                        m_name_cs = ChartIndicatorName(chart_id, m_win_cs, tot_after - 1);
                 }
             }
             if(ok)

@@ -7,6 +7,9 @@
 #property version   "1.00"
 #property strict
 
+#ifndef MARKET_ACCESS_MQH
+#define MARKET_ACCESS_MQH
+
 //+------------------------------------------------------------------+
 //| Market Type Enumeration                                          |
 //+------------------------------------------------------------------+
@@ -555,3 +558,5 @@ public:
     }
 };
 //+------------------------------------------------------------------+
+
+#endif // MARKET_ACCESS_MQH

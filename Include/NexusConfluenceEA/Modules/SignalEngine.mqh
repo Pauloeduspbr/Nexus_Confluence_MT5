@@ -7,6 +7,9 @@
 #property version   "1.00"
 #property strict
 
+#ifndef SIGNAL_ENGINE_MQH
+#define SIGNAL_ENGINE_MQH
+
 #include "Core.mqh"
 #include "MarketAccess.mqh"
 #include "IndicatorHub.mqh"
@@ -379,30 +382,31 @@ public:
     
     //+------------------------------------------------------------------+
     //| GATE 4: Momentum - OBV MACD FIRST, then RSI OMA (CRITICAL ORDER) |
-    //| ✅ FIXED v2.33: Use COLOR INDEX to detect strong momentum       |
-    //| OBV_MACD has 4 colors:                                           |
-    //|   0 = Strong Green (hist>0 AND expanding) - ACCEPT for BUY      |
-    //|   1 = Strong Red (hist<0 AND expanding) - ACCEPT for SELL       |
-    //|   2 = Weak Green (hist>0 but weakening) - REJECT                |
-    //|   3 = Weak Red (hist<0 but recovering) - REJECT                 |
+    //| ✅ v2.15 CRITICAL FIX: Histogram analysis replaces color index  |
+    //| OBV_MACD histogram analysis:                                     |
+    //|   Histogram > 0 AND expanding = Bullish momentum - ACCEPT BUY   |
+    //|   Histogram < 0 AND expanding = Bearish momentum - ACCEPT SELL  |
+    //|   Histogram weakening = Lateral/weak - REJECT                   |
     //+------------------------------------------------------------------+
     bool ProcessGate4_Momentum(void)
     {
-        // STEP 1: Check if momentum is STRONG (color index 0 or 1)
-        // Rejects weak momentum (color index 2 or 3)
+        // ✅ v2.15 NEW LOGIC: Análise de histograma (valor + tendência)
+        // STEP 1: Check if momentum is EXPANDING (histogram growing in absolute value)
         bool macd_strong = m_indicators.IsMomentumExpanding();
         if(!macd_strong)
         {
             m_gate_results[4] = false;
-            m_gate_messages[4] = "G4✗ MOM weak";
-            m_core.LogMessage(2, "❌ Gate 4 REJECTED: Momentum (OBV MACD) is WEAK (color index 2 or 3)");
+            double hist_current = m_indicators.GetMomentumHistogram();
+            double hist_previous = m_indicators.GetMomentumHistogramPrevious();
+            m_gate_messages[4] = StringFormat("G4✗ MOM weak (%.5f→%.5f)", hist_previous, hist_current);
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: Momentum (OBV MACD) is WEAK/CONTRACTING | Hist: %.5f → %.5f", hist_previous, hist_current));
             return false;
         }
 
         // STEP 2: Get direction from histogram sign
         int macd_direction = m_indicators.GetMomentumDirection();
 
-        // STEP 3: RSI OMA confirmation
+        // STEP 3: RSI OMA confirmation (SECOND check - confirms momentum direction)
         int rsi_signal = m_indicators.GetRSIOMASignal();
 
         bool result = false;
@@ -416,10 +420,15 @@ public:
         }
 
         m_gate_results[4] = result;
-        m_gate_messages[4] = StringFormat("G4%s MOM:%+d RSI:%+d", result ? "✓" : "✗", macd_direction, rsi_signal);
+        double hist_val = m_indicators.GetMomentumHistogram();
+        m_gate_messages[4] = StringFormat("G4%s MOM:%+d(%.5f) RSI:%+d", result ? "✓" : "✗", macd_direction, hist_val, rsi_signal);
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: MOM=%+d RSI=%+d vs Direction=%s", macd_direction, rsi_signal, EnumToString(m_signal_direction)));
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: MOM=%+d (hist=%.5f) RSI=%+d vs Direction=%s", macd_direction, hist_val, rsi_signal, EnumToString(m_signal_direction)));
+        }
+        else
+        {
+            m_core.LogMessage(2, StringFormat("✅ Gate 4 PASSED: MOM expanding (hist=%.5f) + RSI aligned", hist_val));
         }
         return result;
     }
@@ -600,3 +609,5 @@ public:
     int GetMTFScore(void) const { return m_mtf_score; }
 };
 //+------------------------------------------------------------------+
+
+#endif // SIGNAL_ENGINE_MQH

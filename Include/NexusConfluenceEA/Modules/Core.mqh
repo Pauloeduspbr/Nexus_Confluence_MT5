@@ -7,15 +7,20 @@
 #property version   "1.00"
 #property strict
 
+#ifndef CORE_MQH
+#define CORE_MQH
+
 //+------------------------------------------------------------------+
-//| EA State Machine Enumeration                                     |
+//| EA State Machine Enumeration (v2.15 - Enhanced Anti-Duplication) |
 //+------------------------------------------------------------------+
 enum ENUM_EA_STATE
 {
     STATE_IDLE,              // Ready to process new signals
     STATE_SIGNAL_DETECTED,   // Valid signal found, preparing order
-    STATE_ORDER_SENT,        // Order executed, waiting for close
-    STATE_WAITING_CLOSE      // Position open, monitoring exit
+    STATE_PROCESSING_ORDER,  // ✅ NEW: Prevents duplicate order attempts
+    STATE_ORDER_SENT,        // Order executed successfully
+    STATE_WAITING_CLOSE,     // Position open, monitoring exit
+    STATE_ERROR_RECOVERY     // ✅ NEW: Handles recoverable errors (requote, timeout)
 };
 
 //+------------------------------------------------------------------+
@@ -217,3 +222,5 @@ public:
     ENUM_TIMEFRAMES GetTimeframe(void) const { return m_timeframe; }
 };
 //+------------------------------------------------------------------+
+
+#endif // CORE_MQH

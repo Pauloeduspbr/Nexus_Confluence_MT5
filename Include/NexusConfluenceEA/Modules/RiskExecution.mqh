@@ -7,6 +7,9 @@
 #property version   "1.00"
 #property strict
 
+#ifndef RISK_EXECUTION_MQH
+#define RISK_EXECUTION_MQH
+
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
 #include "Core.mqh"
@@ -238,11 +241,17 @@ public:
     //+------------------------------------------------------------------+
     //| Execute order with retry logic                                  |
     //+------------------------------------------------------------------+
+    //| Execute order with retry logic (recoverable errors)             |
+    //| ✅ v2.15: Added state machine transitions                       |
+    //+------------------------------------------------------------------+
     bool ExecuteOrderWithRetry(ENUM_ORDER_TYPE order_type, double lot, 
                                double price, double sl, double tp, string comment)
     {
         int attempts = 0;
         bool result = false;
+        
+        // ✅ v2.15: Transition to PROCESSING_ORDER state before first attempt
+        m_core->UpdateStateMachine(STATE_PROCESSING_ORDER);
         
         while(attempts < m_max_retries && !result)
         {
@@ -263,10 +272,14 @@ public:
                 // Validate result
                 if(m_trade.ResultRetcode() == TRADE_RETCODE_DONE)
                 {
+                    // ✅ v2.15: Transition to ORDER_SENT on success
+                    m_core->UpdateStateMachine(STATE_ORDER_SENT);
                     return true;
                 }
                 else if(m_trade.ResultRetcode() == TRADE_RETCODE_PLACED)
                 {
+                    // ✅ v2.15: Transition to ORDER_SENT on success
+                    m_core->UpdateStateMachine(STATE_ORDER_SENT);
                     return true; // Order placed successfully
                 }
                 else
@@ -274,16 +287,25 @@ public:
                     // Check if error is recoverable
                     if(IsRecoverableError(m_trade.ResultRetcode()))
                     {
-                        m_core->LogMessage(2, StringFormat("[WARN] Recoverable error on attempt %d: %s",
-                                          attempts, m_trade.ResultRetcodeDescription()));
+                        // ✅ v2.15: Transition to ERROR_RECOVERY on retryable error
+                        m_core->UpdateStateMachine(STATE_ERROR_RECOVERY);
+                        
+                        m_core->LogMessage(2, StringFormat("[WARN] Recoverable error on attempt %d/%d: %s",
+                                          attempts, m_max_retries, m_trade.ResultRetcodeDescription()));
                         
                         Sleep(m_retry_delay_ms);
                         result = false; // Retry
+                        
+                        // ✅ Return to PROCESSING_ORDER for next attempt
+                        if(attempts < m_max_retries)
+                            m_core->UpdateStateMachine(STATE_PROCESSING_ORDER);
+                        
                         continue;
                     }
                     else
                     {
-                        // Non-recoverable error
+                        // Non-recoverable error - reset to IDLE
+                        m_core->UpdateStateMachine(STATE_IDLE);
                         return false;
                     }
                 }
@@ -295,19 +317,29 @@ public:
                 
                 if(IsRecoverableError(error_code))
                 {
-                    m_core->LogMessage(2, StringFormat("[WARN] Recoverable error on attempt %d: %d",
-                                      attempts, error_code));
+                    // ✅ v2.15: Transition to ERROR_RECOVERY
+                    m_core->UpdateStateMachine(STATE_ERROR_RECOVERY);
+                    
+                    m_core->LogMessage(2, StringFormat("[WARN] Recoverable error on attempt %d/%d: %d",
+                                      attempts, m_max_retries, error_code));
                     
                     Sleep(m_retry_delay_ms);
+                    
+                    // ✅ Return to PROCESSING_ORDER for next attempt
+                    if(attempts < m_max_retries)
+                        m_core->UpdateStateMachine(STATE_PROCESSING_ORDER);
                 }
                 else
                 {
-                    // Non-recoverable error
+                    // Non-recoverable error - reset to IDLE
+                    m_core->UpdateStateMachine(STATE_IDLE);
                     return false;
                 }
             }
         }
         
+        // ✅ v2.15: All retries exhausted - reset to IDLE
+        m_core->UpdateStateMachine(STATE_IDLE);
         return false;
     }
     
@@ -396,3 +428,5 @@ public:
     void SetTakeProfit(int points) { m_take_profit_points = points; }
 };
 //+------------------------------------------------------------------+
+
+#endif // RISK_EXECUTION_MQH

@@ -7,6 +7,9 @@
 #property version   "2.36"
 #property strict
 
+#ifndef INDICATOR_HUB_MQH
+#define INDICATOR_HUB_MQH
+
 //+------------------------------------------------------------------+
 //| v2.36: CRITICAL FIX - Ultra-tolerant CopyBuffer error handling  |
 //| - CopyBuffer falhas NÃO bloqueiam mais UpdateBufferCache()      |
@@ -54,17 +57,21 @@ private:
     string          m_symbol;
     ENUM_TIMEFRAMES m_operational_tf;
     
+    // ✅ v2.15 FIX: MTF Configuration (para GG handles separados)
+    ENUM_TIMEFRAMES m_mtf_timeframes[4];  // [0]=H4, [1]=H1, [2]=M30, [3]=M15
+    
     // Indicator handles (MUST check for INVALID_HANDLE)
-    int             m_gg_handle;
+    // ✅ v2.15 FIX: Array de handles GG - um por timeframe MTF
+    int             m_gg_handles[4];      // [0]=H4, [1]=H1, [2]=M30, [3]=M15
     int             m_supertrend_handle;
-    int             m_mom_handle; // OBV_MACD (momentum)
+    int             m_mom_handle;         // OBV_MACD (momentum)
     int             m_rsi_oma_handle;
     int             m_currency_handle;
     
-    // GG TrendBar buffers (v2.27: EXTENDED to 15 timeframes)
-    // M1, M5, M10, M15, M20, M30, H1, H2, H4, H6, H8, H12, D1, W1, MN1
-    // Returns: -1 (bearish), 0 (neutral), +1 (bullish)
-    double          m_gg_buffer[15];
+    // ✅ v2.15 FIX: Buffers GG simplificados - um valor por TF MTF
+    // Anteriormente: 15 timeframes em buffer único (incorreto)
+    // Agora: 4 valores, um por handle MTF (correto)
+    double          m_gg_buffer[4];       // [0]=H4, [1]=H1, [2]=M30, [3]=M15
     
     // Supertrend buffers (TrendMagic_MT5)
     // Buffer 0: Upper band (blue line - bullish)
@@ -75,8 +82,11 @@ private:
     // Momentum buffers (OBV_MACD)
     // Buffer 0: Histogram value (can be positive or negative)
     // Buffer 1: Color index (0=strong green, 1=strong red, 2=weak green, 3=weak red)
-    double          m_mom_histogram;
-    int             m_mom_color_index;
+    // ✅ v2.15 FIX: Armazenar histórico do histograma para análise de tendência
+    double          m_mom_histogram;          // ✅ Backward compatibility
+    double          m_mom_histogram_current;
+    double          m_mom_histogram_previous;
+    int             m_mom_color_index;  // Mantido para compatibilidade, mas não usado
     
     // RSI OMA buffers
     // Buffer 0: Red line (RSI)
@@ -243,11 +253,23 @@ public:
         m_symbol = _Symbol;
         m_operational_tf = PERIOD_CURRENT;
         
-        m_gg_handle = INVALID_HANDLE;
+        // ✅ v2.15 FIX: Inicializar array de handles GG
+        for(int i = 0; i < 4; i++)
+        {
+            m_gg_handles[i] = INVALID_HANDLE;
+            m_gg_buffer[i] = 0;
+        }
+        
         m_supertrend_handle = INVALID_HANDLE;
     m_mom_handle = INVALID_HANDLE;
         m_rsi_oma_handle = INVALID_HANDLE;
         m_currency_handle = INVALID_HANDLE;
+        
+        // ✅ v2.15 FIX: Inicializar variáveis de histograma
+        m_mom_histogram = 0.0;
+        m_mom_histogram_current = 0.0;
+        m_mom_histogram_previous = 0.0;
+        m_mom_color_index = 0;
         
         m_cs_available = false;
         m_last_update_time = 0;
@@ -257,7 +279,6 @@ public:
     m_attached_win_supertrend = -1; m_attached_win_mom = -1; m_attached_win_rsi = -1; m_attached_win_cs = -1;
     m_name_gg = ""; m_attached_win_gg = -1; // v2.33
         
-        ArrayInitialize(m_gg_buffer, 0);
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
         ArrayInitialize(m_st_lower, EMPTY_VALUE);
     }
@@ -307,7 +328,11 @@ public:
     //+------------------------------------------------------------------+
     //| Initialization - Create all indicator handles                   |
     //+------------------------------------------------------------------+
+    //| ✅ v2.15: Init signature extended with enable/disable flags     |
+    //+------------------------------------------------------------------+
     bool Init(string symbol, ENUM_TIMEFRAMES operational_tf,
+              // ✅ v2.15 NEW: Enable/Disable flags per indicator
+              bool enable_gg, bool enable_st, bool enable_macd, bool enable_rsi, bool enable_cs,
               // GG TrendBar
               color gg_up_color, color gg_down_color, color gg_flat_color, color gg_text_color,
               ENUM_BASE_CORNER gg_corner, bool gg_create_objects,
@@ -365,42 +390,84 @@ public:
         Print("📊 Initializing IndicatorHub for ", m_symbol, " on ", EnumToString(operational_tf));
         Print("   Looking for indicators in MQL5\\Indicators\\NexusConfluenceEA\\");
         
-        // 1. GG TrendBar Indicator (try multiple paths and names)
+        // ✅ v2.15 CRITICAL FIX: Configurar timeframes MTF ANTES de criar handles
+        // Assumindo que operational_tf é M15, os MTF são:
+        ENUM_TIMEFRAMES macro1_tf = PERIOD_H4;   // Highest
+        ENUM_TIMEFRAMES macro2_tf = PERIOD_H1;   // High
+        ENUM_TIMEFRAMES macro3_tf = PERIOD_M30;  // Medium
+        // operational_tf já está definido (M15 ou o que vier do EA)
+        
+        m_mtf_timeframes[0] = macro1_tf;
+        m_mtf_timeframes[1] = macro2_tf;
+        m_mtf_timeframes[2] = macro3_tf;
+        m_mtf_timeframes[3] = operational_tf;
+        
+        Print("   ✅ MTF Configuration: ", EnumToString(m_mtf_timeframes[0]), " / ",
+              EnumToString(m_mtf_timeframes[1]), " / ",
+              EnumToString(m_mtf_timeframes[2]), " / ",
+              EnumToString(m_mtf_timeframes[3]));
+        
+        // ✅ v2.15 CRITICAL FIX: GG TrendBar com 4 handles separados
+        // Um handle por timeframe MTF (H4, H1, M30, M15)
+        // ✅ v2.15: Conditionally load based on enable_gg flag
+        if(enable_gg)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
-            int handle = INVALID_HANDLE;
-            for(int i = 0; i < ArraySize(paths); i++)
+            
+            for(int tf_idx = 0; tf_idx < 4; tf_idx++)
             {
-                string full_path = paths[i] + "GG_TrendBar_Indicator.ex5";
-                handle = iCustom(m_symbol, operational_tf, full_path,
+                ENUM_TIMEFRAMES tf = m_mtf_timeframes[tf_idx];
+                bool loaded = false;
+                
+                for(int path_idx = 0; path_idx < ArraySize(paths); path_idx++)
+                {
+                    string full_path = paths[path_idx] + "GG_TrendBar_Indicator.ex5";
+                    int handle = iCustom(m_symbol, tf, full_path,
+                                     m_gg_up_color, m_gg_down_color, m_gg_flat_color, m_gg_text_color,
+                                     m_gg_corner, m_gg_create_objects,
+                                     m_gg_adx_period, m_gg_adx_price, m_gg_psar_step, m_gg_psar_max);
+                    
+                    if(handle != INVALID_HANDLE)
+                    {
+                        m_gg_handles[tf_idx] = handle;
+                        Print("   ✅ GG TrendBar [", EnumToString(tf), "] loaded from: ", full_path);
+                        loaded = true;
+                        break;
+                    }
+                    
+                    // Try without extension
+                    string base_path = paths[path_idx] + "GG_TrendBar_Indicator";
+                    handle = iCustom(m_symbol, tf, base_path,
                                  m_gg_up_color, m_gg_down_color, m_gg_flat_color, m_gg_text_color,
                                  m_gg_corner, m_gg_create_objects,
                                  m_gg_adx_period, m_gg_adx_price, m_gg_psar_step, m_gg_psar_max);
-                if(handle != INVALID_HANDLE)
-                {
-                    m_gg_handle = handle;
-                    Print("✅ GG TrendBar loaded from: ", full_path);
-                    break;
+                    
+                    if(handle != INVALID_HANDLE)
+                    {
+                        m_gg_handles[tf_idx] = handle;
+                        Print("   ✅ GG TrendBar [", EnumToString(tf), "] loaded from: ", base_path);
+                        loaded = true;
+                        break;
+                    }
+                    
+                    ResetLastError();
                 }
-                // Try without extension as some terminals require base name
-                string base_path = paths[i] + "GG_TrendBar_Indicator";
-                handle = iCustom(m_symbol, operational_tf, base_path,
-                                 m_gg_up_color, m_gg_down_color, m_gg_flat_color, m_gg_text_color,
-                                 m_gg_corner, m_gg_create_objects,
-                                 m_gg_adx_period, m_gg_adx_price, m_gg_psar_step, m_gg_psar_max);
-                if(handle != INVALID_HANDLE)
+                
+                if(!loaded)
                 {
-                    m_gg_handle = handle;
-                    Print("✅ GG TrendBar loaded from: ", base_path);
-                    break;
+                    Print("   ❌ CRITICAL ERROR: Failed to load GG TrendBar for ", EnumToString(tf));
+                    return false;
                 }
-                ResetLastError();
             }
-            if(m_gg_handle == INVALID_HANDLE)
-                return false;
+        }
+        else
+        {
+            Print("   ⚠️ GG TrendBar DISABLED by user input");
         }
         
         // 2. TrendMagic (Supertrend) – try with and without extension
+        // ✅ v2.15: Conditionally load based on enable_st flag
+        if(enable_st)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
             int handle = INVALID_HANDLE;
@@ -429,8 +496,14 @@ public:
             if(m_supertrend_handle == INVALID_HANDLE)
                 return false;
         }
+        else
+        {
+            Print("   ⚠️ Supertrend DISABLED by user input");
+        }
         
     // 3. Momentum (OBV MACD) – legacy WAE removed
+        // ✅ v2.15: Conditionally load based on enable_macd flag
+        if(enable_macd)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
             int handle = INVALID_HANDLE;
@@ -463,8 +536,14 @@ public:
             if(m_mom_handle == INVALID_HANDLE)
                 return false;
         }
+        else
+        {
+            Print("   ⚠️ OBV MACD DISABLED by user input");
+        }
         
         // 4. RSI OMA – try with and without extension
+        // ✅ v2.15: Conditionally load based on enable_rsi flag
+        if(enable_rsi)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
             int handle = INVALID_HANDLE;
@@ -493,8 +572,14 @@ public:
             if(m_rsi_oma_handle == INVALID_HANDLE)
                 return false;
         }
+        else
+        {
+            Print("   ⚠️ RSI OMA DISABLED by user input");
+        }
         
         // 5. Currency Strength (with fallback for indices) – try with and without extension
+        // ✅ v2.15: Conditionally load based on enable_cs flag
+        if(enable_cs)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
             int handle = INVALID_HANDLE;
@@ -528,6 +613,11 @@ public:
                 m_cs_available = false;
             }
         }
+        else
+        {
+            Print("   ⚠️ Currency Strength DISABLED by user input");
+            m_cs_available = false;
+        }
         
         // Wait for indicators to initialize
         Sleep(1000);
@@ -556,8 +646,9 @@ public:
             int tot_rsi_before  = ChartIndicatorsTotal(chart_id, m_win_rsi);
             int tot_cs_before   = ChartIndicatorsTotal(chart_id, m_win_cs);
             
-            // GG TrendBar overlays main chart (window 0)
-            if(m_gg_handle != INVALID_HANDLE)
+            // ✅ v2.15 FIX: GG TrendBar - anexar apenas o operational TF (índice 3)
+            // Não precisamos anexar todos os 4 handles ao gráfico
+            if(m_gg_handles[3] != INVALID_HANDLE)
             {
                 // v2.33 DUPLICATION GUARD: Check if already present
                 bool gg_exists = false;
@@ -580,10 +671,11 @@ public:
                 else
                 {
                     ResetLastError();
-                    if(!ChartIndicatorAdd(chart_id, 0, m_gg_handle))
+                    // Anexar apenas o operational TF ao gráfico visual
+                    if(!ChartIndicatorAdd(chart_id, 0, m_gg_handles[3]))
                     {
                         int err = GetLastError();
-                        Print("❌ Could not attach GG TrendBar to window 0 | Error: ", err, " (", ErrorDescription(err), ")");
+                        Print("❌ Could not attach GG TrendBar [Operational] to window 0 | Error: ", err, " (", ErrorDescription(err), ")");
                         ok = false;
                     }
                     else
@@ -595,7 +687,7 @@ public:
                             // Capture name for detach
                             m_name_gg = ChartIndicatorName(chart_id, 0, tot_after - 1);
                             m_attached_win_gg = 0;
-                            Print("✅ GG TrendBar attached to main chart (window 0)");
+                            Print("✅ GG TrendBar [Operational TF] attached to main chart (window 0)");
                         }
                     }
                 }
@@ -729,6 +821,9 @@ public:
     //+------------------------------------------------------------------+
     //| Deinitialization - Release all handles                          |
     //+------------------------------------------------------------------+
+    //+------------------------------------------------------------------+
+    //| Deinitialization - Release all handles                          |
+    //+------------------------------------------------------------------+
     void Deinit(void)
     {
         // Ensure indicators are removed from chart if we attached them
@@ -736,10 +831,15 @@ public:
         {
             AttachToChart(false);
         }
-        if(m_gg_handle != INVALID_HANDLE)
+        
+        // ✅ v2.15 FIX: Liberar array de handles GG
+        for(int i = 0; i < 4; i++)
         {
-            IndicatorRelease(m_gg_handle);
-            m_gg_handle = INVALID_HANDLE;
+            if(m_gg_handles[i] != INVALID_HANDLE)
+            {
+                IndicatorRelease(m_gg_handles[i]);
+                m_gg_handles[i] = INVALID_HANDLE;
+            }
         }
         
         if(m_supertrend_handle != INVALID_HANDLE)
@@ -766,7 +866,7 @@ public:
             m_currency_handle = INVALID_HANDLE;
         }
         
-        Print("📊 IndicatorHub released");
+        Print("📊 IndicatorHub released (4 GG handles + 4 other indicators)");
     }
     
     //+------------------------------------------------------------------+
@@ -784,8 +884,15 @@ public:
         // Log detalhado de quais indicadores falharam (primeiras 10x)
         // ═══════════════════════════════════════════════════════════════
         
-        // Verificar se indicadores têm pelo menos 1 barra calculada (absolute minimum)
-        int bars_calculated_gg = BarsCalculated(m_gg_handle);
+        // ✅ v2.15 FIX: Verificar BarsCalculated para cada handle GG MTF
+        int bars_calculated_gg_min = INT_MAX;
+        for(int i = 0; i < 4; i++)
+        {
+            int bars = BarsCalculated(m_gg_handles[i]);
+            if(bars < bars_calculated_gg_min)
+                bars_calculated_gg_min = bars;
+        }
+        
         int bars_calculated_st = BarsCalculated(m_supertrend_handle);
         int bars_calculated_mom = BarsCalculated(m_mom_handle);
         int bars_calculated_rsi = BarsCalculated(m_rsi_oma_handle);
@@ -793,12 +900,12 @@ public:
         // ✅ FIX v2.36: Se BarsCalculated() falha, loga mas NÃO retorna false
         // Permite EA continuar com valores anteriores do cache
         static int bars_fail_count = 0;
-        if(bars_calculated_gg <= 0 || bars_calculated_st <= 0 || 
+        if(bars_calculated_gg_min <= 0 || bars_calculated_st <= 0 || 
            bars_calculated_mom <= 0 || bars_calculated_rsi <= 0)
         {
             if(bars_fail_count < 10)
             {
-                Print("[SYNC v2.36] BarsCalculated não pronto (usando cache anterior): GG=", bars_calculated_gg,
+                Print("[SYNC v2.15] BarsCalculated não pronto (usando cache anterior): GG_min=", bars_calculated_gg_min,
                       " ST=", bars_calculated_st, " MOM=", bars_calculated_mom, " RSI=", bars_calculated_rsi);
                 bars_fail_count++;
             }
@@ -830,44 +937,43 @@ public:
         // ✅ v2.36 FIX: NUNCA falha - mantém valor anterior em caso de erro
         // ✅ v2.21 FIX: GG_TrendBar retorna APENAS valores -1/0/+1 nos buffers 0-14
         
-        if(m_gg_handle == INVALID_HANDLE)
+        // ✅ v2.15 CRITICAL FIX: GG TrendBar com handles separados por TF
+        // Cada handle retorna apenas o buffer 0 com o valor do próprio TF
+        // Não usa mais o buffer array de 15 timeframes
         {
-            static int gg_handle_warn = 0;
-            if(gg_handle_warn < 3)
-            {
-                Print("[v2.36] ⚠️ GG TrendBar handle inválido - usando valores em cache");
-                gg_handle_warn++;
-            }
-            // ✅ v2.36: NÃO retorna false - continua com cache anterior
-        }
-        else
-        {
-            // ✅ v2.36: Loop com NEVER-FAIL - mantém valor anterior em qualquer erro
             double temp_gg_val[1];
-            static int gg_copy_fails[15];  // Counter per timeframe
+            static int gg_copy_fails[4];  // Counter per MTF timeframe
             
-            for(int i = 0; i < 15; i++)
+            for(int tf_idx = 0; tf_idx < 4; tf_idx++)
             {
+                if(m_gg_handles[tf_idx] == INVALID_HANDLE)
+                {
+                    if(gg_copy_fails[tf_idx] < 3)
+                    {
+                        string tf_names[] = {"H4", "H1", "M30", "M15"};
+                        Print("[v2.15] ⚠️ GG TrendBar handle inválido para ", tf_names[tf_idx], " - usando valor em cache");
+                        gg_copy_fails[tf_idx]++;
+                    }
+                    continue;
+                }
+                
                 ResetLastError();
-                int copied = CopyBuffer(m_gg_handle, i, 1, 1, temp_gg_val);
+                // ✅ CORRETO: CopyBuffer do handle específico, buffer 0, shift=1
+                int copied = CopyBuffer(m_gg_handles[tf_idx], 0, 1, 1, temp_gg_val);
                 
                 if(copied == 1)
                 {
-                    // ✅ Sucesso - atualizar buffer
-                    m_gg_buffer[i] = temp_gg_val[0];
+                    m_gg_buffer[tf_idx] = temp_gg_val[0];
                 }
                 else
                 {
                     int err = GetLastError();
-                    
-                    // ✅ v2.36: QUALQUER erro - manter valor anterior e logar (primeiras 3x por TF)
-                    if(gg_copy_fails[i] < 3)
+                    if(gg_copy_fails[tf_idx] < 3)
                     {
-                        string tf_names[] = {"M1","M5","M10","M15","M20","M30","H1","H2","H4","H6","H8","H12","D1","W1","MN1"};
-                        Print("[v2.36] ⚠️ GG TrendBar[", i, "] (", tf_names[i], ") CopyBuffer falhou (Erro ", err, ") - mantendo valor anterior: ", m_gg_buffer[i]);
-                        gg_copy_fails[i]++;
+                        string tf_names[] = {"H4", "H1", "M30", "M15"};
+                        Print("[v2.15] ⚠️ GG TrendBar[", tf_names[tf_idx], "] CopyBuffer falhou (Erro ", err, ") - mantendo valor anterior: ", m_gg_buffer[tf_idx]);
+                        gg_copy_fails[tf_idx]++;
                     }
-                    // ✅ v2.36 CRITICAL: NÃO retorna false - continua loop
                 }
             }
         }
@@ -940,22 +1046,28 @@ public:
             double temp_mom[1];
             static int mom_copy_fail = 0;
             
+            // ✅ v2.15 FIX: Armazenar valor anterior ANTES de sobrescrever
+            m_mom_histogram_previous = m_mom_histogram_current;
+            
             // Buffer 0: Histogram value (positive or negative)
             int copied_hist = CopyBuffer(m_mom_handle, 0, 1, 1, temp_mom);
             if(copied_hist == 1)
             {
-                m_mom_histogram = temp_mom[0];
+                m_mom_histogram_current = temp_mom[0];
+                m_mom_histogram = temp_mom[0]; // ✅ Manter backward compatibility
             }
             else
             {
                 if(mom_copy_fail < 3)
                 {
-                    Print("[v2.36] ⚠️ OBV MACD Histogram CopyBuffer falhou (Erro:", GetLastError(), ") - mantendo valor anterior:", m_mom_histogram);
+                    Print("[v2.36] ⚠️ OBV MACD Histogram CopyBuffer falhou (Erro:", GetLastError(), ") - mantendo valor anterior:", m_mom_histogram_current);
                     mom_copy_fail++;
                 }
             }
 
             // Buffer 1: Color index (0=strong green, 1=strong red, 2=weak green, 3=weak red)
+            // ⚠️ DEPRECATED in v2.15: Color index será removido do Gate 4
+            // Mantido apenas para backward compatibility temporária
             int copied_color = CopyBuffer(m_mom_handle, 1, 1, 1, temp_mom);
             if(copied_color == 1)
             {
@@ -1057,36 +1169,35 @@ public:
     //+------------------------------------------------------------------+
     //| Get GG TrendBar signal for specific timeframe                   |
     //| Returns: -1 (bearish), 0 (neutral), +1 (bullish)                |
-    //| v2.27: Updated for 15 timeframes                                |
+    //| ✅ v2.15 CRITICAL FIX: Usa handles separados por TF MTF         |
     //+------------------------------------------------------------------+
     int GetGGTrendSignal(ENUM_TIMEFRAMES tf)
     {
-        // Map timeframe to buffer index (v2.27 - 15 timeframes)
-        // Order: M1, M5, M10, M15, M20, M30, H1, H2, H4, H6, H8, H12, D1, W1, MN1
+        // ✅ v2.15 FIX: Mapear TF para índice do array MTF
+        // Array: [0]=H4, [1]=H1, [2]=M30, [3]=M15
         int index = -1;
         
-        switch(tf)
+        // Verificar se o TF é um dos 4 MTF configurados
+        for(int i = 0; i < 4; i++)
         {
-            case PERIOD_M1:  index = 0; break;
-            case PERIOD_M5:  index = 1; break;
-            case PERIOD_M10: index = 2; break;
-            case PERIOD_M15: index = 3; break;
-            case PERIOD_M20: index = 4; break;
-            case PERIOD_M30: index = 5; break;
-            case PERIOD_H1:  index = 6; break;
-            case PERIOD_H2:  index = 7; break;
-            case PERIOD_H4:  index = 8; break;
-            case PERIOD_H6:  index = 9; break;
-            case PERIOD_H8:  index = 10; break;
-            case PERIOD_H12: index = 11; break;
-            case PERIOD_D1:  index = 12; break;
-            case PERIOD_W1:  index = 13; break;
-            case PERIOD_MN1: index = 14; break;
-            default:
-                Print("⚠️ WARNING: Invalid timeframe for GG TrendBar: ", EnumToString(tf));
-                return 0;
+            if(m_mtf_timeframes[i] == tf)
+            {
+                index = i;
+                break;
+            }
         }
         
+        if(index < 0)
+        {
+            Print("⚠️ [v2.15] WARNING: Timeframe ", EnumToString(tf), " não está nos MTF configurados");
+            Print("   MTF disponíveis: ", EnumToString(m_mtf_timeframes[0]), ", ",
+                  EnumToString(m_mtf_timeframes[1]), ", ",
+                  EnumToString(m_mtf_timeframes[2]), ", ",
+                  EnumToString(m_mtf_timeframes[3]));
+            return 0;  // Neutro se TF não está configurado
+        }
+        
+        // ✅ CORRETO: Ler do buffer correspondente ao handle correto
         double value = m_gg_buffer[index];
         
         // Return as integer (-1, 0, +1)
@@ -1152,13 +1263,29 @@ public:
     //| Color 2 = Weak Green (bullish weakening) - REJECT               |
     //| Color 3 = Weak Red (bearish weakening) - REJECT                 |
     //+------------------------------------------------------------------+
+    //| Check if momentum is expanding (Gate 4 - FIRST check)           |
+    //| ✅ v2.15 FIX: Usa análise de histograma (valor absoluto + tendência) |
+    //| Substitui a dependência do color index (buffers 1-3)            |
+    //+------------------------------------------------------------------+
     bool IsMomentumExpanding(void)
     {
-        // Accept only STRONG colors (0 or 1)
-        // Reject WEAK colors (2 or 3)
-        bool is_strong = (m_mom_color_index == 0 || m_mom_color_index == 1);
+        // ⚠️ DEPRECATED OLD METHOD (removed in v2.15)
+        // bool is_strong = (m_mom_color_index == 0 || m_mom_color_index == 1);
         
-        return is_strong;
+        // ✅ NEW LOGIC: Histogram deve estar ACIMA da threshold E CRESCENDO
+        // 1. Verificar se o histograma atual está expandindo (crescendo em valor absoluto)
+        // 2. Confirmar que estamos fora da zona de lateral (threshold)
+        
+        double hist_current = MathAbs(m_mom_histogram_current);
+        double hist_previous = MathAbs(m_mom_histogram_previous);
+        
+        // Expansão = histograma cresceu OU manteve-se significativo
+        bool expanding = (hist_current >= hist_previous * 0.95); // 5% tolerance
+        
+        // Deve estar acima de threshold mínimo (filtrar ruído)
+        bool above_threshold = (hist_current > 0.00001); // Dynamic threshold will be added later
+        
+        return (expanding && above_threshold);
     }
     
     //+------------------------------------------------------------------+
@@ -1167,9 +1294,26 @@ public:
     //+------------------------------------------------------------------+
     int GetMomentumDirection(void)
     {
-        if(m_mom_histogram > 0.0) return 1;   // Bullish (histogram above zero)
-        if(m_mom_histogram < 0.0) return -1;  // Bearish (histogram below zero)
+        // ✅ v2.15: Usar m_mom_histogram_current para consistência
+        if(m_mom_histogram_current > 0.0) return 1;   // Bullish (histogram above zero)
+        if(m_mom_histogram_current < 0.0) return -1;  // Bearish (histogram below zero)
         return 0;                              // Neutral (exactly zero)
+    }
+    
+    //+------------------------------------------------------------------+
+    //| ✅ v2.15 NEW: Getter para histogram atual                       |
+    //+------------------------------------------------------------------+
+    double GetMomentumHistogram(void)
+    {
+        return m_mom_histogram_current;
+    }
+    
+    //+------------------------------------------------------------------+
+    //| ✅ v2.15 NEW: Getter para histogram anterior                    |
+    //+------------------------------------------------------------------+
+    double GetMomentumHistogramPrevious(void)
+    {
+        return m_mom_histogram_previous;
     }
     
     //+------------------------------------------------------------------+
@@ -1242,3 +1386,5 @@ public:
     }
 };
 //+------------------------------------------------------------------+
+
+#endif // INDICATOR_HUB_MQH

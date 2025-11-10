@@ -174,6 +174,7 @@ input bool     InpSellGoodEnable    = false;   // SELL GOOD: ATIVO/INATIVO
 //| SEÇÃO 18: INDICADOR - GG TREND BAR                               |
 //+------------------------------------------------------------------+
 input group "═══════════ 📊 GG TREND BAR ═══════════"
+input bool              InpGG_Enable          = true;                // ✅ ATIVAR GG TrendBar
 input color             InpGG_UpColor         = clrLime;             // Cor de Alta
 input color             InpGG_DownColor       = clrRed;              // Cor de Baixa
 input color             InpGG_FlatColor       = clrYellow;           // Cor de Lateral
@@ -189,6 +190,7 @@ input double            InpGG_PSAR_Max        = 0.20;                // Máximo 
 //| SEÇÃO 19: INDICADOR - SUPERTREND (TrendMagic_MT5)                |
 //+------------------------------------------------------------------+
 input group "═══════════ 📈 SUPERTREND (TrendMagic) ═══════════"
+input bool              InpST_Enable          = true;                // ✅ ATIVAR Supertrend
 input int               InpST_CCI_Period      = 50;                  // CCI Period
 input int               InpST_ATR_Period      = 5;                   // ATR Period
 input double            InpST_ATR_Multiplier  = 1.0;                 // ATR Multiplier
@@ -197,6 +199,7 @@ input double            InpST_ATR_Multiplier  = 1.0;                 // ATR Mult
 //| SEÇÃO 20: INDICADOR - OBV MACD (Momentum)                        |
 //+------------------------------------------------------------------+
 input group "═══════════ 💥 OBV MACD (Momentum) ═══════════"
+input bool              InpMACD_Enable        = true;                // ✅ ATIVAR OBV MACD
 input int               InpMACD_FastEMA       = 12;                  // Fast EMA (OBV MACD)
 input int               InpMACD_SlowEMA       = 26;                  // Slow EMA (OBV MACD)
 input int               InpMACD_SignalSMA     = 9;                   // Signal SMA (OBV MACD)
@@ -211,6 +214,7 @@ input double            InpMACD_ThreshMult    = 0.6;                 // Threshol
 //| SEÇÃO 21: INDICADOR - RSI OMA                                    |
 //+------------------------------------------------------------------+
 input group "═══════════ 📐 RSI OMA ═══════════"
+input bool              InpRSI_Enable         = true;                // ✅ ATIVAR RSI OMA
 input int               InpRSI_Period         = 14;                  // RSI Period
 input int               InpRSI_MA_Period      = 9;                   // MA Period
 input ENUM_MA_METHOD    InpRSI_MA_Method      = MODE_SMA;            // MA Method
@@ -222,6 +226,7 @@ input bool              InpRSI_ShowLevels     = true;                // Mostrar 
 //| SEÇÃO 22: INDICADOR - CURRENCY STRENGTH                          |
 //+------------------------------------------------------------------+
 input group "═══════════ 🌍 CURRENCY STRENGTH ═══════════"
+input bool              InpCS_Enable          = true;                // ✅ ATIVAR Currency Strength
 input int               InpCS_CalcPeriod      = 24;                  // Período Cálculo
 input int               InpCS_Smoothing       = 5;                   // Suavização (EMA)
 input bool              InpCS_ShowPercent     = true;                // Exibir em %

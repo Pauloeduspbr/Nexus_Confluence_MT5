@@ -139,7 +139,10 @@ int OnInit()
     // Mantém buffers data-only intactos para o EA (shift=1) sem repaint.
     bool create_gg_objects = InpGG_CreateObjects; // Default TRUE in Inputs
     
+    // ✅ v2.15: Pass enable/disable flags from inputs
     if(!g_indicators.Init(_Symbol, InpOperationalTF,
+                          // ✅ v2.15: Enable/Disable flags FIRST
+                          InpGG_Enable, InpST_Enable, InpMACD_Enable, InpRSI_Enable, InpCS_Enable,
                           // GG TrendBar
                           InpGG_UpColor, InpGG_DownColor, InpGG_FlatColor, InpGG_TextColor,
                           InpGG_Corner, create_gg_objects, // ✅ FIX: Auto-detectar ambiente

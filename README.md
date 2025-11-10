@@ -1,11 +1,11 @@
-# 🚀 Nexus Confluence EA v2.03
+# 🚀 Nexus Confluence EA v2.14
 
 **Expert Advisor de Trading Profissional para MetaTrader 5**  
 Sistema de Confluência Multi-Timeframe com Validação de 6 Gates
 
-> **⚙️ v2.03 Update (04/11/2025):**
+> **⚙️ v2.14 Update (04/11/2025):**
 > - Visualização: novo input InpAttachIndicatorsToChart para anexar indicadores ao gráfico automaticamente
->   - Supertrend no gráfico principal; WAE, RSI OMA e Currency Strength em sub-janelas 1/2/3
+>   - Supertrend no gráfico principal; OBV MACD (Momentum), RSI OMA e Currency Strength em sub-janelas 1/2/3
 >   - Remoção automática ao desligar o EA (limpeza garantida)
 > - Trailing Stop: robustez e logs limpos
 >   - Checks de broker: FREEZE_LEVEL/STOPS_LEVEL antes de modificar SL
@@ -19,6 +19,7 @@ Sistema de Confluência Multi-Timeframe com Validação de 6 Gates
 ## 📋 Índice
 
 - [Visão Geral](#visão-geral)
+- [**✨ Timeframes Configuráveis (IMPORTANTE)**](#-timeframes-configuráveis-importante)
 - [Arquitetura do Sistema](#arquitetura-do-sistema)
 - [Sistema de 6 Gates](#sistema-de-6-gates)
 - [Indicadores Customizados](#indicadores-customizados)
@@ -32,9 +33,126 @@ Sistema de Confluência Multi-Timeframe com Validação de 6 Gates
 
 ---
 
+## ✨ Timeframes Configuráveis (IMPORTANTE)
+
+### ✅ **OS TIMEFRAMES NÃO ESTÃO HARDCODED!**
+
+Todos os timeframes do sistema MTF são **100% configuráveis via inputs** do EA. Isso permite:
+- 🔧 **Otimização completa** no Strategy Tester
+- 🎯 **Adaptação a diferentes mercados** e estilos de trading
+- 📊 **Testes de múltiplas configurações** MTF
+
+### 📝 Inputs de Timeframes
+
+```cpp
+═══════════ ⏰ TIMEFRAMES ═══════════
+InpMacro1TF      = PERIOD_H4   // Macro 1 Timeframe (padrão: H4)
+InpMacro2TF      = PERIOD_H1   // Macro 2 Timeframe (padrão: H1)
+InpMacro3TF      = PERIOD_M30  // Macro 3 Timeframe (padrão: M30)
+InpOperationalTF = PERIOD_M15  // Operational Timeframe (padrão: M15)
+InpMinScore      = 2           // Score Mínimo MTF (≥+2 BUY, ≤-2 SELL)
+```
+
+### 🎯 Exemplos de Configurações
+
+#### **Scalping M1 (Ultra-Agressivo)**
+```
+InpMacro1TF      = PERIOD_M15  // M15
+InpMacro2TF      = PERIOD_M10  // M10
+InpMacro3TF      = PERIOD_M5   // M5
+InpOperationalTF = PERIOD_M1   // M1
+InpMinScore      = 2
+```
+
+#### **Swing H4 (Conservador)**
+```
+InpMacro1TF      = PERIOD_D1   // D1
+InpMacro2TF      = PERIOD_H4   // H4
+InpMacro3TF      = PERIOD_H1   // H1
+InpOperationalTF = PERIOD_M30  // M30
+InpMinScore      = 3           // Mais rigoroso
+```
+
+#### **Day Trading M5 (Moderado)**
+```
+InpMacro1TF      = PERIOD_H1   // H1
+InpMacro2TF      = PERIOD_M30  // M30
+InpMacro3TF      = PERIOD_M15  // M15
+InpOperationalTF = PERIOD_M5   // M5
+InpMinScore      = 2
+```
+
+### ⚠️ Regras OBRIGATÓRIAS
+
+1. **HIERARQUIA**: Macro1 > Macro2 > Macro3 > Operational
+   - ❌ **ERRADO**: H1 (Macro1) + H4 (Macro2) ← ordem invertida
+   - ✅ **CORRETO**: H4 (Macro1) + H1 (Macro2) ← ordem decrescente
+
+2. **GG_TrendBar suporta 15 timeframes**:
+   - M1, M5, M10, M15, M20, M30, H1, H2, H4, H6, H8, H12, D1, W1, MN1
+   - Use apenas estes valores nos inputs
+
+3. **MinScore** ajusta sensibilidade:
+   - `2` = Aceita GOOD (2/4 alinhados) + PREMIUM (4/4)
+   - `3` = Apenas GOOD forte ou PREMIUM
+   - `4` = Apenas PREMIUM perfeito (muito restritivo)
+
+### 🧪 Otimização de Timeframes no Strategy Tester
+
+#### Arquivo .set para Otimização Completa
+
+```ini
+[Strategy Tester Settings]
+InpMacro1TF=1||PERIOD_H4||PERIOD_H4||N||PERIOD_D1||PERIOD_H1
+InpMacro2TF=1||PERIOD_H1||PERIOD_H1||N||PERIOD_H4||PERIOD_M30
+InpMacro3TF=1||PERIOD_M30||PERIOD_M30||N||PERIOD_H1||PERIOD_M15
+InpOperationalTF=1||PERIOD_M15||PERIOD_M15||N||PERIOD_M30||PERIOD_M5
+InpMinScore=1||2||1||N||4||1
+```
+
+#### Processo Recomendado
+
+1. **Fase 1:** Fixar timeframes padrão → Otimizar SL/TP
+2. **Fase 2:** Usar SL/TP ótimos → Otimizar timeframes
+3. **Fase 3:** Configuração final → Otimizar Break Even/TS
+
+### 📊 Como Funciona o Score MTF
+
+```
+Score MTF = GG[Macro1] + GG[Macro2] + GG[Macro3] + GG[Operational]
+```
+
+Cada GG_TrendBar retorna:
+- `+1` = Bullish (verde)
+- `0` = Neutro (amarelo)  
+- `-1` = Bearish (vermelho)
+
+**Exemplo:**
+```
+H4=+1 + H1=+1 + M30=+1 + M15=0 = Score +3 (GOOD BUY)
+H4=+1 + H1=+1 + M30=+1 + M15=+1 = Score +4 (PREMIUM BUY)
+```
+
+### 🎮 Teste Rápido de Configuração
+
+Execute backtest curto (1 mês) com:
+- `InpLogLevel = 2` (Operacional)
+- Procure logs: `"📊 Gate 2 MTF Signals: H4=+1 | H1=+1 | M30=+1 | M15=+1"`
+- Verifique se timeframes são lidos corretamente
+
+### ⚙️ Por Que Esta Flexibilidade é Importante?
+
+1. **Adaptação a Mercados**: Forex precisa TFs diferentes de Índices
+2. **Estilos de Trading**: Scalper vs Swing Trader
+3. **Volatilidade**: Ajustar TFs conforme ATR médio
+4. **Otimização**: Encontrar combinação ótima para cada ativo
+5. **Walk-Forward Analysis**: Testar estabilidade em diferentes configurações
+
+---
+
 ## 🎯 Visão Geral
 
-O **Nexus Confluence EA v2.02** é um Expert Advisor profissional desenvolvido para trading em **contas reais** no MetaTrader 5. Utiliza análise de confluência multi-timeframe com validação rigorosa através de 6 gates sequenciais.
+O **Nexus Confluence EA v2.14** é um Expert Advisor profissional desenvolvido para trading em **contas reais** no MetaTrader 5. Utiliza análise de confluência multi-timeframe com validação rigorosa através de 6 gates sequenciais.
 
 ### ✨ Características Principais
 
@@ -85,9 +203,9 @@ O **Nexus Confluence EA v2.02** é um Expert Advisor profissional desenvolvido p
 └── 📁 Indicators/
     └── 📁 NexusConfluenceEA/
         ├── GG_TrendBar_Indicator.mq5       ← MTF Trend Analysis
-        ├── TrendMagic_MT5.mq5              ← Supertrend
-        ├── WaddahAttarExplosion_Professional.mq5  ← WAE Momentum
-        ├── RSIOMA_v2HHLSX_MT5.mq5          ← RSI OMA
+      ├── TrendMagic_MT5.mq5              ← Supertrend
+      ├── OBV_MACD.mq5                   ← Momentum (substitui WAE)
+      ├── RSIOMA_v2HHLSX_MT5.mq5          ← RSI OMA
         └── CurrencyStrengthMeter_MT5.mq5   ← Currency Strength
 ```
 
@@ -140,7 +258,7 @@ O **Nexus Confluence EA v2.02** é um Expert Advisor profissional desenvolvido p
 - Trailing após trigger específico
 - Step configurável por direção
 - Proteção de lucros
-- v2.03: valida FREEZE_LEVEL/STOPS_LEVEL e deduplica logs por vela
+- v2.14: valida FREEZE_LEVEL/STOPS_LEVEL e deduplica logs por vela
 
 #### 9. **DrawdownProtection.mqh** (v2.00)
 - Circuit Breaker por DD% diário
@@ -285,29 +403,29 @@ M15 (Operacional)─┘
 
 ---
 
-### Gate 4: Momentum (Filtro Lateral + Direção) 💥
+### Gate 4: Momentum (OBV MACD + RSI OMA) 💥
 
-**Objetivo:** Confirmar expansão de momentum E direção.
+**Objetivo:** Confirmar que há expansão de momentum (não mercado lateral) e alinhamento direcional.
 
-#### ⚠️ ORDEM CRÍTICA: WAE PRIMEIRO → RSI SEGUNDO
+#### ⚠️ ORDEM CRÍTICA: OBV MACD PRIMEIRO → RSI OMA SEGUNDO
 
-1. **WAE (Waddah Attar Explosion)** - Filtro de Expansão
-   - ✅ Trend Bar (verde OU vermelho) > Explosion Line
-   - ❌ Mercado lateral (ambos < Explosion Line) → REJECT
+1. **OBV MACD (Momentum)** – Histograma precisa estar acima de um threshold dinâmico (plot de limiar) em módulo:
+   - BUY elegível: histograma positivo acima do threshold
+   - SELL elegível: histograma negativo (módulo) acima do threshold
+   - Mercado lateral: |hist| ≤ threshold → REJECT
 
-2. **RSI OMA** - Confirmação de Direção
-   - BUY: Red Line > Blue Line
-   - SELL: Red Line < Blue Line
+2. **RSI OMA** – Confirmação direcional:
+   - BUY: Red > Blue
+   - SELL: Red < Blue
 
 **Validações:**
-- ✅ WAE expandindo (não lateral)
-- ✅ WAE direcionado para o lado do MTF
-- ✅ RSI OMA confirmando direção
+- ✅ Expansão: |Histograma| > Threshold
+- ✅ Direção Momentum: sinal do histograma consistente com direção MTF
+- ✅ RSI OMA confirma a mesma direção
 
-**Buffers WAE:**
-- Buffer 0: Trend Up (barras verdes)
-- Buffer 1: Trend Down (barras vermelhas)
-- Buffer 2: Explosion Line (linha limite)
+**Buffers OBV_MACD (usados pelo EA):**
+- Buffer 0: Histogram (sinal bruto ±)
+- Buffer 4: Threshold (linha dinâmica) – filtro de expansão
 
 **Buffers RSI OMA:**
 - Buffer 0: Red Line (RSI)
@@ -377,25 +495,25 @@ M15 (Operacional)─┘
 
 ---
 
-### 3. Waddah Attar Explosion (WAE)
+### 3. OBV MACD (Momentum)
 
-**Função:** Detecta explosão de momentum e força direcional.
+**Função:** Mede momentum direcional combinando fluxo de volume (OBV) suavizado com estrutura MACD.
 
-**Buffers:**
-- 0: Trend Up (barras verdes - momentum bullish)
-- 1: Trend Down (barras vermelhas - momentum bearish)
-- 2: Explosion Line (threshold de ativação)
+**Buffers principais usados pelo EA:**
+- 0: Histograma (MACD - Signal) – intensidade e sinal
+- 4: Threshold dinâmico (derivado de média/EMA do módulo do histograma)
 
-**Lógica:**
-- MACD Histogram vs Bollinger Bands
-- Filtra mercados laterais (compressão)
+**Critério de Expansão:** `|Histogram| > Threshold`
+
+**Direção:**
+- Histogram > 0 → Bullish
+- Histogram < 0 → Bearish
 
 **Inputs Principais:**
-- `FastMA` (20): MA rápida
-- `SlowMA` (40): MA lenta
-- `BBLength` (20): Período das Bollinger Bands
-- `BBMultiplier` (2.0): Desvio padrão BB
-- `Sensitivity` (150): Sensibilidade do threshold
+- `FastEMA` / `SlowEMA` / `SignalSMA`
+- `ObvSmooth` (suavização do OBV)
+- `UseTickVolume` (para Forex)
+- `ThreshPeriod` / `ThreshMult` (cálculo do limiar)
 
 ---
 
@@ -584,7 +702,7 @@ Sistema de proteção que **pausa trading automaticamente** quando limites de ri
 3. Compile cada indicador:
    - `GG_TrendBar_Indicator.mq5`
    - `TrendMagic_MT5.mq5`
-   - `WaddahAttarExplosion_Professional.mq5`
+   - `OBV_MACD.mq5`
    - `RSIOMA_v2HHLSX_MT5.mq5`
    - `CurrencyStrengthMeter_MT5.mq5`
 
@@ -730,7 +848,7 @@ InpTradeOnMonday = false        // Skip Monday gap
 
 ## 🎨 Visualização no Gráfico
 
-A partir da v2.03, o EA pode anexar os indicadores visualmente no gráfico automaticamente.
+A partir da v2.14, o EA pode anexar os indicadores visualmente no gráfico automaticamente.
 
 ### Toggle
 
@@ -741,7 +859,7 @@ InpAttachIndicatorsToChart = true  // ON por padrão
 ### Layout
 
 - Supertrend (TrendMagic) → janela principal (overlay)
-- WAE (Waddah Attar Explosion) → Sub-janela #1
+- OBV MACD (Momentum) → Sub-janela #1
 - RSI OMA → Sub-janela #2
 - Currency Strength → Sub-janela #3 (se disponível; índices fazem fallback)
 
@@ -815,7 +933,7 @@ InpSellGoodEnable = true||false||0||true||N
 InpGG_CreateObjects = false||false||0||true||N
 InpGG_ADX_Period = 14||14||1||50||N
 InpST_CCI_Period = 50||50||10||100||N
-InpWAE_FastMA = 20||20||5||40||N
+InpMACD_FastEMA = 12||12||5||40||N
 InpRSI_Period = 14||14||5||30||N
 InpCS_CalcPeriod = 24||24||5||50||N
 ```
@@ -899,7 +1017,7 @@ Tempo: ~15-30 min
 2. **Observar:**
    - ✅ Entries em confluência de cores (GG TrendBar)
    - ✅ Supertrend alinhado
-   - ✅ WAE expandindo
+   - ✅ Momentum expansivo (OBV MACD hist |hist| > threshold)
    - ✅ Sem entries em lateralização
    - ✅ Break Even ativando corretamente
 
@@ -939,9 +1057,9 @@ Tempo: ~15-30 min
 
 **Causa:** Indicadores não estavam sendo anexados visualmente pelo EA.
 
-**v2.03 Solução:**
+**v2.14 Solução:**
 - Ative `InpAttachIndicatorsToChart = true` nos inputs do EA
-- O EA usará ChartIndicatorAdd para anexar Supertrend (principal), WAE (#1), RSI OMA (#2) e Currency Strength (#3)
+- O EA usará ChartIndicatorAdd para anexar Supertrend (principal), OBV MACD (#1), RSI OMA (#2) e Currency Strength (#3)
 - Na remoção do EA, executa limpeza com ChartIndicatorDelete
 
 Se ainda não aparecer:
@@ -955,7 +1073,7 @@ Se ainda não aparecer:
 
 **Sintoma:** Logs repetidos como “❌ [TS] Falha ao modificar … Retcode: 0 | Erro: 4014”.
 
-**v2.03 Mitigação:**
+**v2.14 Mitigação:**
 - Validação de `SYMBOL_TRADE_FREEZE_LEVEL` e `SYMBOL_TRADE_STOPS_LEVEL` antes de modificar SL
 - Deduplicação por vela e por ticket/SL/retcode/erro: no máximo um log por combinação por vela
 
@@ -989,7 +1107,7 @@ Se ainda não aparecer:
 ```
 [OPERACIONAL] ❌ Gate 1 REJECTED: Spread too high
 [OPERACIONAL] ❌ Gate 2 REJECTED: H4/H1 não alinhados
-[OPERACIONAL] ❌ Gate 4 REJECTED: WAE not expanding
+[OPERACIONAL] ❌ Gate 4 REJECTED: Momentum (OBV MACD) not expanding
 ```
 
 #### 2. Verificar Perfis
@@ -1125,7 +1243,7 @@ InpLogLevel = 1||1||1||2||N  // Menos logs
 ### Logs de Debug
 
 Para reportar problemas, incluir:
-1. **Versão:** EA v2.03
+1. **Versão:** EA v2.14
 2. **Build MT5:** (Help → About)
 3. **Símbolo/Timeframe:** Ex: EURUSD M15
 4. **Configuração:** Arquivo `.set` usado
@@ -1165,9 +1283,9 @@ Este software é fornecido "como está", sem garantias.
 
 ## 📈 Histórico de Versões
 
-### v2.03 (04/11/2025)
+### v2.14 (04/11/2025)
 - ✅ Visualização: novo input `InpAttachIndicatorsToChart` para anexar indicadores ao gráfico
-   - Supertrend (main), WAE (#1), RSI OMA (#2), Currency Strength (#3)
+   - Supertrend (main), OBV MACD (#1), RSI OMA (#2), Currency Strength (#3)
    - Limpeza automática ao remover o EA
 - ✅ Trailing Stop robusto: checks de `FREEZE_LEVEL`/`STOPS_LEVEL` antes de modificar SL
 - ✅ Deduplicação de logs por vela para falhas repetidas (evita spam)

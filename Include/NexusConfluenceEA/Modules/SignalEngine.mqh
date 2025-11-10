@@ -166,6 +166,7 @@ public:
     //| PREMIUM: H4+H1 alinhados E M30+M15 alinhados                     |
     //| GOOD: H4+H1 alinhados E (M30 OU M15 alinhado)                    |
     //| REJECT: H4 e H1 NÃO alinhados OU nenhum M30/M15 alinhado        |
+    //| ✅ v2.12: Added DETAILED LOGGING for debugging                  |
     //+------------------------------------------------------------------+
     bool ProcessGate2_MTF(void)
     {
@@ -174,6 +175,10 @@ public:
         int gg_h1  = m_indicators.GetGGTrendSignal(m_macro2_tf);      // H1
         int gg_m30 = m_indicators.GetGGTrendSignal(m_macro3_tf);      // M30
         int gg_m15 = m_indicators.GetGGTrendSignal(m_operational_tf); // M15
+        
+        // ✅ v2.12: DETAILED DEBUG LOG
+        m_core.LogMessage(2, StringFormat("📊 Gate 2 MTF Signals: H4=%+d | H1=%+d | M30=%+d | M15=%+d",
+                          gg_h4, gg_h1, gg_m30, gg_m15));
         
         // Calculate MTF Score (for logging)
         m_mtf_score = gg_h4 + gg_h1 + gg_m30 + gg_m15;
@@ -373,50 +378,49 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| GATE 4: Momentum - WAE FIRST, then RSI OMA (CRITICAL ORDER)     |
+    //| GATE 4: Momentum - OBV MACD FIRST, then RSI OMA (CRITICAL ORDER) |
+    //| ✅ FIXED v2.33: Use COLOR INDEX to detect strong momentum       |
+    //| OBV_MACD has 4 colors:                                           |
+    //|   0 = Strong Green (hist>0 AND expanding) - ACCEPT for BUY      |
+    //|   1 = Strong Red (hist<0 AND expanding) - ACCEPT for SELL       |
+    //|   2 = Weak Green (hist>0 but weakening) - REJECT                |
+    //|   3 = Weak Red (hist<0 but recovering) - REJECT                 |
     //+------------------------------------------------------------------+
     bool ProcessGate4_Momentum(void)
     {
-        // STEP 1: Check WAE expansion (filters lateral markets)
-        bool wae_expanding = m_indicators.IsWAEExpanding();
-        
-        if(!wae_expanding)
+        // STEP 1: Check if momentum is STRONG (color index 0 or 1)
+        // Rejects weak momentum (color index 2 or 3)
+        bool macd_strong = m_indicators.IsMomentumExpanding();
+        if(!macd_strong)
         {
             m_gate_results[4] = false;
-            m_gate_messages[4] = "G4✗ WAE flat";
-            m_core.LogMessage(2, "❌ Gate 4 REJECTED: WAE not expanding (lateral market)");
+            m_gate_messages[4] = "G4✗ MOM weak";
+            m_core.LogMessage(2, "❌ Gate 4 REJECTED: Momentum (OBV MACD) is WEAK (color index 2 or 3)");
             return false;
         }
-        
-        // Get WAE direction
-        int wae_direction = m_indicators.GetWAEDirection();
-        
-        // STEP 2: Confirm with RSI OMA (confirms directional pressure)
+
+        // STEP 2: Get direction from histogram sign
+        int macd_direction = m_indicators.GetMomentumDirection();
+
+        // STEP 3: RSI OMA confirmation
         int rsi_signal = m_indicators.GetRSIOMASignal();
-        
-        // Both must align with MTF direction
+
         bool result = false;
-        
         if(m_signal_direction == SIGNAL_DIR_BUY)
         {
-            result = (wae_direction == 1 && rsi_signal == 1);
+            result = (macd_direction == 1 && rsi_signal == 1);
         }
         else if(m_signal_direction == SIGNAL_DIR_SELL)
         {
-            result = (wae_direction == -1 && rsi_signal == -1);
+            result = (macd_direction == -1 && rsi_signal == -1);
         }
-        
+
         m_gate_results[4] = result;
-        m_gate_messages[4] = StringFormat("G4%s WAE:%+d RSI:%+d", 
-                             result ? "✓" : "✗", 
-                             wae_direction, rsi_signal);
-        
+        m_gate_messages[4] = StringFormat("G4%s MOM:%+d RSI:%+d", result ? "✓" : "✗", macd_direction, rsi_signal);
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: WAE=%+d RSI=%+d vs Direction=%s",
-                              wae_direction, rsi_signal, EnumToString(m_signal_direction)));
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: MOM=%+d RSI=%+d vs Direction=%s", macd_direction, rsi_signal, EnumToString(m_signal_direction)));
         }
-        
         return result;
     }
     
@@ -538,7 +542,7 @@ public:
         if(!ProcessGate3_Supertrend())
             return false;
         
-        // Gate 4: Momentum (WAE → RSI)
+    // Gate 4: Momentum (OBV MACD → RSI OMA)
         if(!ProcessGate4_Momentum())
             return false;
         

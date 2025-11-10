@@ -282,6 +282,7 @@ public:
     
     //+------------------------------------------------------------------+
     //| Dynamic Spread Filter                                           |
+    //| ✅ v2.12: Strategy Tester mode detection and relaxed limits     |
     //+------------------------------------------------------------------+
     bool CheckSpreadFilter(void)
     {
@@ -291,8 +292,12 @@ public:
         m_spread_array[m_spread_index] = current_spread;
         m_spread_index = (m_spread_index + 1) % m_spread_period;
         
-    // Absolute maximum in points (always enforced)
-    double max_absolute = m_max_spread_points * m_point;
+        // ✅ CRITICAL FIX: Detect Strategy Tester environment
+        bool is_tester = MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_OPTIMIZATION);
+        
+        // In Strategy Tester, use 5x multiplier for absolute max (tester spreads are unrealistic)
+        int spread_multiplier = is_tester ? 5 : 1;
+        double max_absolute = m_max_spread_points * m_point * spread_multiplier;
 
         // Warm-up: require at least half of the window filled with non-zero values
         int valid_count = 0;
@@ -304,8 +309,16 @@ public:
             // During warm-up, only enforce absolute max to avoid blocking all trades
             if(current_spread > max_absolute)
             {
-                Print(StringFormat("⚠️ Spread too high (warm-up): %.1f pts | AbsLimit: %d",
-                      current_spread / m_point, m_max_spread_points));
+                if(is_tester)
+                {
+                    Print(StringFormat("⚠️ [TESTER] Spread alto (warm-up): %.1f pts | Limite x%d: %.1f pts",
+                          current_spread / m_point, spread_multiplier, max_absolute / m_point));
+                }
+                else
+                {
+                    Print(StringFormat("⚠️ Spread too high (warm-up): %.1f pts | AbsLimit: %d",
+                          current_spread / m_point, m_max_spread_points));
+                }
                 return false;
             }
             return true;

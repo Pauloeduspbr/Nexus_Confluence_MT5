@@ -39,7 +39,7 @@ Indicators/NexusConfluenceEA/       # 5 custom indicators (.mq5)
 - **1 candle tolerance** allowed for lag
 
 ### Gate 4 - Momentum (PROCESSING ORDER MATTERS)
-1. **WAE first** (Waddah Attar Explosion) - filters range/lateral movement
+1. **OBV MACD first** - histogram must exceed adaptive threshold (filters ranges)
 2. **RSI OMA second** - confirms directional pressure
 3. Both must align with MTF direction
 
@@ -71,7 +71,7 @@ Indicators/NexusConfluenceEA/       # 5 custom indicators (.mq5)
 ### 4. SignalEngine.mqh
 - Implements all 6 gates sequentially
 - MTF score calculation and signal classification
-- WAE→RSI processing order enforcement
+- Momentum (OBV MACD) → RSI OMA processing order enforcement
 - Returns `ENUM_SIGNAL_CLASS` (PREMIUM/GOOD/REJECT)
 
 ### 5. RiskExecution.mqh
@@ -92,10 +92,10 @@ Indicators/NexusConfluenceEA/       # 5 custom indicators (.mq5)
 - Used in Gate 3 for trend confirmation
 - 1 candle tolerance implemented in SignalEngine
 
-### WaddahAttarExplosion_Professional.mq5
-- Buffer 0: Trend Up (green), Buffer 1: Trend Down (red)
-- Buffer 2: Explosion Line (threshold)
-- **Processed first** in Gate 4 (filters lateral markets)
+### OBV_MACD.mq5 (Momentum)
+- Buffer 0: Histogram (positive/negative)
+- Buffer 4: Adaptive threshold line
+- Processed first in Gate 4 (filters lateral markets)
 
 ### RSIOMA_v2HHLSX_MT5.mq5
 - Buffer 0: Red line, Buffer 1: Blue line
@@ -169,11 +169,11 @@ if(g_core.CanProcessSignal() && signal_detected) {
 
 ### Wrong Gate 4 Order
 ```mql5
-// ❌ Wrong: RSI before WAE
-if(RSI_signal && WAE_expanding) { ... }
+// ❌ Wrong: RSI before momentum
+if(RSI_signal && momentum_expanding) { ... }
 
-// ✅ Correct: WAE filters first
-if(WAE_expanding) {
+// ✅ Correct: Momentum filters first
+if(momentum_expanding) {
     if(RSI_signal) { ... }
 }
 ```
@@ -204,7 +204,7 @@ Print("Gates: G0✓ G1✓ G2✓ G3✓ G4✓ G5✓ | MTF Score: +4 | PREMIUM");
 ### Level 3 (Debug)
 Raw indicator values, buffer contents
 ```mql5
-Print("GG[H4]:+1 [H1]:+1 [M30]:+1 [M15]:+1 | WAE: 0.0015 > 0.0010");
+Print("GG[H4]:+1 [H1]:+1 [M30]:+1 [M15]:+1 | MOM: hist 0.0015 > thr 0.0010");
 ```
 
 ## Questions to Ask When Uncertain

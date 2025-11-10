@@ -135,12 +135,16 @@ InpST_CCI_Period=50||50||25||100||N
 InpST_ATR_Period=5||5||3||15||N
 InpST_ATR_Multiplier=1.0||1.0||0.5||3.0||N
 
-; ═══════════ 💥 WAE (Waddah Attar Explosion) (FIXO) ═══════════
-InpWAE_FastMA=20||20||10||40||N
-InpWAE_SlowMA=40||40||20||80||N
-InpWAE_BBLength=20||20||10||40||N
-InpWAE_BBMultiplier=2.0||2.0||1.0||4.0||N
-InpWAE_Sensitivity=150||150||50||300||N
+; ═══════════ 💥 MOMENTUM (OBV MACD) (FIXO) ═══════════
+InpMACD_FastEMA=12||12||5||40||N
+InpMACD_SlowEMA=26||26||10||80||N
+InpMACD_SignalSMA=9||9||3||30||N
+InpMACD_ObvSmooth=5||5||1||20||N
+InpMACD_UseTickVolume=true||false||0||true||N
+InpMACD_ShowMACDLine=true||false||0||true||N
+InpMACD_ShowSignalLine=true||false||0||true||N
+InpMACD_ThreshPeriod=34||34||10||100||N
+InpMACD_ThreshMult=0.6||0.6||0.2||2.0||N
 
 ; ═══════════ 📐 RSI OMA (FIXO) ═══════════
 InpRSI_Period=14||14||7||30||N

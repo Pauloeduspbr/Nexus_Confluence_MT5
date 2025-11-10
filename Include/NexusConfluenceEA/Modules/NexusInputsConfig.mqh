@@ -179,7 +179,7 @@ input color             InpGG_DownColor       = clrRed;              // Cor de B
 input color             InpGG_FlatColor       = clrYellow;           // Cor de Lateral
 input color             InpGG_TextColor       = clrAqua;             // Cor do Texto
 input ENUM_BASE_CORNER  InpGG_Corner          = CORNER_LEFT_UPPER;   // Canto do Painel
-input bool              InpGG_CreateObjects   = false;               // Criar Objetos Visuais
+input bool              InpGG_CreateObjects   = true;                // Criar Objetos Visuais (v2.10 default TRUE)
 input int               InpGG_ADX_Period      = 14;                  // Período ADX
 input ENUM_APPLIED_PRICE InpGG_ADX_Price      = PRICE_CLOSE;         // Preço para ADX/PSAR
 input double            InpGG_PSAR_Step       = 0.02;                // Passo PSAR
@@ -194,14 +194,18 @@ input int               InpST_ATR_Period      = 5;                   // ATR Peri
 input double            InpST_ATR_Multiplier  = 1.0;                 // ATR Multiplier
 
 //+------------------------------------------------------------------+
-//| SEÇÃO 20: INDICADOR - WAE (Waddah Attar Explosion)               |
+//| SEÇÃO 20: INDICADOR - OBV MACD (Momentum)                        |
 //+------------------------------------------------------------------+
-input group "═══════════ 💥 WAE (Waddah Attar Explosion) ═══════════"
-input int               InpWAE_FastMA         = 20;                  // Fast MA
-input int               InpWAE_SlowMA         = 40;                  // Slow MA
-input int               InpWAE_BBLength       = 20;                  // Band Length
-input double            InpWAE_BBMultiplier   = 2.0;                 // Band Multiplier
-input int               InpWAE_Sensitivity    = 150;                 // Sensibilidade
+input group "═══════════ 💥 OBV MACD (Momentum) ═══════════"
+input int               InpMACD_FastEMA       = 12;                  // Fast EMA (OBV MACD)
+input int               InpMACD_SlowEMA       = 26;                  // Slow EMA (OBV MACD)
+input int               InpMACD_SignalSMA     = 9;                   // Signal SMA (OBV MACD)
+input int               InpMACD_ObvSmooth     = 5;                   // OBV Smoothing Period
+input bool              InpMACD_UseTickVolume = true;                // Use Tick Volume (Forex)
+input bool              InpMACD_ShowMACDLine  = true;                // Show MACD Line
+input bool              InpMACD_ShowSignalLine= true;                // Show Signal Line
+input int               InpMACD_ThreshPeriod  = 34;                  // Threshold Period (|hist| EMA)
+input double            InpMACD_ThreshMult    = 0.6;                 // Threshold Multiplier
 
 //+------------------------------------------------------------------+
 //| SEÇÃO 21: INDICADOR - RSI OMA                                    |
@@ -527,8 +531,13 @@ bool ValidateInputs()
         // Avisos não-bloqueantes para parâmetros extremos de indicadores
         if(InpST_ATR_Period > 100 || InpST_ATR_Multiplier > 4.0)
             Print("⚠️ AVISO: Parâmetros do Supertrend muito elevados (ATR_Period>", InpST_ATR_Period, ", Mult>", DoubleToString(InpST_ATR_Multiplier,2), ") podem afastar a linha do preço e causar dessincronização visual.");
-        if(InpWAE_BBLength > 100 || InpWAE_BBMultiplier > 4.0 || InpWAE_Sensitivity > 500)
-            Print("⚠️ AVISO: Parâmetros do WAE muito elevados (BB Len/Mult/Sens) podem ocultar a linha de explosão e suavizar barras em excesso.");
+        // MACD+OBV sanity warnings
+        if(InpMACD_FastEMA <= 0 || InpMACD_SlowEMA <= 0 || InpMACD_SignalSMA <= 0)
+            Print("⚠️ AVISO: Períodos do MACD/Signal devem ser > 0.");
+        if(InpMACD_FastEMA >= InpMACD_SlowEMA)
+            Print("⚠️ AVISO: Fast EMA >= Slow EMA – recomenda-se Fast < Slow para MACD.");
+        if(InpMACD_ObvSmooth < 1)
+            Print("⚠️ AVISO: OBV Smooth < 1 – usando OBV bruto pode aumentar ruído.");
         if(InpGG_CreateObjects == false)
             Print("ℹ️ GG_TrendBar em modo DATA-ONLY (objetos visuais desativados). Para ver no gráfico, ative InpGG_CreateObjects=TRUE.");
 

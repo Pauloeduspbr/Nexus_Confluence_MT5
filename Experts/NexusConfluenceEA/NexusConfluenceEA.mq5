@@ -1,23 +1,35 @@
 //+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.03   |
+//|                                      Nexus Confluence EA v2.14   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
 //|                                                                    |
-//| v2.03 (04/11/2025): Robustness fixes                             |
-//|   - Gate 3: GOOD requires ST aligned (sem neutro); PREMIUM strict|
-//|   - AsymmetricRisk: removido +1 p/ PREMIUM (alinhado ao módulo)  |
-//|   - Execução: usar RiskExecution (retry + lote normalizado)      |
-//|   - MarketAccess: spread dinâmico com aquecimento + hora wrap    |
-//|   - Entrada: removido realtime momentum guard (shift=0)          |
+//| v2.14 (09/11/2025): GG_TrendBar v2.32 MTF shift fix              |
+//|   - CRITICAL: Each TF uses shift=1 FIXED (last closed bar)      |
+//|   - MTF values independent from chart timeframe                  |
+//|   - All buffers filled with same value (last closed bar)         |
+//| v2.13 (08/11/2025): GG_TrendBar v2.31 buffer shift fix           |
+//|   - CRITICAL: Fixed buffer index to shift conversion             |
+//|   - chart_shift = rates_total - 1 - i (corrects ZERO values)   |
+//|   - All MTF signals now read correctly from closed bars          |
+//| v2.12 (08/11/2025): Strategy Tester spread fix + detailed logs   |
+//|   - Auto-detect Strategy Tester: spread limit x5                 |
+//|   - Added detailed MTF logging in Gate 2                         |
+//|   - LogLevel=2 shows all gate decisions                          |
+//| v2.11 (08/11/2025): OBV_MACD color index logic fixed             |
+//|   - Gate 4 now uses COLOR INDEX (0/1=strong, 2/3=weak)          |
+//|   - Removed threshold logic (not part of MACD visual)            |
+//| v2.10 (08/11/2025): GG_TrendBar visual objects optional          |
+//|   - Default InpGG_CreateObjects=TRUE (creates labels/arrows)     |
+//|   - Strategy Tester: ChartIndicatorAdd() disabled automatically   |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.03"
+#property version   "2.14"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.03: Gate3 stricter; RiskExec; spread warm-up; no RT guard"
+#property description "v2.14: GG_TrendBar v2.32 - MTF uses shift=1 FIXED per TF"
 #property strict
 
 // Include MQL5 standard libraries
@@ -65,8 +77,14 @@ int g_position_check_interval = 5; // Check every 5 seconds minimum
 int OnInit()
 {
     Print("==========================================");
-    Print("    NEXUS CONFLUENCE EA v2.03 STARTING    ");
-    Print("  • Fixes: Gate3 stricter, Exec retry, MA  ");
+    Print("════════════════════════════════════");
+    Print("    NEXUS CONFLUENCE EA v2.14 STARTING    ");
+    Print("════════════════════════════════════");
+    Print("  • v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED (CRITICAL!)");
+    Print("  • v2.14: Each TF independent - no chart correlation");
+    Print("  • v2.13: GG_TrendBar v2.31 buffer shift fix");
+    Print("  • v2.12: Strategy Tester spread fix (x5 limit)");
+    Print("  • v2.11: OBV_MACD color index logic fixed");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -116,15 +134,21 @@ int OnInit()
         return(INIT_FAILED);
     }
     
+    // ✅ v2.10 (ajuste): Permitir modo visual opcional controlado por InpGG_CreateObjects
+    // Se InpGG_CreateObjects=true o indicador criará cabeçalhos e setas (labels) no gráfico.
+    // Mantém buffers data-only intactos para o EA (shift=1) sem repaint.
+    bool create_gg_objects = InpGG_CreateObjects; // Default TRUE in Inputs
+    
     if(!g_indicators.Init(_Symbol, InpOperationalTF,
                           // GG TrendBar
                           InpGG_UpColor, InpGG_DownColor, InpGG_FlatColor, InpGG_TextColor,
-                          InpGG_Corner, (InpGG_CreateObjects && InpShowPanel),
+                          InpGG_Corner, create_gg_objects, // ✅ FIX: Auto-detectar ambiente
                           InpGG_ADX_Period, InpGG_ADX_Price, InpGG_PSAR_Step, InpGG_PSAR_Max,
                           // Supertrend (TrendMagic)
                           InpST_CCI_Period, InpST_ATR_Period, InpST_ATR_Multiplier,
-                          // WAE
-                          InpWAE_FastMA, InpWAE_SlowMA, InpWAE_BBLength, InpWAE_BBMultiplier, InpWAE_Sensitivity,
+                          // Momentum (OBV MACD)
+                          InpMACD_FastEMA, InpMACD_SlowEMA, InpMACD_SignalSMA, InpMACD_ObvSmooth, InpMACD_UseTickVolume, InpMACD_ShowMACDLine, InpMACD_ShowSignalLine,
+                          InpMACD_ThreshPeriod, InpMACD_ThreshMult,
                           // RSI OMA
                           InpRSI_Period, InpRSI_MA_Period, InpRSI_MA_Method, InpRSI_HighLevel, InpRSI_LowLevel, InpRSI_ShowLevels,
                           // Currency Strength
@@ -135,9 +159,17 @@ int OnInit()
         return(INIT_FAILED);
     }
     // Attach indicators visually to chart if requested
-    if(InpAttachIndicatorsToChart)
+    // ✅ FIX v2.10: Desabilitar em Strategy Tester (ChartIndicatorAdd não funciona em backtest)
+    bool is_tester = MQLInfoInteger(MQL_TESTER) || MQLInfoInteger(MQL_OPTIMIZATION);
+    bool is_visual = MQLInfoInteger(MQL_VISUAL_MODE);
+    
+    if(InpAttachIndicatorsToChart && (is_visual || !is_tester))
     {
         g_indicators.AttachToChart(true);
+    }
+    else if(is_tester && !is_visual)
+    {
+        Print("ℹ️ Strategy Tester detected - indicator attachment skipped (data-only mode)");
     }
     
     if(!g_signals.Init(g_core, g_market, g_indicators, 
@@ -175,8 +207,11 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.03 READY     ");
-    Print("  📊 Gate3 stricter; Exec via RiskExec    ");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.14 READY     ");
+    Print("  🔧 GG_TrendBar v2.32 MTF shift=1 FIXED applied");
+    Print("  📊 Each TF calculates independently");
+    Print("  🎨 OBV_MACD uses COLOR INDEX (4 colors)");
+    Print("  🧪 Strategy Tester: Spread limit x5 auto-applied");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -188,7 +223,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.03 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.10 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -363,6 +398,7 @@ void OnTick()
     {
         // Signal rejected by one of the gates
         // Already logged by SignalEngine
+        g_core.LogMessage(2, "❌ Signal REJECTED - Check gate messages above");
         return;
     }
     
@@ -767,15 +803,19 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("\n=== EA CONFIGURATION v2.03 ===");
+    Print("\n=== EA CONFIGURATION v2.14 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
-    Print("• v2.03: Gate3 stricter; RiskExec; spread warm-up; no RT guard");
+    Print("• v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED per TF (CRITICAL!)");
+    Print("• v2.13: GG_TrendBar v2.31 buffer shift fix");
+    Print("• v2.12: Strategy Tester spread x5 + MTF detailed logs");
+    Print("• v2.11: OBV_MACD color index logic (4 colors: strong/weak)");
     Print("");
     Print("=== VISUALIZAÇÃO ===");
     Print("Attach Indicators To Chart: ", (InpAttachIndicatorsToChart ? "ON" : "OFF"));
+    Print("GG Create Objects: ", (InpGG_CreateObjects?"ON":"OFF"));
     
     Print("\n=== ASYMMETRIC RISK MANAGEMENT ===");
     Print("📈 BUY: ", (InpEnableBuy ? "ENABLED" : "DISABLED"));
@@ -866,15 +906,18 @@ void PrintConfiguration()
         " | Price=", InpGG_ADX_Price,
         " | PSAR Step=", DoubleToString(InpGG_PSAR_Step, 2),
         " | PSAR Max=", DoubleToString(InpGG_PSAR_Max, 2),
-        " | Objects=", (InpGG_CreateObjects ? "ON" : "OFF"));
+        " | Objects=OFF (v2.24 data only)");
     Print("TrendMagic: CCI=", InpST_CCI_Period,
         " | ATR=", InpST_ATR_Period,
         " | Mult=", DoubleToString(InpST_ATR_Multiplier, 2));
-    Print("WAE: Fast=", InpWAE_FastMA,
-        " | Slow=", InpWAE_SlowMA,
-        " | BB Len=", InpWAE_BBLength,
-        " | BB Mult=", DoubleToString(InpWAE_BBMultiplier, 2),
-        " | Sens=", InpWAE_Sensitivity);
+    Print("Momentum (OBV MACD): FastEMA=", InpMACD_FastEMA,
+        " | SlowEMA=", InpMACD_SlowEMA,
+        " | SignalSMA=", InpMACD_SignalSMA,
+        " | OBV Smooth=", InpMACD_ObvSmooth,
+        " | TickVol=", (InpMACD_UseTickVolume ? "ON" : "OFF"),
+        " | Show MACD=", (InpMACD_ShowMACDLine ? "ON" : "OFF"),
+        " | Show Signal=", (InpMACD_ShowSignalLine ? "ON" : "OFF"));
+    Print("   Gate 4 uses COLOR INDEX: 0=StrongGreen, 1=StrongRed, 2=WeakGreen, 3=WeakRed");
     Print("RSI OMA: RSI=", InpRSI_Period,
         " | MA=", InpRSI_MA_Period,
         " | Method=", InpRSI_MA_Method,

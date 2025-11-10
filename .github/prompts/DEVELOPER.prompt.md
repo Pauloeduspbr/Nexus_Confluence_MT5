@@ -67,13 +67,13 @@ Você é um **Expert Developer de MQL5** com mais de 20 anos de experiência esp
 - BUY: Linha azul + preço acima
 - SELL: Linha vermelha + preço abaixo
 
-**GATE 4 - FORÇA/MOMENTUM (ORDEM CRÍTICA):**
-- **WAE PRIMEIRO** (filtro de expansão):
-  - Barras acima da linha de explosão
-  - Expansão crescente (rejeitar laterais)
+**GATE 4 - MOMENTUM (ORDEM CRÍTICA):**
+- **OBV MACD PRIMEIRO** (filtro de expansão / volatilidade):
+    - Histogram acima do threshold adaptativo
+    - Expansão crescente (rejeita mercados laterais)
 - **RSI OMA DEPOIS** (confirmação de pressão):
-  - BUY: Linha vermelha > azul
-  - SELL: Linha vermelha < azul
+    - BUY: Linha vermelha > azul
+    - SELL: Linha vermelha < azul
 
 **GATE 5 - CONTEXTO (Currency Strength):**
 - **FOREX/METAIS**: Obrigatório
@@ -107,7 +107,7 @@ Você é um **Expert Developer de MQL5** com mais de 20 anos de experiência esp
 ### INDICADORES NECESSÁRIOS:
 - `GG_TrendBar_Indicator.mq5`
 - `TrendMagic_MT5.mq5` (Supertrend)
-- `WaddahAttarExplosion_Professional.mq5`
+- `OBV_MACD.mq5` (Momentum – substitui WAE)
 - `RSIOMA_v2HHLSX_MT5.mq5`
 - `CurrencyStrengthMeter_MT5.mq5`
 
@@ -199,7 +199,7 @@ private:
     // Handles dos indicadores
     int         m_gg_handle;
     int         m_supertrend_handle;
-    int         m_wae_handle;
+    int         m_mom_handle;      // OBV MACD (Momentum)
     int         m_rsi_oma_handle;
     int         m_currency_handle;
     
@@ -207,8 +207,8 @@ private:
     double      m_gg_buffer[];
     double      m_st_upper[];
     double      m_st_lower[];
-    double      m_wae_green[];
-    double      m_wae_red[];
+    double      m_mom_hist[];      // histogram (positivo/negativo)
+    double      m_mom_threshold[]; // threshold adaptativo
     double      m_rsi_red[];
     double      m_rsi_blue[];
     
@@ -220,7 +220,7 @@ public:
     bool        UpdateBufferCache(void);
     int         GetGGTrendSignal(ENUM_TIMEFRAMES tf, int shift);
     bool        IsSupertrendBullish(int shift);
-    bool        IsWAEExpanding(int shift);
+    bool        IsMomentumExpanding(int shift);
     int         GetRSIOMASignal(int shift);
     double      GetCurrencyStrength(string currency, int shift);
 };
@@ -287,7 +287,7 @@ public:
   - PREMIUM: 4/4 timeframes alinhados
   - GOOD: Macros alinhados + operacional neutro
   - REJECT: Qualquer oposição
-- **ORDEM DE PROCESSAMENTO GATE 4**: WAE primeiro, depois RSI OMA
+- **ORDEM DE PROCESSAMENTO GATE 4**: Momentum (OBV MACD) primeiro, depois RSI OMA
 - **Tolerância Supertrend**: Permitir 1 candle de atraso
 - Análise de confluência entre indicadores
 - Lógica de decisão para entrada em trades
@@ -496,7 +496,7 @@ void OnTick()
         return;
     }
     
-    // GATE 4: Momentum (WAE + RSI)
+    // GATE 4: Momentum (OBV MACD + RSI OMA)
     if(!g_signals.ProcessGate4_Momentum())
     {
         g_core.LogMessage(3, "Gate 4 rejeitado - Sem momentum");
@@ -572,13 +572,13 @@ bool CIndicatorHub::UpdateBufferCache(void)
     if(CopyBuffer(m_supertrend_handle, 1, 1, 2, m_st_lower) < 1)
         return false;
     
-    // Copiar WAE (processar ANTES do RSI OMA)
-    if(CopyBuffer(m_wae_handle, 0, 1, 1, m_wae_green) != 1)
+    // Copiar Momentum (OBV MACD) ANTES do RSI OMA
+    if(CopyBuffer(m_mom_handle, 0, 1, 1, m_mom_hist) != 1)
         return false;
-    if(CopyBuffer(m_wae_handle, 1, 1, 1, m_wae_red) != 1)
+    if(CopyBuffer(m_mom_handle, 4, 1, 1, m_mom_threshold) != 1)
         return false;
     
-    // Copiar RSI OMA (confirmar DEPOIS do WAE)
+    // Copiar RSI OMA (confirmar DEPOIS do Momentum)
     if(CopyBuffer(m_rsi_oma_handle, 0, 1, 1, m_rsi_red) != 1)
         return false;
     if(CopyBuffer(m_rsi_oma_handle, 1, 1, 1, m_rsi_blue) != 1)
@@ -633,16 +633,16 @@ ENUM_SIGNAL_CLASS CSignalEngine::ClassifySignal(int score)
 }
 ```
 
-### GATE 4 - ORDEM CORRETA (WAE → RSI):
+### GATE 4 - ORDEM CORRETA (Momentum OBV MACD → RSI OMA):
 
 ```mql5
 bool CSignalEngine::ProcessGate4_Momentum(void)
 {
-    // ETAPA 1: Verificar WAE (expansão/momentum)
-    bool wae_expanding = m_indicators.IsWAEExpanding(1);  // shift=1
-    if(!wae_expanding)
+    // ETAPA 1: Verificar Momentum (OBV MACD) expansão
+    bool mom_expanding = m_indicators.IsMomentumExpanding(1);  // shift=1
+    if(!mom_expanding)
     {
-        LogMessage(3, "Gate 4: WAE sem expansão - mercado lateral");
+        LogMessage(3, "Gate 4: Momentum sem expansão - mercado lateral");
         return false;
     }
     
@@ -654,7 +654,7 @@ bool CSignalEngine::ProcessGate4_Momentum(void)
         return false;
     }
     
-    // Validar alinhamento WAE + RSI com direção MTF
+    // Validar alinhamento Momentum + RSI com direção MTF
     if(m_mtf_score > 0 && rsi_signal < 0)  // BUY mas RSI bearish
         return false;
     if(m_mtf_score < 0 && rsi_signal > 0)  // SELL mas RSI bullish
@@ -726,7 +726,7 @@ double CMarketAccess::NormalizeLot(double lot)
 - **SEMPRE usar `shift=1`** (bar close) para evitar repaint
 - **Cache único por candle** - congelar todos os buffers simultaneamente
 - **Score System**: BUY ≥ +2, SELL ≤ -2 (sistema de votação)
-- **Ordem Gate 4**: WAE primeiro (filtro), RSI OMA depois (confirmação)
+- **Ordem Gate 4**: Momentum (OBV MACD) primeiro (filtro), RSI OMA depois (confirmação)
 - **Tolerância Supertrend**: Permitir 1 candle de atraso
 - **State Machine**: Prevenir duplicação de ordens no mesmo candle
 - **Fallback automático**: Operar sem Currency Strength em índices
@@ -773,7 +773,7 @@ double CMarketAccess::NormalizeLot(double lot)
 // Gates, scores e decisões
 [2025.01.10 09:15:00] Gates: G0✓ G1✓ G2✓ G3✓ G4✓ G5✓
 [2025.01.10 09:15:00] MTF Score: +4 | Classification: PREMIUM
-[2025.01.10 09:15:00] Micro: ST✓ WAE✓ RSI✓ CS✓
+[2025.01.10 09:15:00] Micro: ST✓ MOM✓ RSI✓ CS✓
 [2025.01.10 09:15:00] Order: #123456 | 0.01 lots @ 141.250
 [2025.01.10 09:15:01] State: IDLE → ORDER_SENT
 ```
@@ -783,7 +783,7 @@ double CMarketAccess::NormalizeLot(double lot)
 // Valores brutos dos indicadores
 [2025.01.10 09:15:00] Buffers frozen at: 2025.01.10 09:15:00 (shift=1)
 [2025.01.10 09:15:00] GG[H4]:+1 [H1]:+1 [M30]:+1 [M15]:+1 | Score: +4
-[2025.01.10 09:15:00] WAE: Green=0.0015 > Explosion=0.0010 ✓
+[2025.01.10 09:15:00] MOM: Hist=0.0015 > Threshold=0.0010 ✓
 [2025.01.10 09:15:00] RSI OMA: Red=0.82 > Blue=0.65 (BUY signal)
 [2025.01.10 09:15:00] Spread: 15pts < Max:20pts (75% limit) ✓
 [2025.01.10 09:15:00] CS: EUR=0.65 > USD=0.35 (Delta: +0.30) ✓
@@ -809,7 +809,7 @@ MQL5/
 └── Indicators/NexusConfluenceEA/
                ├── GG_TrendBar_Indicator.mq5 (ou .ex5)
                ├── TrendMagic_MT5.mq5 (ou .ex5)
-               ├── WaddahAttarExplosion_Professional.mq5 (ou .ex5)
+               ├── OBV_MACD.mq5 (ou .ex5)
                ├── RSIOMA_v2HHLSX_MT5.mq5 (ou .ex5)
                └── CurrencyStrengthMeter_MT5.mq5 (ou .ex5)
 ```
@@ -839,7 +839,7 @@ MQL5/
 - **Win Rate PREMIUM**: > 65% (objetivo)
 - **Win Rate GOOD**: > 55% (objetivo)
 - **Rejeições Gate 2 (MTF)**: ~40% esperado
-- **Rejeições Gate 4 (WAE)**: ~30% esperado
+- **Rejeições Gate 4 (Momentum)**: ~30% esperado
 - **Rejeições Gate 5 (CS)**: ~20% esperado
 - **Latência por tick**: < 50ms
 - **CPU por candle**: < 100ms
@@ -855,7 +855,7 @@ MQL5/
 4. ✅ Considerar performance e otimização
 5. ✅ **Validar compreensão do Sistema de Gates (0-5)**
 6. ✅ **Entender Score System (≥+2 para BUY, ≤-2 para SELL)**
-7. ✅ **Confirmar ordem WAE→RSI no Gate 4**
+7. ✅ **Confirmar ordem Momentum (OBV MACD) → RSI OMA no Gate 4**
 
 ### DURANTE O DESENVOLVIMENTO:
 - ✅ Código completo, sem placeholders ou TODOs
@@ -894,7 +894,7 @@ MQL5/
 - [ ] Gate 1: Spread dinâmico + Skip Monday Open + News Filter
 - [ ] Gate 2: Score MTF + Classificação (PREMIUM/GOOD/REJECT)
 - [ ] Gate 3: Supertrend com tolerância de 1 candle
-- [ ] Gate 4: WAE primeiro (expansão) → RSI OMA depois (confirmação)
+- [ ] Gate 4: Momentum (OBV MACD) primeiro (expansão) → RSI OMA depois (confirmação)
 - [ ] Gate 5: Currency Strength com fallback para índices
 
 ### CONFIGURAÇÕES POR MERCADO:
@@ -933,7 +933,7 @@ MQL5/
 ### REGRAS DE OURO:
 1. **SHIFT=1 SEMPRE** (bar close) - NÃO NEGOCIÁVEL
 2. **Score ≥ +2 para BUY, ≤ -2 para SELL** - Sistema de votação
-3. **WAE antes de RSI** no Gate 4 - Ordem crítica
+3. **Momentum (OBV MACD) antes de RSI OMA** no Gate 4 - Ordem crítica
 4. **State Machine ativa** - Prevenir duplicação
 5. **Logs em 3 níveis** - Debug em produção
 

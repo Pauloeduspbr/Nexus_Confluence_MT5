@@ -2,7 +2,7 @@
 //|                                                TrendMagic_MT5.mq5 |
 //|                              Converted from MT4 by GitHub Copilot |
 //|                                              MT5 Compatible Version |
-//|                           v1.01 - FIX: Ajustar escala ATR Multiplier |
+//|                           v1.02 - FIX: Sincronização shift=1       |
 //+------------------------------------------------------------------+
 
 #property indicator_chart_window
@@ -108,19 +108,24 @@ int OnCalculate(const int rates_total,
    ArraySetAsSeries(cci_values, true);
    ArraySetAsSeries(atr_values, true);
    
+   // ✅ FIX v1.02: Copiar apenas barras necessárias (otimização)
    int copy_bars = rates_total - prev_calculated + 1;
    if(prev_calculated == 0)
       copy_bars = rates_total;
+   else if(copy_bars < 2)
+      copy_bars = 2; // Mínimo 2 barras para verificar mudança de tendência
    
    if(CopyBuffer(cci_handle, 0, 0, copy_bars, cci_values) <= 0)
       return(0);
    if(CopyBuffer(atr_handle, 0, 0, copy_bars, atr_values) <= 0)
       return(0);
    
-   //--- Calculate starting position
+   //--- ✅ FIX v1.02: Calculate starting position (NÃO recalcular barra fechada a cada tick)
    int start = prev_calculated;
    if(start == 0)
       start = 1;
+   else
+      start = rates_total - 1; // Apenas barra atual (shift=0)
    
    //--- Main calculation loop
    for(int i = start; i < rates_total; i++)

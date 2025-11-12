@@ -169,46 +169,92 @@ CBreakEvenManager::~CBreakEvenManager(void)
 bool CBreakEvenManager::Init(bool buy_enabled, int trigger_buy, int step_buy,
                               bool sell_enabled, int trigger_sell, int step_sell)
 {
+    // ✅ v2.63 UNIVERSAL CONVERSION: User input = PRICE DISTANCE (points)
+    string symbol = Symbol();
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+    
+    int trigger_buy_converted = trigger_buy;
+    int step_buy_converted = step_buy;
+    int trigger_sell_converted = trigger_sell;
+    int step_sell_converted = step_sell;
+    
+    if(tick_size > point)
+    {
+        // B3/Special assets: convert input points to steps
+        // Formula: steps = input_points / tick_size
+        trigger_buy_converted = (int)MathRound(trigger_buy / tick_size);
+        step_buy_converted = (int)MathRound(step_buy / tick_size);
+        trigger_sell_converted = (int)MathRound(trigger_sell / tick_size);
+        step_sell_converted = (int)MathRound(step_sell / tick_size);
+        
+        Print("✅ v2.63 [BE]: Universal conversion (input points → steps):");
+        Print(StringFormat("   • BUY Trigger: %d input → %d steps (%.1f distance)",
+              trigger_buy, trigger_buy_converted, trigger_buy_converted * tick_size));
+        Print(StringFormat("   • BUY Step: %d input → %d steps (%.1f distance)",
+              step_buy, step_buy_converted, step_buy_converted * tick_size));
+        Print(StringFormat("   • SELL Trigger: %d input → %d steps (%.1f distance)",
+              trigger_sell, trigger_sell_converted, trigger_sell_converted * tick_size));
+        Print(StringFormat("   • SELL Step: %d input → %d steps (%.1f distance)",
+              step_sell, step_sell_converted, step_sell_converted * tick_size));
+    }
+    
     // Validação de parâmetros BUY
     if(buy_enabled)
     {
-        if(trigger_buy <= 0 || step_buy < 0)
+        if(trigger_buy_converted <= 0 || step_buy_converted < 0)
         {
-            Print("❌ [BE] Erro: Parâmetros BUY inválidos. Trigger=", trigger_buy, " Step=", step_buy);
+            Print("❌ [BE] Erro: Parâmetros BUY inválidos. Trigger=", trigger_buy_converted, " Step=", step_buy_converted);
             return false;
         }
         
-        if(trigger_buy <= step_buy)
+        // ✅ v2.59 CRITICAL VALIDATION: After conversion, Trigger MUST be > Step
+        // BE has less strict requirement than TS (no throttling), but Trigger≤Step is nonsense
+        if(trigger_buy_converted <= step_buy_converted)
         {
-            Print("⚠️ [BE] Aviso: BE Trigger BUY (", trigger_buy, 
-                  ") deve ser maior que Step (", step_buy, ")");
+            Print("❌ [BE] ERRO CRÍTICO: Trigger BUY convertido não é maior que Step convertido!");
+            Print("   📊 Após conversão: Trigger=", trigger_buy_converted, " Step=", step_buy_converted);
+            Print("   ⚠️ IMPOSSÍVEL: BE não pode funcionar com Trigger≤Step");
+            Print("   💡 SOLUÇÃO:");
+            Print("      Para WDOZ25 (tick_size=0.5):");
+            Print("      - Aumente Trigger para >= 1000 pontos (→ 2 steps = 1.0 distance)");
+            Print("      - OU configure Step=0 (move para Entry exato)");
+            return false;
         }
     }
     
     // Validação de parâmetros SELL
     if(sell_enabled)
     {
-        if(trigger_sell <= 0 || step_sell < 0)
+        if(trigger_sell_converted <= 0 || step_sell_converted < 0)
         {
-            Print("❌ [BE] Erro: Parâmetros SELL inválidos. Trigger=", trigger_sell, " Step=", step_sell);
+            Print("❌ [BE] Erro: Parâmetros SELL inválidos. Trigger=", trigger_sell_converted, " Step=", step_sell_converted);
             return false;
         }
         
-        if(trigger_sell <= step_sell)
+        // ✅ v2.59 CRITICAL VALIDATION: After conversion, Trigger MUST be > Step
+        // BE has less strict requirement than TS (no throttling), but Trigger≤Step is nonsense
+        if(trigger_sell_converted <= step_sell_converted)
         {
-            Print("⚠️ [BE] Aviso: BE Trigger SELL (", trigger_sell,
-                  ") deve ser maior que Step (", step_sell, ")");
+            Print("❌ [BE] ERRO CRÍTICO: Trigger SELL convertido não é maior que Step convertido!");
+            Print("   📊 Após conversão: Trigger=", trigger_sell_converted, " Step=", step_sell_converted);
+            Print("   ⚠️ IMPOSSÍVEL: BE não pode funcionar com Trigger≤Step");
+            Print("   💡 SOLUÇÃO:");
+            Print("      Para WDOZ25 (tick_size=0.5):");
+            Print("      - Aumente Trigger para >= 1000 pontos (→ 2 steps = 1.0 distance)");
+            Print("      - OU configure Step=0 (move para Entry exato)");
+            return false;
         }
     }
     
-    // Armazenar configurações
+    // Armazenar configurações CONVERTIDAS
     m_buy_enabled = buy_enabled;
-    m_trigger_buy = trigger_buy;
-    m_step_buy = step_buy;
+    m_trigger_buy = trigger_buy_converted;  // v2.58: Now in STEPS
+    m_step_buy = step_buy_converted;        // v2.58: Now in STEPS
     
     m_sell_enabled = sell_enabled;
-    m_trigger_sell = trigger_sell;
-    m_step_sell = step_sell;
+    m_trigger_sell = trigger_sell_converted;  // v2.58: Now in STEPS
+    m_step_sell = step_sell_converted;        // v2.58: Now in STEPS
     
     m_initialized = true;
     
@@ -295,19 +341,25 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
     
     // Informações do símbolo
     double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
     int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
     
-    // Calcular lucro em pontos/pips
+    // ✅ v2.57 FIX: Usar TICK_SIZE (B3/Forex) ou POINT (Índices) universalmente
+    // WDOZ25: tick_size=0.5 > point=0.001 → usa 0.5
+    // WINZ25: tick_size=1 = point=1 → usa 1
+    double price_step = (tick_size > point) ? tick_size : point;
+    
+    // Calcular lucro em pontos/pips (usando price_step correto)
     double profit_points;
     
     if(pos_type == POSITION_TYPE_BUY)
     {
-        profit_points = (current_price - entry_price) / point;
+        profit_points = (current_price - entry_price) / price_step;  // v2.57: usa price_step
         
         // Se o SL atual já atingiu ou superou o alvo de BE, marcar e sair
         // Alvo BUY: entry + step
-        double target_be = NormalizeDouble(entry_price + (m_step_buy * point), digits);
-        double tol = 2 * point; // tolerância de 2 pontos para arredondamentos
+        double target_be = NormalizeDouble(entry_price + (m_step_buy * price_step), digits);  // v2.57
+        double tol = 2 * price_step; // v2.57: tolerância de 2 price_steps para arredondamentos
         if(m_step_buy >= 0 && current_sl > 0 && current_sl >= (target_be - tol))
         {
             // Adicionar ticket à lista se ainda não estiver
@@ -322,7 +374,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
         if(profit_points >= m_trigger_buy)
         {
             // Calcular novo SL (entry + step)
-            double new_sl = NormalizeDouble(entry_price + (m_step_buy * point), digits);
+            double new_sl = NormalizeDouble(entry_price + (m_step_buy * price_step), digits);  // v2.57
 
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO 1: SL não pode ultrapassar TP em BUY
@@ -337,7 +389,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA 2: SL deve estar ABAIXO do preço atual
             // ═══════════════════════════════════════════════════════
-            double min_distance_for_be = (m_trigger_buy - m_step_buy) * point; // Distância segura
+            double min_distance_for_be = (m_trigger_buy - m_step_buy) * price_step; // v2.57: Distância segura
             double current_distance = current_price - new_sl;
             
             if(current_distance <= 0)
@@ -352,8 +404,8 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             if(current_distance < min_distance_for_be)
             {
                 Print("⚠️ [BE] BUY #", ticket, ": Distância insuficiente entre SL e preço (", 
-                      NormalizeDouble(current_distance/point, 0), " pts < ", 
-                      NormalizeDouble(min_distance_for_be/point, 0), " pts necessários)");
+                      NormalizeDouble(current_distance/price_step, 0), " pts < ",  // v2.57
+                      NormalizeDouble(min_distance_for_be/price_step, 0), " pts necessários)");  // v2.57
                 Print("   💡 Aguardando preço se afastar mais do SL alvo antes de ativar");
                 return false;
             }
@@ -364,7 +416,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 // ═══════════════════════════════════════════════════════
                 // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
                 // ═══════════════════════════════════════════════════════
-                if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+                if(current_sl > 0 && MathAbs(new_sl - current_sl) < price_step)  // v2.57
                 {
                     // SL já está no valor calculado, não modificar
                     return false;
@@ -376,7 +428,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 int min_level = (int)MathMax((double)stop_level, (double)freeze_level);
                 if(min_level > 0)
                 {
-                    double distance_to_price = (current_price - new_sl) / point;
+                    double distance_to_price = (current_price - new_sl) / price_step;  // v2.57
                     if(distance_to_price < min_level)
                     {
                         Print("⚠️ [BE] BUY #", ticket, ": SL muito próximo do preço (min_level=", min_level, " | distância: ", (int)distance_to_price, " pontos)");
@@ -414,7 +466,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                         
                         m_total_activations_buy++;
                         
-                        double protected_points = (new_sl - entry_price) / point;
+                        double protected_points = (new_sl - entry_price) / price_step;  // v2.57
                         
                         Print("✅ [BE] Break Even ativado para BUY #", ticket);
                         Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
@@ -457,12 +509,12 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
     }
     else // POSITION_TYPE_SELL
     {
-        profit_points = (entry_price - current_price) / point;
+        profit_points = (entry_price - current_price) / price_step;  // v2.57
         
         // Se o SL atual já atingiu ou superou o alvo de BE, marcar e sair
         // Alvo SELL: entry - step
-        double target_be = NormalizeDouble(entry_price - (m_step_sell * point), digits);
-        double tol = 2 * point; // tolerância de 2 pontos para arredondamentos
+        double target_be = NormalizeDouble(entry_price - (m_step_sell * price_step), digits);  // v2.57
+        double tol = 2 * price_step;  // v2.57: tolerância de 2 steps para arredondamentos
         if(m_step_sell >= 0 && current_sl > 0 && current_sl <= (target_be + tol))
         {
             // Adicionar ticket à lista se ainda não estiver
@@ -477,7 +529,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
         if(profit_points >= m_trigger_sell)
         {
             // Calcular novo SL (entry - step)
-            double new_sl = NormalizeDouble(entry_price - (m_step_sell * point), digits);
+            double new_sl = NormalizeDouble(entry_price - (m_step_sell * price_step), digits);  // v2.57
 
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO 1: SL não pode ultrapassar TP em SELL
@@ -492,7 +544,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA 2: SL deve estar ACIMA do preço atual
             // ═══════════════════════════════════════════════════════
-            double min_distance_for_be = (m_trigger_sell - m_step_sell) * point; // Distância segura
+            double min_distance_for_be = (m_trigger_sell - m_step_sell) * price_step;  // v2.57: Distância segura
             double current_distance = new_sl - current_price;
             
             if(current_distance <= 0)
@@ -507,8 +559,8 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
             if(current_distance < min_distance_for_be)
             {
                 Print("⚠️ [BE] SELL #", ticket, ": Distância insuficiente entre SL e preço (", 
-                      NormalizeDouble(current_distance/point, 0), " pts < ", 
-                      NormalizeDouble(min_distance_for_be/point, 0), " pts necessários)");
+                      NormalizeDouble(current_distance/price_step, 0), " pts < ",  // v2.57
+                      NormalizeDouble(min_distance_for_be/price_step, 0), " pts necessários)");  // v2.57
                 Print("   💡 Aguardando preço se afastar mais do SL alvo antes de ativar");
                 return false;
             }
@@ -519,7 +571,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 // ═══════════════════════════════════════════════════════
                 // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
                 // ═══════════════════════════════════════════════════════
-                if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+                if(current_sl > 0 && MathAbs(new_sl - current_sl) < price_step)  // v2.57
                 {
                     // SL já está no valor calculado, não modificar
                     return false;
@@ -531,7 +583,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                 int min_level = (int)MathMax((double)stop_level, (double)freeze_level);
                 if(min_level > 0)
                 {
-                    double distance_to_price = (new_sl - current_price) / point;
+                    double distance_to_price = (new_sl - current_price) / price_step;  // v2.57
                     if(distance_to_price < min_level)
                     {
                         Print("⚠️ [BE] SELL #", ticket, ": SL muito próximo do preço (min_level=", min_level, " | distância: ", (int)distance_to_price, " pontos)");
@@ -569,7 +621,7 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
                         
                         m_total_activations_sell++;
                         
-                        double protected_points = (entry_price - new_sl) / point;
+                        double protected_points = (entry_price - new_sl) / price_step;  // v2.57
                         
                         Print("✅ [BE] Break Even ativado para SELL #", ticket);
                         Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
@@ -640,16 +692,18 @@ bool CBreakEvenManager::IsBEActivated(ulong ticket)
     // Referência APENAS no valor de SL vs Entry ± Step (com tolerância pequena)
     int step_threshold = (type == POSITION_TYPE_BUY) ? m_step_buy : m_step_sell;
     double point = SymbolInfoDouble(PositionGetString(POSITION_SYMBOL), SYMBOL_POINT);
-    double tol = 2 * point; // 2 pontos de tolerância para arredondamentos
+    double tick_size = SymbolInfoDouble(PositionGetString(POSITION_SYMBOL), SYMBOL_TRADE_TICK_SIZE);
+    double price_step = (tick_size > point) ? tick_size : point;  // v2.57 universal
+    double tol = 2 * price_step;  // v2.57: 2 steps de tolerância para arredondamentos
     
     if(type == POSITION_TYPE_BUY)
     {
-        double target = entry + (step_threshold * point);
+        double target = entry + (step_threshold * price_step);  // v2.57
         return (sl >= (target - tol));
     }
     else // SELL
     {
-        double target = entry - (step_threshold * point);
+        double target = entry - (step_threshold * price_step);  // v2.57
         return (sl <= (target + tol));
     }
 }

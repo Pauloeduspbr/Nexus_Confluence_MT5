@@ -143,16 +143,46 @@ bool CAsymmetricRisk::Init(bool buy_enabled, bool sell_enabled,
         }
     }
     
-    // Armazenar configurações
+    // ✅ v2.63 UNIVERSAL CONVERSION: User input = PRICE DISTANCE (points)
+    string symbol = Symbol();
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+    
+    int sl_buy_converted = sl_buy;
+    int tp_buy_converted = tp_buy;
+    int sl_sell_converted = sl_sell;
+    int tp_sell_converted = tp_sell;
+    
+    if(tick_size > point)
+    {
+        // B3/Special assets: convert input points to steps
+        // Formula: steps = input_points / tick_size
+        sl_buy_converted = (int)MathRound(sl_buy / tick_size);
+        tp_buy_converted = (int)MathRound(tp_buy / tick_size);
+        sl_sell_converted = (int)MathRound(sl_sell / tick_size);
+        tp_sell_converted = (int)MathRound(tp_sell / tick_size);
+        
+        Print("✅ v2.63 [AR]: Universal conversion (input points → steps):");
+        Print(StringFormat("   • BUY SL: %d input → %d steps (%.1f distance)",
+              sl_buy, sl_buy_converted, sl_buy_converted * tick_size));
+        Print(StringFormat("   • BUY TP: %d input → %d steps (%.1f distance)",
+              tp_buy, tp_buy_converted, tp_buy_converted * tick_size));
+        Print(StringFormat("   • SELL SL: %d input → %d steps (%.1f distance)",
+              sl_sell, sl_sell_converted, sl_sell_converted * tick_size));
+        Print(StringFormat("   • SELL TP: %d input → %d steps (%.1f distance)",
+              tp_sell, tp_sell_converted, tp_sell_converted * tick_size));
+    }
+    
+    // Armazenar configurações CONVERTIDAS
     m_buy_enabled = buy_enabled;
     m_sell_enabled = sell_enabled;
     
-    m_sl_buy = sl_buy;
-    m_tp_buy = tp_buy;
+    m_sl_buy = sl_buy_converted;      // v2.59: Now in STEPS
+    m_tp_buy = tp_buy_converted;      // v2.59: Now in STEPS
     m_min_score_buy = score_buy;
     
-    m_sl_sell = sl_sell;
-    m_tp_sell = tp_sell;
+    m_sl_sell = sl_sell_converted;    // v2.59: Now in STEPS
+    m_tp_sell = tp_sell_converted;    // v2.59: Now in STEPS
     m_min_score_sell = score_sell;
     
     m_initialized = true;

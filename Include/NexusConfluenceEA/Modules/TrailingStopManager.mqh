@@ -119,95 +119,163 @@ CTrailingStopManager::~CTrailingStopManager(void)
 bool CTrailingStopManager::Init(bool buy_enabled, int trigger_buy, int step_buy,
                                  bool sell_enabled, int trigger_sell, int step_sell)
 {
-    // Obter STOPS_LEVEL do símbolo atual
-    long stops_level = SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL);
+    // ✅ v2.63 UNIVERSAL CONVERSION: User input = PRICE DISTANCE (points)
+    string symbol = Symbol();
+    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+    
+    int trigger_buy_converted = trigger_buy;
+    int step_buy_converted = step_buy;
+    int trigger_sell_converted = trigger_sell;
+    int step_sell_converted = step_sell;
+    
+    if(tick_size > point)
+    {
+        // B3/Special assets: convert input points to steps
+        // Formula: steps = input_points / tick_size
+        trigger_buy_converted = (int)MathRound(trigger_buy / tick_size);
+        step_buy_converted = (int)MathRound(step_buy / tick_size);
+        trigger_sell_converted = (int)MathRound(trigger_sell / tick_size);
+        step_sell_converted = (int)MathRound(step_sell / tick_size);
+        
+        Print("✅ v2.63 [TS]: Universal conversion (input points → steps):");
+        Print(StringFormat("   • BUY Trigger: %d input → %d steps (%.1f distance)",
+              trigger_buy, trigger_buy_converted, trigger_buy_converted * tick_size));
+        Print(StringFormat("   • BUY Step: %d input → %d steps (%.1f distance)",
+              step_buy, step_buy_converted, step_buy_converted * tick_size));
+        Print(StringFormat("   • SELL Trigger: %d input → %d steps (%.1f distance)",
+              trigger_sell, trigger_sell_converted, trigger_sell_converted * tick_size));
+        Print(StringFormat("   • SELL Step: %d input → %d steps (%.1f distance)",
+              step_sell, step_sell_converted, step_sell_converted * tick_size));
+    }
+    
+    // ✅ v2.63: STOPS_LEVEL validation REMOVED for Trailing Stop
+    // STOPS_LEVEL is for INITIAL SL/TP distance from entry
+    // Trailing Stop moves SL PROGRESSIVELY as profit increases
+    // TS can use smaller steps because SL is already far from entry!
+    // Example Forex: STOPS_LEVEL=20 pips, but TS Step=5 pips is perfectly fine!
     
     // Validação de parâmetros BUY
     if(buy_enabled)
     {
-        if(trigger_buy <= 0 || step_buy <= 0)
+        if(trigger_buy_converted <= 0 || step_buy_converted <= 0)
         {
-            Print("❌ [TS] Erro: Parâmetros BUY inválidos. Trigger=", trigger_buy, " Step=", step_buy);
+            Print("❌ [TS] Erro: Parâmetros BUY inválidos. Trigger=", trigger_buy_converted, " Step=", step_buy_converted);
             return false;
         }
         
-        // CRÍTICO: Step deve ser MAIOR que STOPS_LEVEL
-        if(stops_level > 0 && step_buy <= stops_level)
+        // ✅ v2.63 RELAXED VALIDATION: Minimum ratio 2:1 (was 20:1)
+        // With correct price distance conversion, 3:1 ratio is perfectly valid!
+        // Technical minimum: 2:1 for throttling to work (75% rule)
+        // User example: Trigger=15 / Step=5 = 3:1 ✅ (good ratio!)
+        double ratio;
+        if(tick_size > point)
         {
-            Print("❌ [TS] ERRO CRÍTICO: Step BUY (", step_buy, ") deve ser MAIOR que STOPS_LEVEL (", stops_level, ")");
-            Print("   💡 Configure InpTS_Buy_Step para pelo menos ", (stops_level + 10), " pontos");
-            return false;
+            // Use original user inputs for ratio validation
+            ratio = (double)trigger_buy / (double)step_buy;
+        }
+        else
+        {
+            // Use converted values for point-based assets (indices)
+            ratio = (double)trigger_buy_converted / (double)step_buy_converted;
         }
         
-        // ✅ v2.51 CRITICAL FIX: Validar proporção Trigger:Step
-        // Step muito pequeno causa throttling impossível (75% rule)
-        // Recomendação: Trigger deve ser no MÍNIMO 50x o Step
-        double ratio = (double)trigger_buy / (double)step_buy;
-        if(ratio < 20.0)
+        if(ratio < 2.0)
         {
-            Print("❌ [TS] ERRO CRÍTICO: Proporção Trigger:Step BUY muito baixa!");
+            Print("❌ [TS] ERRO: Proporção Trigger:Step BUY muito baixa!");
             Print("   📊 Atual: Trigger=", trigger_buy, " / Step=", step_buy, " = ", DoubleToString(ratio, 1), ":1");
-            Print("   ⚠️ Com Step=", step_buy, " e throttling 75%, preço precisa mover ", DoubleToString(step_buy * 0.75, 1), " pontos entre updates");
+            Print("   ⚠️ Mínimo técnico: ratio >= 2:1 (para throttling funcionar)");
             Print("   💡 RECOMENDAÇÃO:");
-            Print("      Opção 1: Aumente Step para pelo menos ", (int)(trigger_buy / 20), " pontos (ratio 20:1)");
-            Print("      Opção 2: Reduza Trigger para ", (step_buy * 20), " pontos");
-            Print("   ✅ IDEAL: Trigger=", trigger_buy, " com Step entre ", (int)(trigger_buy / 50), "-", (int)(trigger_buy / 20), " pontos");
+            Print("      Opção 1: Reduza Step para ", (int)(trigger_buy / 3), " pontos (ratio 3:1)");
+            Print("      Opção 2: Aumente Trigger para ", (step_buy * 3), " pontos (ratio 3:1)");
+            Print("   ✅ BOAS PROPORÇÕES: 2:1 (mínimo) | 3:1 (bom) | 5:1 (ótimo)");
             return false;
         }
         
-        if(trigger_buy <= step_buy)
+        // ✅ v2.59 CRITICAL VALIDATION: After conversion, Trigger MUST be > Step
+        // With WDOZ25: 400pts→1, 15pts→1 both round to 1 → Trigger=Step=1 ❌
+        // This breaks throttling (75% rule requires Step × 1.33 movement)
+        if(trigger_buy_converted <= step_buy_converted)
         {
-            Print("⚠️ [TS] Aviso: TS Trigger BUY (", trigger_buy,
-                  ") deve ser maior que Step (", step_buy, ")");
+            Print("❌ [TS] ERRO CRÍTICO: Trigger BUY convertido não é maior que Step convertido!");
+            Print("   📊 Após conversão: Trigger=", trigger_buy_converted, " Step=", step_buy_converted);
+            Print("   ⚠️ IMPOSSÍVEL: Throttling (75% rule) falha com Trigger≤Step");
+            Print("   💡 SOLUÇÃO:");
+            Print("      Para WDOZ25 (tick_size=0.5):");
+            Print("      - Aumente Trigger para >= 1000 pontos (→ 2 steps = 1.0 distance)");
+            Print("      - Mantenha Step em 15 pontos (→ 1 step = 0.5 distance)");
+            Print("      - Resultado: ratio 2:1 permite throttling");
+            return false;
         }
     }
     
     // Validação de parâmetros SELL
     if(sell_enabled)
     {
-        if(trigger_sell <= 0 || step_sell <= 0)
+        if(trigger_sell_converted <= 0 || step_sell_converted <= 0)
         {
-            Print("❌ [TS] Erro: Parâmetros SELL inválidos. Trigger=", trigger_sell, " Step=", step_sell);
+            Print("❌ [TS] Erro: Parâmetros SELL inválidos. Trigger=", trigger_sell_converted, " Step=", step_sell_converted);
             return false;
         }
         
-        // CRÍTICO: Step deve ser MAIOR que STOPS_LEVEL
-        if(stops_level > 0 && step_sell <= stops_level)
+        // ✅ v2.63: STOPS_LEVEL validation REMOVED for Trailing Stop
+        // STOPS_LEVEL is for INITIAL SL/TP distance from entry
+        // Trailing Stop moves SL PROGRESSIVELY as profit increases
+        // TS can use smaller steps because SL is already far from entry!
+        // Example Forex: STOPS_LEVEL=20 pips, but TS Step=5 pips is perfectly fine!
+        
+        // ✅ v2.63 RELAXED VALIDATION: Minimum ratio 2:1 (was 20:1)
+        // With correct price distance conversion, 3:1 ratio is perfectly valid!
+        // Technical minimum: 2:1 for throttling to work (75% rule)
+        double ratio;
+        if(tick_size > point)
         {
-            Print("❌ [TS] ERRO CRÍTICO: Step SELL (", step_sell, ") deve ser MAIOR que STOPS_LEVEL (", stops_level, ")");
-            Print("   💡 Configure InpTS_Sell_Step para pelo menos ", (stops_level + 10), " pontos");
-            return false;
+            // Use original user inputs for ratio validation
+            ratio = (double)trigger_sell / (double)step_sell;
+        }
+        else
+        {
+            // Use converted values for point-based assets (indices)
+            ratio = (double)trigger_sell_converted / (double)step_sell_converted;
         }
         
-        // ✅ v2.51 CRITICAL FIX: Validar proporção Trigger:Step
-        double ratio = (double)trigger_sell / (double)step_sell;
-        if(ratio < 20.0)
+        if(ratio < 2.0)
         {
-            Print("❌ [TS] ERRO CRÍTICO: Proporção Trigger:Step SELL muito baixa!");
+            Print("❌ [TS] ERRO: Proporção Trigger:Step SELL muito baixa!");
             Print("   📊 Atual: Trigger=", trigger_sell, " / Step=", step_sell, " = ", DoubleToString(ratio, 1), ":1");
-            Print("   ⚠️ Com Step=", step_sell, " e throttling 75%, preço precisa mover ", DoubleToString(step_sell * 0.75, 1), " pontos entre updates");
+            Print("   ⚠️ Mínimo técnico: ratio >= 2:1 (para throttling funcionar)");
             Print("   💡 RECOMENDAÇÃO:");
-            Print("      Opção 1: Aumente Step para pelo menos ", (int)(trigger_sell / 20), " pontos (ratio 20:1)");
-            Print("      Opção 2: Reduza Trigger para ", (step_sell * 20), " pontos");
-            Print("   ✅ IDEAL: Trigger=", trigger_sell, " com Step entre ", (int)(trigger_sell / 50), "-", (int)(trigger_sell / 20), " pontos");
+            Print("      Opção 1: Reduza Step para ", (int)(trigger_sell / 3), " pontos (ratio 3:1)");
+            Print("      Opção 2: Aumente Trigger para ", (step_sell * 3), " pontos (ratio 3:1)");
+            Print("   ✅ BOAS PROPORÇÕES: 2:1 (mínimo) | 3:1 (bom) | 5:1 (ótimo)");
             return false;
         }
         
-        if(trigger_sell <= step_sell)
+        // ✅ v2.59 CRITICAL VALIDATION: After conversion, Trigger MUST be > Step
+        // With WDOZ25: 400pts→1, 15pts→1 both round to 1 → Trigger=Step=1 ❌
+        // This breaks throttling (75% rule requires Step × 1.33 movement)
+        if(trigger_sell_converted <= step_sell_converted)
         {
-            Print("⚠️ [TS] Aviso: TS Trigger SELL (", trigger_sell,
-                  ") deve ser maior que Step (", step_sell, ")");
+            Print("❌ [TS] ERRO CRÍTICO: Trigger SELL convertido não é maior que Step convertido!");
+            Print("   📊 Após conversão: Trigger=", trigger_sell_converted, " Step=", step_sell_converted);
+            Print("   ⚠️ IMPOSSÍVEL: Throttling (75% rule) falha com Trigger≤Step");
+            Print("   💡 SOLUÇÃO:");
+            Print("      Para WDOZ25 (tick_size=0.5):");
+            Print("      - Aumente Trigger para >= 1000 pontos (→ 2 steps = 1.0 distance)");
+            Print("      - Mantenha Step em 15 pontos (→ 1 step = 0.5 distance)");
+            Print("      - Resultado: ratio 2:1 permite throttling");
+            return false;
         }
     }
     
-    // Armazenar configurações
+    // Armazenar configurações CONVERTIDAS
     m_buy_enabled = buy_enabled;
-    m_trigger_buy = trigger_buy;
-    m_step_buy = step_buy;
+    m_trigger_buy = trigger_buy_converted;  // v2.58: Now in STEPS
+    m_step_buy = step_buy_converted;        // v2.58: Now in STEPS
     
     m_sell_enabled = sell_enabled;
-    m_trigger_sell = trigger_sell;
-    m_step_sell = step_sell;
+    m_trigger_sell = trigger_sell_converted;  // v2.58: Now in STEPS
+    m_step_sell = step_sell_converted;        // v2.58: Now in STEPS
     
     m_initialized = true;
     
@@ -293,6 +361,11 @@ bool CTrailingStopManager::Update(ulong ticket)
     
     // Informações do símbolo
     double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
+    double tick_size = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
+    // ✅ v2.57 FIX: Usar TICK_SIZE (B3/Forex) ou POINT (Índices) universalmente
+    // WDOZ25: tick_size=0.5 > point=0.001 → usa 0.5
+    // WINZ25: tick_size=1 = point=1 → usa 1
+    double price_step = (tick_size > point) ? tick_size : point;
     int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
     
     // Calcular lucro em pontos/pips
@@ -301,7 +374,7 @@ bool CTrailingStopManager::Update(ulong ticket)
     
     if(pos_type == POSITION_TYPE_BUY)
     {
-        profit_points = (current_price - entry_price) / point;
+        profit_points = (current_price - entry_price) / price_step;  // v2.57
         trigger = m_trigger_buy;
         step = m_step_buy;
         
@@ -339,7 +412,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                 
                 // ✅ v2.54 CRITICAL FIX: Movimento DIRECIONAL (sem MathAbs)
                 // Para BUY: Apenas aceitar quando preço SUBIU (price_change > 0)
-                double price_change = (current_price - last_price) / point;
+                double price_change = (current_price - last_price) / price_step;  // v2.57
                 double min_required = step * 0.75;
                 
                 // ✅ v2.54 FIX: Log com sinal (positivo/negativo)
@@ -380,12 +453,12 @@ bool CTrailingStopManager::Update(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // Para BUY: mover no máximo 1 passo (step) acima do SL atual
             // e nunca ultrapassar o alvo de distância do preço (preço_atual - step)
-            double target_sl = NormalizeDouble(current_price - (step * point), digits);
+            double target_sl = NormalizeDouble(current_price - (step * price_step), digits);  // v2.57
             double candidate_sl;
             if(current_sl > 0)
-                candidate_sl = NormalizeDouble(current_sl + (step * point), digits);
+                candidate_sl = NormalizeDouble(current_sl + (step * price_step), digits);  // v2.57
             else
-                candidate_sl = NormalizeDouble(entry_price + ((trigger - step) * point), digits);
+                candidate_sl = NormalizeDouble(entry_price + ((trigger - step) * price_step), digits);  // v2.57
             
             // ✅ v2.51 FIX: Log detalhado do cálculo
             Print("   🧮 Cálculo SL: target_sl=", target_sl, " | candidate_sl=", candidate_sl);
@@ -407,9 +480,9 @@ bool CTrailingStopManager::Update(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
             // ═══════════════════════════════════════════════════════
-            if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+            if(current_sl > 0 && MathAbs(new_sl - current_sl) < price_step)  // v2.57
             {
-                Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL já está no valor calculado (diff < 1 point)");
+                Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL já está no valor calculado (diff < 1 step)");
                 // SL já está no valor calculado, não modificar
                 return false;
             }
@@ -446,13 +519,13 @@ bool CTrailingStopManager::Update(ulong ticket)
                 
                 // Verificar distância mínima do stop level
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-                double min_distance = stop_level * point;
+                double min_distance = stop_level * price_step;  // v2.57
                 
                 Print("   📏 STOPS_LEVEL: ", stop_level, " pontos | min_distance: ", DoubleToString(min_distance, digits));
                 
                 if(stop_level > 0)
                 {
-                    double distance_to_price = (current_price - new_sl) / point;
+                    double distance_to_price = (current_price - new_sl) / price_step;  // v2.57
                     Print("   📏 Distance to price: ", DoubleToString(distance_to_price, 1), " pontos (required > ", stop_level, ")");
                     
                     if(distance_to_price <= stop_level)
@@ -461,7 +534,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                         Print("      ❌ distance=", DoubleToString(distance_to_price, 1), " <= stops_level=", stop_level);
                         Print("      🔍 DEBUG: price=", DoubleToString(current_price, digits), 
                               " | new_sl=", DoubleToString(new_sl, digits),
-                              " | step=", step, " | point=", DoubleToString(point, digits));
+                              " | step=", step, " | price_step=", DoubleToString(price_step, digits));  // v2.57
                         Print("      💡 Aumente InpTS_Buy_Step para pelo menos ", (stop_level + 10), " pontos");
                         return false;
                     }
@@ -473,7 +546,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                 
                 if(freeze_level > 0)
                 {
-                    double freeze_distance = (current_price - new_sl) / point;
+                    double freeze_distance = (current_price - new_sl) / price_step;  // v2.57
                     Print("   ❄️ Freeze distance: ", DoubleToString(freeze_distance, 1), " pontos (required > ", freeze_level, ")");
                     
                     if(freeze_distance <= freeze_level)
@@ -537,7 +610,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                         m_trailing_records[idxs].last_failure_log_time = 0;
                     }
                     
-                    double protected_profit = (new_sl - entry_price) / point;
+                    double protected_profit = (new_sl - entry_price) / price_step;  // v2.57
                     
                     Print("🚀 [TS] Trailing Stop ajustado para BUY #", ticket);
                     Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");
@@ -597,7 +670,7 @@ bool CTrailingStopManager::Update(ulong ticket)
     }
     else // POSITION_TYPE_SELL
     {
-        profit_points = (entry_price - current_price) / point;
+        profit_points = (entry_price - current_price) / price_step;  // v2.57
         trigger = m_trigger_sell;
         step = m_step_sell;
         
@@ -615,7 +688,7 @@ bool CTrailingStopManager::Update(ulong ticket)
             {
                 double last_price = m_trailing_records[record_idx].last_price;
                 // SELL: preço deve CAIR (negativo) para mover TS
-                double price_change = (current_price - last_price) / point; // Sem MathAbs
+                double price_change = (current_price - last_price) / price_step;  // v2.57: Sem MathAbs
                 double min_required = step * 0.75;
                 
                 // SELL só aceita movimento NEGATIVO >= min_required
@@ -645,12 +718,12 @@ bool CTrailingStopManager::Update(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // Para SELL: mover no máximo 1 passo (step) abaixo do SL atual
             // e nunca ultrapassar o alvo de distância do preço (preço_atual + step)
-            double target_sl = NormalizeDouble(current_price + (step * point), digits);
+            double target_sl = NormalizeDouble(current_price + (step * price_step), digits);  // v2.57
             double candidate_sl;
             if(current_sl > 0)
-                candidate_sl = NormalizeDouble(current_sl - (step * point), digits);
+                candidate_sl = NormalizeDouble(current_sl - (step * price_step), digits);  // v2.57
             else
-                candidate_sl = NormalizeDouble(entry_price - ((trigger - step) * point), digits);
+                candidate_sl = NormalizeDouble(entry_price - ((trigger - step) * price_step), digits);  // v2.57
             
             // CORREÇÃO CRÍTICA: Usar MathMin para SELL (SL deve DESCER)
             double new_sl = MathMin(current_sl, MathMax(target_sl, candidate_sl));
@@ -666,7 +739,7 @@ bool CTrailingStopManager::Update(ulong ticket)
             // ═══════════════════════════════════════════════════════
             // VALIDAÇÃO CRÍTICA: Evitar modificação se SL é idêntico
             // ═══════════════════════════════════════════════════════
-            if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
+            if(current_sl > 0 && MathAbs(new_sl - current_sl) < price_step)  // v2.57
             {
                 // SL já está no valor calculado, não modificar
                 return false;
@@ -681,7 +754,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                 if(new_sl <= current_tp)
                 {
                     // Ajustar SL para ficar alguns pips acima do TP
-                    double safe_distance = 10 * point; // 10 pontos de segurança
+                    double safe_distance = 10 * price_step;  // v2.57: 10 steps de segurança
                     new_sl = NormalizeDouble(current_tp + safe_distance, digits);
                     
                     // Se ainda assim SL não é válido, não atualizar
@@ -700,18 +773,18 @@ bool CTrailingStopManager::Update(ulong ticket)
             {
                 // Verificar distância mínima do stop level
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-                double min_distance = stop_level * point;
+                double min_distance = stop_level * price_step;  // v2.57
                 
                 if(stop_level > 0)
                 {
-                    double distance_to_price = (new_sl - current_price) / point;
+                    double distance_to_price = (new_sl - current_price) / price_step;  // v2.57
                     if(distance_to_price <= stop_level)
                     {
                         Print("⚠️ [TS] SELL #", ticket, ": SL muito próximo do preço (stops_level=", stop_level, ")");
                         Print("   🔍 DEBUG: price=", DoubleToString(current_price, digits),
                               " | new_sl=", DoubleToString(new_sl, digits),
                               " | distance=", DoubleToString(distance_to_price, 1), " pontos",
-                              " | step=", step, " | point=", DoubleToString(point, digits));
+                              " | step=", step, " | price_step=", DoubleToString(price_step, digits));  // v2.57
                         Print("   💡 Aumente InpTS_Sell_Step para pelo menos ", (stop_level + 10), " pontos");
                         return false;
                     }
@@ -721,7 +794,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                 long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
                 if(freeze_level > 0)
                 {
-                    double freeze_distance = (new_sl - current_price) / point;
+                    double freeze_distance = (new_sl - current_price) / price_step;  // v2.57
                     if(freeze_distance <= freeze_level)
                     {
                         int ridx = FindRecordIndex(ticket);
@@ -778,7 +851,7 @@ bool CTrailingStopManager::Update(ulong ticket)
                         m_trailing_records[idxs].last_failure_log_time = 0;
                     }
                     
-                    double protected_profit = (entry_price - new_sl) / point;
+                    double protected_profit = (entry_price - new_sl) / price_step;  // v2.57
                     
                     Print("🚀 [TS] Trailing Stop ajustado para SELL #", ticket);
                     Print("   📊 Lucro atual: +", (int)profit_points, " pontos/pips");

@@ -37,8 +37,11 @@ private:
     double          m_lot_step;
     double          m_lot_min;
     double          m_lot_max;
+    int             m_stops_level;      // v2.57: Broker minimum distance for SL/TP
+    bool            m_use_tick_size;    // v2.57: true=B3/Forex (tick_size), false=Indices (point)
     
     // Spread monitoring
+    bool            m_enable_spread_filter;
     double          m_spread_array[];
     int             m_spread_period;
     int             m_spread_index;
@@ -72,6 +75,7 @@ public:
     CMarketAccess(void)
     {
         m_symbol = _Symbol;
+        m_enable_spread_filter = true;
         m_spread_period = 20;
         m_spread_index = 0;
         m_market_type = MARKET_UNKNOWN;
@@ -100,13 +104,14 @@ public:
     //+------------------------------------------------------------------+
     //| Initialization                                                   |
     //+------------------------------------------------------------------+
-    bool Init(string symbol, int spread_period, double spread_multiplier, 
-              int max_spread, bool use_time_filter, string start_time, 
-              string end_time, bool trade_sunday, bool trade_monday, 
-              bool trade_tuesday, bool trade_wednesday, bool trade_thursday,
-              bool trade_friday, bool trade_saturday)
+    bool Init(string symbol, bool enable_spread_filter, int spread_period, 
+              double spread_multiplier, int max_spread, bool use_time_filter, 
+              string start_time, string end_time, bool trade_sunday, 
+              bool trade_monday, bool trade_tuesday, bool trade_wednesday, 
+              bool trade_thursday, bool trade_friday, bool trade_saturday)
     {
         m_symbol = symbol;
+        m_enable_spread_filter = enable_spread_filter;
         m_spread_period = spread_period;
         m_spread_multiplier = spread_multiplier;
         m_max_spread_points = max_spread;
@@ -129,12 +134,29 @@ public:
         m_lot_step = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_STEP);
         m_lot_min = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
         m_lot_max = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MAX);
+        m_stops_level = (int)SymbolInfoInteger(m_symbol, SYMBOL_TRADE_STOPS_LEVEL);
+        
+        // ✅ v2.57 CRITICAL FIX: Detectar se usa TICK_SIZE (B3/Forex) ou POINT (Índices)
+        // WDOZ25: tick_size=0.5, point=0.001 → usa TICK_SIZE ✅
+        // WINZ25: tick_size=1, point=1 → usa POINT ✅
+        // EURUSD: tick_size=0.00001, point=0.00001 → usa TICK_SIZE ✅
+        if(m_tick_size > m_point)
+        {
+            m_use_tick_size = true;  // B3 Futuros (WDOZ25, etc) e alguns Forex
+            Print("✅ v2.57: Asset uses TICK_SIZE for SL/TP calculation (tick_size=", m_tick_size, " > point=", m_point, ")");
+        }
+        else
+        {
+            m_use_tick_size = false; // Índices (WINZ25) onde tick_size = point
+            Print("✅ v2.57: Asset uses POINT for SL/TP calculation (tick_size=", m_tick_size, " = point=", m_point, ")");
+        }
         
         // Debug: Log symbol properties
         Print("📊 Symbol Properties for ", m_symbol, ":");
         Print("   • Point: ", m_point, " | Digits: ", m_digits);
         Print("   • Tick Size: ", m_tick_size, " | Tick Value: ", m_tick_value);
         Print("   • Lot: Min=", m_lot_min, " Max=", m_lot_max, " Step=", m_lot_step);
+        Print("   • Stops Level: ", m_stops_level, " points (minimum SL/TP distance)");
         
         // Validate symbol properties (m_digits CAN be 0 for indices like WIN)
         if(m_point == 0)
@@ -281,8 +303,8 @@ public:
             return false;
         }
         
-        // Check spread filter
-        if(!CheckSpreadFilter())
+        // Check spread filter (can be disabled via input)
+        if(m_enable_spread_filter && !CheckSpreadFilter())
         {
             return false;
         }
@@ -292,13 +314,15 @@ public:
     
     //+------------------------------------------------------------------+
     //| Dynamic Spread Filter                                           |
+    //| ✅ v2.54: Fixed spread calculation (now returns POINTS)         |
     //| ✅ v2.12: Strategy Tester mode detection and relaxed limits     |
     //+------------------------------------------------------------------+
     bool CheckSpreadFilter(void)
     {
+        // GetCurrentSpread() now returns POINTS (not price)
         double current_spread = GetCurrentSpread();
         
-        // Update spread array
+        // Update spread array (in POINTS)
         m_spread_array[m_spread_index] = current_spread;
         m_spread_index = (m_spread_index + 1) % m_spread_period;
         
@@ -307,7 +331,7 @@ public:
         
         // In Strategy Tester, use 5x multiplier for absolute max (tester spreads are unrealistic)
         int spread_multiplier = is_tester ? 5 : 1;
-        double max_absolute = m_max_spread_points * m_point * spread_multiplier;
+        double max_absolute = m_max_spread_points * spread_multiplier; // Already in POINTS
 
         // Warm-up: require at least half of the window filled with non-zero values
         int valid_count = 0;
@@ -322,19 +346,19 @@ public:
                 if(is_tester)
                 {
                     Print(StringFormat("⚠️ [TESTER] Spread alto (warm-up): %.1f pts | Limite x%d: %.1f pts",
-                          current_spread / m_point, spread_multiplier, max_absolute / m_point));
+                          current_spread, spread_multiplier, max_absolute));
                 }
                 else
                 {
                     Print(StringFormat("⚠️ Spread too high (warm-up): %.1f pts | AbsLimit: %d",
-                          current_spread / m_point, m_max_spread_points));
+                          current_spread, m_max_spread_points));
                 }
                 return false;
             }
             return true;
         }
 
-        // Calculate median spread from NON-ZERO samples once warmed up
+        // Calculate median spread from NON-ZERO samples once warmed up (already in POINTS)
         int nz_count = 0;
         double median_spread = GetMedianSpreadNonZero(nz_count);
 
@@ -345,7 +369,7 @@ public:
             if(current_spread > max_absolute)
             {
                 Print(StringFormat("⚠️ Spread too high: %.1f pts (AbsLimit: %d)",
-                      current_spread / m_point, m_max_spread_points));
+                      current_spread, m_max_spread_points));
                 return false;
             }
             return true;
@@ -356,8 +380,7 @@ public:
         if(current_spread > max_allowed || current_spread > max_absolute)
         {
             Print(StringFormat("⚠️ Spread too high: %.1f pts (Median: %.1f | DynMax: %.1f | AbsLimit: %d)",
-                  current_spread / m_point, median_spread / m_point, 
-                  max_allowed / m_point, m_max_spread_points));
+                  current_spread, median_spread, max_allowed, m_max_spread_points));
             return false;
         }
         
@@ -367,11 +390,25 @@ public:
     //+------------------------------------------------------------------+
     //| Get Current Spread                                              |
     //+------------------------------------------------------------------+
+    //+------------------------------------------------------------------+
+    //| Get Current Spread (in POINTS, not price)                       |
+    //| ✅ FIX: Divide by point to convert from price to points         |
+    //+------------------------------------------------------------------+
     double GetCurrentSpread(void)
     {
         double ask = SymbolInfoDouble(m_symbol, SYMBOL_ASK);
         double bid = SymbolInfoDouble(m_symbol, SYMBOL_BID);
-        return ask - bid;
+        
+        // CRITICAL: Convert price difference to POINTS
+        // For WDOZ25: spread 0.5 / point 0.001 = 500 points ERROR
+        // For Forex EURUSD: spread 0.00015 / point 0.00001 = 15 points CORRECT
+        double spread_in_price = ask - bid;
+        
+        // FIXED: Return spread in POINTS (symbol-agnostic)
+        if(m_point > 0)
+            return spread_in_price / m_point;
+        else
+            return 0.0; // Safety fallback
     }
     
     //+------------------------------------------------------------------+
@@ -532,6 +569,15 @@ public:
     ENUM_MARKET_TYPE GetMarketType(void) const { return m_market_type; }
     double GetPoint(void) const { return m_point; }
     int GetDigits(void) const { return m_digits; }
+    int GetStopsLevel(void) const { return m_stops_level; }
+    
+    //+------------------------------------------------------------------+
+    //| v2.57: Get price step for SL/TP calculation (TICK_SIZE or POINT)|
+    //+------------------------------------------------------------------+
+    double GetPriceStep(void) const 
+    { 
+        return m_use_tick_size ? m_tick_size : m_point; 
+    }
 
     // ──────────────────────────────────────────────────────────────
     // Trade mode helpers: check if opening new positions is allowed

@@ -1,45 +1,34 @@
-//+------------------------------------------------------------------+
+﻿//+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.54   |
+//|                                      Nexus Confluence EA v2.63   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
 //|                                                                    |
-//| v2.54 (12/11/2025): Bug #13 - Trailing Stop Directional Throttling Fix |
-//|   - CRITICAL: Removed MathAbs() from throttling - now directional |
-//|   - BUY: Only moves SL when price RISES >= 11.3pts (75% of step) |
-//|   - SELL: Only moves SL when price FALLS >= 11.3pts (75% of step) |
-//|   - Eliminates 60+ excessive modifications (now ~15-20 expected)  |
-//|   - Added detailed logs: "BLOQUEADO: Preço CAIU/SUBIU" messages  |
-//| v2.53 (12/11/2025): Trailing Stop v2.53 - Retcode 0 fix + Log throttling |
-//|   - CRITICAL: PositionModify() usa TICKET não símbolo no MT5    |
-//|   - FIX: Log "Aguardando trigger" apenas a cada 60s (anti-spam) |
-//|   - Captura imediata de ResultRetcode() após PositionModify()   |
-//| v2.14 (09/11/2025): GG_TrendBar v2.32 MTF shift fix              |
-//|   - CRITICAL: Each TF uses shift=1 FIXED (last closed bar)      |
-//|   - MTF values independent from chart timeframe                  |
-//|   - All buffers filled with same value (last closed bar)         |
-//| v2.13 (08/11/2025): GG_TrendBar v2.31 buffer shift fix           |
-//|   - CRITICAL: Fixed buffer index to shift conversion             |
-//|   - chart_shift = rates_total - 1 - i (corrects ZERO values)   |
-//|   - All MTF signals now read correctly from closed bars          |
-//| v2.12 (08/11/2025): Strategy Tester spread fix + detailed logs   |
-//|   - Auto-detect Strategy Tester: spread limit x5                 |
-//|   - Added detailed MTF logging in Gate 2                         |
-//|   - LogLevel=2 shows all gate decisions                          |
-//| v2.11 (08/11/2025): OBV_MACD color index logic fixed             |
-//|   - Gate 4 now uses COLOR INDEX (0/1=strong, 2/3=weak)          |
-//|   - Removed threshold logic (not part of MACD visual)            |
-//| v2.10 (08/11/2025): GG_TrendBar visual objects optional          |
-//|   - Default InpGG_CreateObjects=TRUE (creates labels/arrows)     |
-//|   - Strategy Tester: ChartIndicatorAdd() disabled automatically   |
+//| v2.63 (12/11/2025): UNIVERSAL CONVERSION - User input = PRICE DISTANCE (points) |
+//|   - CORRETO: Input em PONTOS de preço → conversão: steps = input/tick_size |
+//|   - WDOZ25: Input 40 → 40/0.5 = 80 steps × 0.5 = 40.0 distance ✅ |
+//|   - WIN: Input 400 → 400/1.0 = 400 steps × 1.0 = 400.0 distance ✅ |
+//|   - Forex: Input 200 → 200/0.00001 = 200 steps × 0.00001 = 200 pips ✅ |
+//|   - UNIVERSAL: Funciona para QUALQUER mercado/ativo automaticamente |
+//|   - v2.62 REVERTIDO: Tratava input como steps direto (errado!)    |
+//|   - v2.58-v2.61 REVERTIDO: Formula errada (input × point/tick_size) |
+//| v2.61 (12/11/2025): SELL SL/TP calculado no BID (não ASK)       |
+//| v2.60 (12/11/2025): REVERTIDO - Bug somava spread 2x            |
+//| v2.59 (12/11/2025): AsymmetricRisk conversion + SetStopLoss override |
+//| v2.57 (12/11/2025): CRITICAL FIX - TICK_SIZE vs POINT Universal Calculation |
+//|   - BUG: WDOZ25 usa TICKS (tick_size=0.5) não POINTS (point=0.001) |
+//|   - FIX: Auto-detecta tick_size > point → usa TICK_SIZE ✅       |
+//|   - FIX: GetPriceStep() retorna tick_size (B3/Forex) ou point (Índices) |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.54"
+#property version   "2.63"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.54: Bug #13 - TS Directional Throttling Fix"
+#property description "v2.63: UNIVERSAL - User input = PRICE DISTANCE → steps = input/tick_size"
+#property description "v2.61: SELL SL/TP calculado no BID (não ASK)"
+#property description "v2.60: REVERTIDO - Bug somava spread 2x"
 #property strict
 
 // Include MQL5 standard libraries
@@ -88,13 +77,17 @@ int OnInit()
 {
     Print("==========================================");
     Print("════════════════════════════════════");
-    Print("    NEXUS CONFLUENCE EA v2.53 STARTING    ");
+    Print("    NEXUS CONFLUENCE EA v2.63 STARTING    ");
     Print("════════════════════════════════════");
-    Print("  • v2.53: Trailing Stop CRITICAL FIX - Retcode 0 + Log throttling");
-    Print("  • v2.53: PositionModify() usa ticket não símbolo (MT5)");
-    Print("  • v2.53: Log 'Aguardando trigger' apenas a cada 60s");
-    Print("  • v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED (CRITICAL!)");
-    Print("  • v2.14: Each TF independent - no chart correlation");
+    Print("  • v2.63: UNIVERSAL CONVERSION - User input = PRICE DISTANCE (points)");
+    Print("  • ✅ CORRETO: steps = input / tick_size (como TODOS os outros EAs)");
+    Print("  • ✅ WDOZ25: Input 40 → 40/0.5 = 80 steps → 40.0 distance ✅");
+    Print("  • ✅ WIN: Input 400 → 400/1.0 = 400 steps → 400 distance ✅");
+    Print("  • ❌ v2.62 REVERTIDO: Tratava input como steps direto (errado!)");
+    Print("  • ❌ v2.58-v2.61 REVERTIDO: Formula errada (input × ratio)");
+    Print("  • v2.61: SELL SL/TP calculado no BID (mantido) ✅");
+    Print("  • v2.57: TICK_SIZE calculation (B3/Forex auto-detect) ✅");
+    Print("  • v2.56: BUY=ASK | SELL=BID (consistent pricing) ✅");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -133,11 +126,11 @@ int OnInit()
         return(INIT_FAILED);
     }
     
-    if(!g_market.Init(_Symbol, InpSpreadPeriod, InpSpreadMulti, InpMaxSpread,
-                      InpUseTimeFilter, InpStartTime, InpEndTime,
-                      InpTradeOnSunday, InpTradeOnMonday, InpTradeOnTuesday,
-                      InpTradeOnWednesday, InpTradeOnThursday, InpTradeOnFriday,
-                      InpTradeOnSaturday))
+    if(!g_market.Init(_Symbol, InpEnableSpreadFilter, InpSpreadPeriod, 
+                      InpSpreadMulti, InpMaxSpread, InpUseTimeFilter, 
+                      InpStartTime, InpEndTime, InpTradeOnSunday, 
+                      InpTradeOnMonday, InpTradeOnTuesday, InpTradeOnWednesday, 
+                      InpTradeOnThursday, InpTradeOnFriday, InpTradeOnSaturday))
     {
         Print("❌ CRITICAL ERROR: MarketAccess initialization failed");
         CleanupModules();
@@ -222,10 +215,12 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.53 READY     ");
-    Print("  🔧 Trailing Stop v2.53: Retcode 0 FIXED!");
-    Print("  📊 PositionModify() agora usa ticket (não símbolo)");
-    Print("  � Log throttling 60s - sem spam!");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.63 READY     ");
+    Print("  🔧 v2.63: UNIVERSAL - User input = PRICE DISTANCE (points)");
+    Print("  ✅ Conversion: steps = input / tick_size (automatic)");
+    Print("  ✅ WDOZ25 Example: 40 → 80 steps = 40.0 distance ✅");
+    Print("  ✅ WIN Example: 400 → 400 steps = 400 distance ✅");
+    Print("  ✅ Works for ANY market/asset automatically!");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -237,7 +232,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.53 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.63 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -425,6 +420,16 @@ void OnTick()
     }
     
     // ──────────────────────────────────────────────────────────────
+    // ✅ v2.63: SILENT TIME FILTER - Check BEFORE processing gates
+    // If outside trading hours, return silently (no logs!)
+    // ──────────────────────────────────────────────────────────────
+    if(!g_market.IsWithinTradingHours())
+    {
+        // Outside trading hours - return silently without any logs
+        return;
+    }
+    
+    // ──────────────────────────────────────────────────────────────
     // v2.00: Check Drawdown Protection (Circuit Breaker)
     // ──────────────────────────────────────────────────────────────
     if(g_dd_protection != NULL && InpDD_Enable)
@@ -597,12 +602,16 @@ void OnTick()
     // Entrada: removido realtime momentum guard (shift=0) para manter
     // consistência com a regra de shift=1 em toda a geração do sinal.
 
+    // ✅ v2.59 FIX: Removed SetStopLoss/SetTakeProfit calls!
+    // These were overriding converted values from RiskExecution Init()
+    // Now AsymmetricRisk converts points→steps, so sl_points/tp_points are already correct
+    
     // Execução robusta via RiskExecution (retry + normalização de lote)
     // Normalizar lote antes de enviar
     lot_size = g_market.NormalizeLot(lot_size);
     g_executor.SetLotSize(lot_size);
-    g_executor.SetStopLoss(sl_points);
-    g_executor.SetTakeProfit(tp_points);
+    // ❌ REMOVED: g_executor.SetStopLoss(sl_points);   // Was overriding Init() conversion!
+    // ❌ REMOVED: g_executor.SetTakeProfit(tp_points); // Was overriding Init() conversion!
 
     bool trade_result = false;
     if(trade_type == POSITION_TYPE_BUY)
@@ -867,16 +876,15 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("\n=== EA CONFIGURATION v2.53 ===");
+    Print("\n=== EA CONFIGURATION v2.63 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
-    Print("• v2.53: Trailing Stop CRITICAL FIX (Retcode 0 + Log 60s)");
-    Print("• v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED per TF (CRITICAL!)");
-    Print("• v2.13: GG_TrendBar v2.31 buffer shift fix");
-    Print("• v2.12: Strategy Tester spread x5 + MTF detailed logs");
-    Print("• v2.11: OBV_MACD color index logic (4 colors: strong/weak)");
+    Print("• v2.63: UNIVERSAL CONVERSION - steps = input / tick_size");
+    Print("• User input = PRICE DISTANCE (works for ANY market)");
+    Print("• v2.61: SELL SL/TP calculated on BID (mantido) ✅");
+    Print("• v2.57: TICK_SIZE calculation (B3/Forex auto-detect) ✅");
     Print("");
     Print("=== VISUALIZAÇÃO ===");
     Print("Attach Indicators To Chart: ", (InpAttachIndicatorsToChart ? "ON" : "OFF"));

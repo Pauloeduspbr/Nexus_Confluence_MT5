@@ -98,6 +98,7 @@ input double   InpDD_LotReduce   = 0.5;       // Redução de Lote após DD (%)
 //+------------------------------------------------------------------+
 
 input group "═══════════ 📊 FILTRO DE SPREAD ═══════════"
+input bool     InpEnableSpreadFilter = true;   // Ativar Filtro de Spread
 input int      InpMaxSpread      = 20;         // Spread Máximo (pontos)
 input double   InpSpreadMulti    = 1.5;        // Multiplicador de Spread (vs mediana)
 input int      InpSpreadPeriod   = 20;         // Período Cálculo Spread (candles)

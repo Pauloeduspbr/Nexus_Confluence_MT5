@@ -60,8 +60,7 @@ private:
     bool            m_gate_results[6];
     string          m_gate_messages[6];
     
-    // Minimum score threshold
-    int             m_min_score;
+    // ✅ m_min_score REMOVED - validation now in AsymmetricRisk only
 
     // Throttle for repetitive Gate 2 rejections (reduce log noise)
     string          m_last_gate2_reason;
@@ -84,7 +83,7 @@ public:
         m_mtf_score = 0;
         m_signal_class = SIGNAL_NONE;
         m_signal_direction = SIGNAL_DIR_NONE;
-        m_min_score = 2;
+        // ✅ m_min_score removed - no longer used
         
         ArrayInitialize(m_gate_results, false);
         m_last_gate2_reason = "";
@@ -102,8 +101,7 @@ public:
     //+------------------------------------------------------------------+
     bool Init(CCore *core, CMarketAccess *market, CIndicatorHub *indicators,
               ENUM_TIMEFRAMES macro1, ENUM_TIMEFRAMES macro2, 
-              ENUM_TIMEFRAMES macro3, ENUM_TIMEFRAMES operational,
-              int min_score = 2)
+              ENUM_TIMEFRAMES macro3, ENUM_TIMEFRAMES operational)
     {
         if(core == NULL || market == NULL || indicators == NULL)
         {
@@ -119,12 +117,11 @@ public:
         m_macro2_tf = macro2;
         m_macro3_tf = macro3;
         m_operational_tf = operational;
-        m_min_score = min_score;
+        // ✅ min_score parameter removed - validation in AsymmetricRisk
         
-        Print(StringFormat("✅ SignalEngine initialized | MTF: %s/%s/%s/%s | MinScore: %d",
+        Print(StringFormat("✅ SignalEngine initialized | MTF: %s/%s/%s/%s",
               EnumToString(m_macro1_tf), EnumToString(m_macro2_tf),
-              EnumToString(m_macro3_tf), EnumToString(m_operational_tf),
-              m_min_score));
+              EnumToString(m_macro3_tf), EnumToString(m_operational_tf)));
         
         return true;
     }
@@ -173,37 +170,46 @@ public:
     //+------------------------------------------------------------------+
     bool ProcessGate2_MTF(void)
     {
-        // Get GG TrendBar signals - ORDEM: H4 → H1 → M30 → M15 (macro para micro)
-        int gg_h4  = m_indicators.GetGGTrendSignal(m_macro1_tf);      // H4
-        int gg_h1  = m_indicators.GetGGTrendSignal(m_macro2_tf);      // H1
-        int gg_m30 = m_indicators.GetGGTrendSignal(m_macro3_tf);      // M30
-        int gg_m15 = m_indicators.GetGGTrendSignal(m_operational_tf); // M15
+        // Get GG TrendBar signals - ORDEM: Macro1 → Macro2 → Macro3 → Operational (macro para micro)
+        int gg_macro1      = m_indicators.GetGGTrendSignal(m_macro1_tf);      // Highest timeframe
+        int gg_macro2      = m_indicators.GetGGTrendSignal(m_macro2_tf);      // High timeframe
+        int gg_macro3      = m_indicators.GetGGTrendSignal(m_macro3_tf);      // Medium timeframe
+        int gg_operational = m_indicators.GetGGTrendSignal(m_operational_tf); // Operational timeframe
         
-        // ✅ v2.12: DETAILED DEBUG LOG
-        m_core.LogMessage(2, StringFormat("📊 Gate 2 MTF Signals: H4=%+d | H1=%+d | M30=%+d | M15=%+d",
-                          gg_h4, gg_h1, gg_m30, gg_m15));
+        // ✅ v2.15: DYNAMIC LOGGING - Shows actual configured timeframes
+        m_core.LogMessage(2, StringFormat("📊 Gate 2 MTF Signals: %s=%+d | %s=%+d | %s=%+d | %s=%+d",
+                          EnumToString(m_macro1_tf), gg_macro1,
+                          EnumToString(m_macro2_tf), gg_macro2,
+                          EnumToString(m_macro3_tf), gg_macro3,
+                          EnumToString(m_operational_tf), gg_operational));
         
         // Calculate MTF Score (for logging)
-        m_mtf_score = gg_h4 + gg_h1 + gg_m30 + gg_m15;
+        m_mtf_score = gg_macro1 + gg_macro2 + gg_macro3 + gg_operational;
         
-        // PASSO 1: H4 e H1 são MANDANTES - devem estar alinhados (ambos +1 ou ambos -1)
-        bool h4_h1_bullish = (gg_h4 == 1 && gg_h1 == 1);
-        bool h4_h1_bearish = (gg_h4 == -1 && gg_h1 == -1);
+        // PASSO 1: Macro1 e Macro2 são MANDANTES - devem estar alinhados (ambos +1 ou ambos -1)
+        bool macro12_bullish = (gg_macro1 == 1 && gg_macro2 == 1);
+        bool macro12_bearish = (gg_macro1 == -1 && gg_macro2 == -1);
         
-        if(!h4_h1_bullish && !h4_h1_bearish)
+        if(!macro12_bullish && !macro12_bearish)
         {
-            // H4 e H1 NÃO alinhados → REJECT (não chama filtros)
+            // Macro1 e Macro2 NÃO alinhados → REJECT (não chama filtros)
             m_signal_class = SIGNAL_REJECT;
             m_signal_direction = SIGNAL_DIR_NONE;
             
             m_gate_results[2] = false;
-            m_gate_messages[2] = "G2✗ H4/H1 desalinhados";
+            m_gate_messages[2] = StringFormat("G2✗ %s/%s desalinhados", 
+                                EnumToString(m_macro1_tf), EnumToString(m_macro2_tf));
 
-            string reason = "H4/H1 desalinhados";
+            string reason = StringFormat("%s/%s desalinhados", 
+                           EnumToString(m_macro1_tf), EnumToString(m_macro2_tf));
             if(m_last_gate2_reason != reason)
             {
-                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | H4:%+d H1:%+d M30:%+d M15:%+d",
-                                  reason, gg_h4, gg_h1, gg_m30, gg_m15));
+                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | %s:%+d %s:%+d %s:%+d %s:%+d",
+                                  reason, 
+                                  EnumToString(m_macro1_tf), gg_macro1,
+                                  EnumToString(m_macro2_tf), gg_macro2,
+                                  EnumToString(m_macro3_tf), gg_macro3,
+                                  EnumToString(m_operational_tf), gg_operational));
                 m_last_gate2_reason = reason;
             }
             else
@@ -215,22 +221,22 @@ public:
             return false;
         }
         
-        // PASSO 2: H4+H1 alinhados - determinar direção
-        if(h4_h1_bullish)
+        // PASSO 2: Macro1+Macro2 alinhados - determinar direção
+        if(macro12_bullish)
         {
             m_signal_direction = SIGNAL_DIR_BUY;
         }
-        else if(h4_h1_bearish)
+        else if(macro12_bearish)
         {
             m_signal_direction = SIGNAL_DIR_SELL;
         }
         
-        // PASSO 3A: CRÍTICO - Verificar se M30 ou M15 estão OPOSTOS aos macros
+        // PASSO 3A: CRÍTICO - Verificar se Macro3 ou Operational estão OPOSTOS aos macros
         // Se TF operacional está contra a tendência macro → REJEITAR
-        bool m30_opposite = (h4_h1_bullish && gg_m30 == -1) || (h4_h1_bearish && gg_m30 == 1);
-        bool m15_opposite = (h4_h1_bullish && gg_m15 == -1) || (h4_h1_bearish && gg_m15 == 1);
+        bool macro3_opposite = (macro12_bullish && gg_macro3 == -1) || (macro12_bearish && gg_macro3 == 1);
+        bool operational_opposite = (macro12_bullish && gg_operational == -1) || (macro12_bearish && gg_operational == 1);
         
-        if(m30_opposite || m15_opposite)
+        if(macro3_opposite || operational_opposite)
         {
             // REJECT: TF operacional contra a tendência macro
             m_signal_class = SIGNAL_REJECT;
@@ -239,12 +245,16 @@ public:
             m_gate_results[2] = false;
             m_gate_messages[2] = "G2✗ TF operacional oposto";
             
-            string opposite_tf = m30_opposite ? "M30" : "M15";
+            string opposite_tf = macro3_opposite ? EnumToString(m_macro3_tf) : EnumToString(m_operational_tf);
             string reason = StringFormat("%s oposto aos macros", opposite_tf);
             if(m_last_gate2_reason != reason)
             {
-                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | H4:%+d H1:%+d M30:%+d M15:%+d",
-                                  reason, gg_h4, gg_h1, gg_m30, gg_m15));
+                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: %s | %s:%+d %s:%+d %s:%+d %s:%+d",
+                                  reason,
+                                  EnumToString(m_macro1_tf), gg_macro1,
+                                  EnumToString(m_macro2_tf), gg_macro2,
+                                  EnumToString(m_macro3_tf), gg_macro3,
+                                  EnumToString(m_operational_tf), gg_operational));
                 m_last_gate2_reason = reason;
             }
             else
@@ -254,52 +264,34 @@ public:
             return false;
         }
         
-        // PASSO 3B: Analisar M30 e M15 para classificar PREMIUM vs GOOD
+        // PASSO 3B: Analisar Macro3 e Operational para classificar PREMIUM vs GOOD
         // Neutros (0) são ACEITOS nesta etapa
-        bool m30_aligned = (h4_h1_bullish && gg_m30 == 1) || (h4_h1_bearish && gg_m30 == -1);
-        bool m15_aligned = (h4_h1_bullish && gg_m15 == 1) || (h4_h1_bearish && gg_m15 == -1);
+        bool macro3_aligned = (macro12_bullish && gg_macro3 == 1) || (macro12_bearish && gg_macro3 == -1);
+        bool operational_aligned = (macro12_bullish && gg_operational == 1) || (macro12_bearish && gg_operational == -1);
         
-        if(m30_aligned && m15_aligned)
+        if(macro3_aligned && operational_aligned)
         {
-            // PREMIUM: Todos 4 timeframes alinhados (H4+H1+M30+M15 mesma cor)
+            // PREMIUM: Todos 4 timeframes alinhados (Macro1+Macro2+Macro3+Operational mesma cor)
             m_signal_class = SIGNAL_PREMIUM;
         }
-        else if(m30_aligned || m15_aligned)
+        else if(macro3_aligned || operational_aligned)
         {
-            // GOOD: H4+H1 alinhados + pelo menos 1 operacional alinhado
+            // GOOD: Macro1+Macro2 alinhados + pelo menos 1 operacional alinhado
             // Neutros (0) são aceitos como GOOD
             m_signal_class = SIGNAL_GOOD;
         }
         else
         {
-            // GOOD: Ambos M30 e M15 neutros (0) mas H4+H1 alinhados
+            // GOOD: Ambos Macro3 e Operational neutros (0) mas Macro1+Macro2 alinhados
             // Aceita pois não há oposição (foi validado no PASSO 3A)
             m_signal_class = SIGNAL_GOOD;
         }
         
-        // PASSO 4: Validar MinScore absoluto, se configurado
-        if(MathAbs(m_mtf_score) < m_min_score)
-        {
-            m_signal_class = SIGNAL_REJECT;
-            m_signal_direction = SIGNAL_DIR_NONE;
-            m_gate_results[2] = false;
-            m_gate_messages[2] = StringFormat("G2✗ MinScore(%d) < Req(%d)", MathAbs(m_mtf_score), m_min_score);
-            string reason = "MinScore";
-            if(m_last_gate2_reason != reason)
-            {
-                m_core.LogMessage(2, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d (H4:%+d H1:%+d M30:%+d M15:%+d)",
-                                  m_mtf_score, m_min_score, gg_h4, gg_h1, gg_m30, gg_m15));
-                m_last_gate2_reason = reason;
-            }
-            else
-            {
-                m_core.LogMessage(3, StringFormat("❌ Gate 2 REJECTED: MinScore | Score:%+d < Req:%d",
-                                  m_mtf_score, m_min_score));
-            }
-            return false;
-        }
+        // ✅ PASSO 4: Score validation REMOVED - now handled by AsymmetricRisk module
+        // AsymmetricRisk uses InpMinScoreBuy/InpMinScoreSell after ALL gates pass
+        // This avoids duplicate validation and allows asymmetric thresholds per direction
 
-        // PASSO 5: PASSED - Log com ordem hierárquica (H4 → H1 → M30 → M15)
+        // PASSO 4 (renumbered from 5): PASSED - Log com ordem hierárquica (Macro → Operational)
         bool result = true;
         
         m_gate_results[2] = result;
@@ -307,11 +299,14 @@ public:
                              EnumToString(m_signal_class),
                              m_mtf_score);
         
-    m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s %s | Score:%+d | H4:%+d → H1:%+d → M30:%+d → M15:%+d",
+    m_core.LogMessage(2, StringFormat("✅ Gate 2 PASSED: %s %s | Score:%+d | %s:%+d → %s:%+d → %s:%+d → %s:%+d",
                           EnumToString(m_signal_class),
                           EnumToString(m_signal_direction),
                           m_mtf_score,
-                          gg_h4, gg_h1, gg_m30, gg_m15));
+                          EnumToString(m_macro1_tf), gg_macro1,
+                          EnumToString(m_macro2_tf), gg_macro2,
+                          EnumToString(m_macro3_tf), gg_macro3,
+                          EnumToString(m_operational_tf), gg_operational));
     // Reset last rejection reason after a pass
     m_last_gate2_reason = "";
         
@@ -361,20 +356,30 @@ public:
         }
         
         m_gate_results[3] = result;
-        m_gate_messages[3] = StringFormat("G3%s ST:%+d [%s]", 
+        
+        // ✅ v2.50 FIX: Get Supertrend raw values for detailed logging
+        double st_blue = 0, st_red = 0, close_price = 0;
+        m_indicators.GetSupertrendValues(st_blue, st_red, close_price);
+        
+        // Format values for display (handle EMPTY_VALUE)
+        string blue_str = (st_blue != EMPTY_VALUE && st_blue < 1e15) ? StringFormat("%.0f", st_blue) : "EMPTY";
+        string red_str = (st_red != EMPTY_VALUE && st_red < 1e15) ? StringFormat("%.0f", st_red) : "EMPTY";
+        
+        m_gate_messages[3] = StringFormat("G3%s ST:%+d (Blue:%s Red:%s Close:%.0f) [%s]", 
                              result ? "✓" : "✗", 
                              st_signal,
+                             blue_str, red_str, close_price,
                              EnumToString(m_signal_class));
         
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("❌ Gate 3 REJECTED: Supertrend=%+d vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito; GOOD não aceita oposto",
-                              st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
+            m_core.LogMessage(2, StringFormat("❌ Gate 3 REJECTED: Supertrend=%+d (Blue:%s Red:%s Close:%.0f) vs Direction=%s Class=%s | PREMIUM exige alinhamento perfeito; GOOD não aceita oposto",
+                              st_signal, blue_str, red_str, close_price, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         else
         {
-            m_core.LogMessage(3, StringFormat("✅ Gate 3 PASSED: ST=%+d vs %s (Class: %s)",
-                              st_signal, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
+            m_core.LogMessage(3, StringFormat("✅ Gate 3 PASSED: ST=%+d (Blue:%s Red:%s Close:%.0f) vs %s (Class: %s)",
+                              st_signal, blue_str, red_str, close_price, EnumToString(m_signal_direction), EnumToString(m_signal_class)));
         }
         
         return result;
@@ -383,23 +388,24 @@ public:
     //+------------------------------------------------------------------+
     //| GATE 4: Momentum - OBV MACD FIRST, then RSI OMA (CRITICAL ORDER) |
     //| ✅ v2.15 CRITICAL FIX: Histogram analysis replaces color index  |
+    //| ✅ v2.49 FIX: Compare histogram against OBV_MACD Buffer 4 (EMA threshold) |
     //| OBV_MACD histogram analysis:                                     |
-    //|   Histogram > 0 AND expanding = Bullish momentum - ACCEPT BUY   |
-    //|   Histogram < 0 AND expanding = Bearish momentum - ACCEPT SELL  |
-    //|   Histogram weakening = Lateral/weak - REJECT                   |
+    //|   Histogram > threshold AND expanding = Strong momentum - ACCEPT |
+    //|   Histogram < threshold OR contracting = Weak - REJECT           |
     //+------------------------------------------------------------------+
     bool ProcessGate4_Momentum(void)
     {
-        // ✅ v2.15 NEW LOGIC: Análise de histograma (valor + tendência)
-        // STEP 1: Check if momentum is EXPANDING (histogram growing in absolute value)
+        // ✅ v2.49 NEW: Adaptive threshold validation from Buffer 4
+        // STEP 1: Check if momentum is EXPANDING (histogram > adaptive threshold)
         bool macd_strong = m_indicators.IsMomentumExpanding();
         if(!macd_strong)
         {
             m_gate_results[4] = false;
             double hist_current = m_indicators.GetMomentumHistogram();
             double hist_previous = m_indicators.GetMomentumHistogramPrevious();
-            m_gate_messages[4] = StringFormat("G4✗ MOM weak (%.5f→%.5f)", hist_previous, hist_current);
-            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: Momentum (OBV MACD) is WEAK/CONTRACTING | Hist: %.5f → %.5f", hist_previous, hist_current));
+            double threshold = m_indicators.GetMomentumThreshold();
+            m_gate_messages[4] = StringFormat("G4✗ MOM weak (%.5f→%.5f | thr:%.5f)", hist_previous, hist_current, threshold);
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: Momentum (OBV MACD) below adaptive threshold | Hist: %.5f → %.5f | Threshold: %.5f", hist_previous, hist_current, threshold));
             return false;
         }
 
@@ -421,14 +427,22 @@ public:
 
         m_gate_results[4] = result;
         double hist_val = m_indicators.GetMomentumHistogram();
-        m_gate_messages[4] = StringFormat("G4%s MOM:%+d(%.5f) RSI:%+d", result ? "✓" : "✗", macd_direction, hist_val, rsi_signal);
+        double threshold = m_indicators.GetMomentumThreshold();
+        
+        // ✅ v2.50 FIX: Get RSI raw values for detailed logging
+        double rsi_red = 0, rsi_blue = 0;
+        m_indicators.GetRSIValues(rsi_red, rsi_blue);
+        
+        m_gate_messages[4] = StringFormat("G4%s MOM:%+d(%.5f>%.5f) RSI:%+d(R:%.2f B:%.2f)", result ? "✓" : "✗", macd_direction, hist_val, threshold, rsi_signal, rsi_red, rsi_blue);
         if(!result)
         {
-            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: MOM=%+d (hist=%.5f) RSI=%+d vs Direction=%s", macd_direction, hist_val, rsi_signal, EnumToString(m_signal_direction)));
+            m_core.LogMessage(2, StringFormat("❌ Gate 4 REJECTED: MOM=%+d (hist=%.5f, thr=%.5f) RSI=%+d (RED:%.2f vs BLUE:%.2f) vs Direction=%s", 
+                              macd_direction, hist_val, threshold, rsi_signal, rsi_red, rsi_blue, EnumToString(m_signal_direction)));
         }
         else
         {
-            m_core.LogMessage(2, StringFormat("✅ Gate 4 PASSED: MOM expanding (hist=%.5f) + RSI aligned", hist_val));
+            m_core.LogMessage(2, StringFormat("✅ Gate 4 PASSED: MOM expanding (hist=%.5f > threshold=%.5f) + RSI aligned (RED:%.2f vs BLUE:%.2f)", 
+                              hist_val, threshold, rsi_red, rsi_blue));
         }
         return result;
     }

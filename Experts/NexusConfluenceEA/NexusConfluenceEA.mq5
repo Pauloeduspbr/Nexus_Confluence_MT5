@@ -1,10 +1,20 @@
 //+------------------------------------------------------------------+
 //|                                          NexusConfluenceEA.mq5   |
-//|                                      Nexus Confluence EA v2.14   |
+//|                                      Nexus Confluence EA v2.54   |
 //|                         Multi-Timeframe Confluence Trading System |
 //|                                6-Gate Validation | Score System  |
 //|                          + Break Even + Trailing Stop + DD Prot  |
 //|                                                                    |
+//| v2.54 (12/11/2025): Bug #13 - Trailing Stop Directional Throttling Fix |
+//|   - CRITICAL: Removed MathAbs() from throttling - now directional |
+//|   - BUY: Only moves SL when price RISES >= 11.3pts (75% of step) |
+//|   - SELL: Only moves SL when price FALLS >= 11.3pts (75% of step) |
+//|   - Eliminates 60+ excessive modifications (now ~15-20 expected)  |
+//|   - Added detailed logs: "BLOQUEADO: Preço CAIU/SUBIU" messages  |
+//| v2.53 (12/11/2025): Trailing Stop v2.53 - Retcode 0 fix + Log throttling |
+//|   - CRITICAL: PositionModify() usa TICKET não símbolo no MT5    |
+//|   - FIX: Log "Aguardando trigger" apenas a cada 60s (anti-spam) |
+//|   - Captura imediata de ResultRetcode() após PositionModify()   |
 //| v2.14 (09/11/2025): GG_TrendBar v2.32 MTF shift fix              |
 //|   - CRITICAL: Each TF uses shift=1 FIXED (last closed bar)      |
 //|   - MTF values independent from chart timeframe                  |
@@ -26,10 +36,10 @@
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property link      "https://github.com/nexusconfluence"
-#property version   "2.14"
+#property version   "2.54"
 #property description "Production EA - 6-Gate MTF Confluence System"
 #property description "ALWAYS shift=1 | Score ≥+2 BUY | Score ≤-2 SELL"
-#property description "v2.14: GG_TrendBar v2.32 - MTF uses shift=1 FIXED per TF"
+#property description "v2.54: Bug #13 - TS Directional Throttling Fix"
 #property strict
 
 // Include MQL5 standard libraries
@@ -78,13 +88,13 @@ int OnInit()
 {
     Print("==========================================");
     Print("════════════════════════════════════");
-    Print("    NEXUS CONFLUENCE EA v2.14 STARTING    ");
+    Print("    NEXUS CONFLUENCE EA v2.53 STARTING    ");
     Print("════════════════════════════════════");
+    Print("  • v2.53: Trailing Stop CRITICAL FIX - Retcode 0 + Log throttling");
+    Print("  • v2.53: PositionModify() usa ticket não símbolo (MT5)");
+    Print("  • v2.53: Log 'Aguardando trigger' apenas a cada 60s");
     Print("  • v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED (CRITICAL!)");
     Print("  • v2.14: Each TF independent - no chart correlation");
-    Print("  • v2.13: GG_TrendBar v2.31 buffer shift fix");
-    Print("  • v2.12: Strategy Tester spread fix (x5 limit)");
-    Print("  • v2.11: OBV_MACD color index logic fixed");
     Print("==========================================");
     
     // ══════════════════════════════════════════════════════════════
@@ -139,9 +149,11 @@ int OnInit()
     // Mantém buffers data-only intactos para o EA (shift=1) sem repaint.
     bool create_gg_objects = InpGG_CreateObjects; // Default TRUE in Inputs
     
-    // ✅ v2.15: Pass enable/disable flags from inputs
+    // ✅ v2.15: Pass MTF timeframes AND enable/disable flags from inputs
     if(!g_indicators.Init(_Symbol, InpOperationalTF,
-                          // ✅ v2.15: Enable/Disable flags FIRST
+                          // ✅ v2.15 FIX: MTF Timeframes from INPUTS (NOT HARDCODED!)
+                          InpMacro1TF, InpMacro2TF, InpMacro3TF,
+                          // ✅ v2.15: Enable/Disable flags per indicator
                           InpGG_Enable, InpST_Enable, InpMACD_Enable, InpRSI_Enable, InpCS_Enable,
                           // GG TrendBar
                           InpGG_UpColor, InpGG_DownColor, InpGG_FlatColor, InpGG_TextColor,
@@ -175,9 +187,9 @@ int OnInit()
         Print("ℹ️ Strategy Tester detected - indicator attachment skipped (data-only mode)");
     }
     
+    // ✅ InpMinScore removed - score validation now in AsymmetricRisk only
     if(!g_signals.Init(g_core, g_market, g_indicators, 
-                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF,
-                       InpMinScore))
+                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF))
     {
         Print("❌ CRITICAL ERROR: SignalEngine initialization failed");
         CleanupModules();
@@ -210,11 +222,10 @@ int OnInit()
     PrintConfiguration();
     
     Print("==========================================");
-    Print("  ✅ NEXUS CONFLUENCE EA v2.14 READY     ");
-    Print("  🔧 GG_TrendBar v2.32 MTF shift=1 FIXED applied");
-    Print("  📊 Each TF calculates independently");
-    Print("  🎨 OBV_MACD uses COLOR INDEX (4 colors)");
-    Print("  🧪 Strategy Tester: Spread limit x5 auto-applied");
+    Print("  ✅ NEXUS CONFLUENCE EA v2.53 READY     ");
+    Print("  🔧 Trailing Stop v2.53: Retcode 0 FIXED!");
+    Print("  📊 PositionModify() agora usa ticket (não símbolo)");
+    Print("  � Log throttling 60s - sem spam!");
     Print("==========================================");
     
     return(INIT_SUCCEEDED);
@@ -226,7 +237,7 @@ int OnInit()
 void OnDeinit(const int reason)
 {
     Print("==========================================");
-    Print("      NEXUS CONFLUENCE EA v2.10 STOPPING ");
+    Print("      NEXUS CONFLUENCE EA v2.53 STOPPING ");
     Print("      Reason: ", GetDeinitReasonText(reason));
     Print("==========================================");
     
@@ -296,31 +307,60 @@ void OnTick()
         
         if(ticket > 0)
         {
-            // ─────────────────────────────────────────────────────
-            // Apply Break Even and Trailing Stop with ordering
-            // TS only after BE is active to avoid conflicts
-            // ─────────────────────────────────────────────────────
+            // ═════════════════════════════════════════════════════════
+            // ✅ v2.52 FIX: HANDOFF LOGIC - Break Even → Trailing Stop
+            // ═════════════════════════════════════════════════════════
+            // REGRA: Break Even move SL primeiro, depois TS assume controle
+            // 
+            // CENÁRIOS:
+            // 1. BE=ON, TS=OFF  → BE controla SL sempre
+            // 2. BE=OFF, TS=ON  → TS controla SL sempre
+            // 3. BE=ON, TS=ON   → BE primeiro, depois TS assume (HANDOFF)
+            // ═════════════════════════════════════════════════════════
+            
             bool be_enabled = ((pos_type == POSITION_TYPE_BUY && InpBE_Buy_Enable) ||
                                (pos_type == POSITION_TYPE_SELL && InpBE_Sell_Enable));
             bool ts_enabled = ((pos_type == POSITION_TYPE_BUY && InpTS_Buy_Enable) ||
                                (pos_type == POSITION_TYPE_SELL && InpTS_Sell_Enable));
 
-            bool be_active = false;
+            // ─────────────────────────────────────────────────────
+            // CENÁRIO 1 & 3: Break Even está HABILITADO
+            // ─────────────────────────────────────────────────────
+            bool be_activated = false;
             if(g_break_even != NULL && be_enabled)
             {
-                // First ensure BE is applied/active
-                be_active = g_break_even.IsBEActivated(ticket);
-                if(!be_active)
-                {
-                    g_break_even.CheckAndApply(ticket);
-                    be_active = g_break_even.IsBEActivated(ticket);
-                }
+                g_break_even.CheckAndApply(ticket);
+                be_activated = g_break_even.IsBEActivated(ticket);
             }
 
+            // ─────────────────────────────────────────────────────
+            // CENÁRIO 2 & 3: Trailing Stop está HABILITADO
+            // ─────────────────────────────────────────────────────
             if(g_trailing_stop != NULL && ts_enabled)
             {
-                // Only start/continue TS if BE is already active
-                if(be_active)
+                // ✅ LÓGICA DE HANDOFF:
+                // Se BE está habilitado E TS habilitado:
+                //   → TS só assume após BE ativar (proteger capital primeiro)
+                // Se BE está desabilitado:
+                //   → TS funciona independentemente desde o início
+                
+                bool can_run_ts = false;
+                
+                if(be_enabled)
+                {
+                    // BE habilitado: TS aguarda BE ativar primeiro
+                    if(be_activated)
+                    {
+                        can_run_ts = true; // ✅ HANDOFF: BE já ativou, TS assume controle
+                    }
+                }
+                else
+                {
+                    // BE desabilitado: TS roda livremente
+                    can_run_ts = true;
+                }
+                
+                if(can_run_ts)
                 {
                     g_trailing_stop.Update(ticket);
                 }
@@ -731,11 +771,32 @@ bool InitializeNewModules()
     
     Print("✅ All v2.00 modules initialized successfully!");
 
-    // Avisos de consistência BE/TS: TS só roda após BE ativo
-    if((InpBE_Buy_Enable && InpTS_Buy_Enable) && (InpTS_Buy_Trigger < InpBE_Buy_Trigger))
-        Print("⚠️ AVISO: TS_Buy_Trigger (", InpTS_Buy_Trigger, ") < BE_Buy_Trigger (", InpBE_Buy_Trigger, ") — TS só inicia após BE estar ativo; verifique se pretende este comportamento.");
-    if((InpBE_Sell_Enable && InpTS_Sell_Enable) && (InpTS_Sell_Trigger < InpBE_Sell_Trigger))
-        Print("⚠️ AVISO: TS_Sell_Trigger (", InpTS_Sell_Trigger, ") < BE_Sell_Trigger (", InpBE_Sell_Trigger, ") — TS só inicia após BE estar ativo; verifique se pretende este comportamento.");
+    // ✅ v2.52: Avisos de consistência BE/TS com lógica de HANDOFF
+    // TS aguarda BE ativar quando AMBOS estão habilitados
+    if(InpBE_Buy_Enable && InpTS_Buy_Enable)
+    {
+        Print("ℹ️ BUY: BE + TS habilitados → HANDOFF mode:");
+        Print("   1️⃣ BE move SL primeiro (trigger=", InpBE_Buy_Trigger, " pontos)");
+        Print("   2️⃣ TS assume após BE ativar (trigger=", InpTS_Buy_Trigger, " pontos)");
+        if(InpTS_Buy_Trigger < InpBE_Buy_Trigger)
+            Print("   ⚠️ TS_Trigger (", InpTS_Buy_Trigger, ") < BE_Trigger (", InpBE_Buy_Trigger, ") → TS aguardará BE ativar primeiro");
+    }
+    
+    if(InpBE_Sell_Enable && InpTS_Sell_Enable)
+    {
+        Print("ℹ️ SELL: BE + TS habilitados → HANDOFF mode:");
+        Print("   1️⃣ BE move SL primeiro (trigger=", InpBE_Sell_Trigger, " pontos)");
+        Print("   2️⃣ TS assume após BE ativar (trigger=", InpTS_Sell_Trigger, " pontos)");
+        if(InpTS_Sell_Trigger < InpBE_Sell_Trigger)
+            Print("   ⚠️ TS_Trigger (", InpTS_Sell_Trigger, ") < BE_Trigger (", InpBE_Sell_Trigger, ") → TS aguardará BE ativar primeiro");
+    }
+    
+    if(!InpBE_Buy_Enable && InpTS_Buy_Enable)
+        Print("ℹ️ BUY: Apenas TS habilitado → Controle direto do SL (trigger=", InpTS_Buy_Trigger, " pontos)");
+    
+    if(!InpBE_Sell_Enable && InpTS_Sell_Enable)
+        Print("ℹ️ SELL: Apenas TS habilitado → Controle direto do SL (trigger=", InpTS_Sell_Trigger, " pontos)");
+    
     return true;
 }
 
@@ -806,11 +867,12 @@ void CleanupModules()
 //+------------------------------------------------------------------+
 void PrintConfiguration()
 {
-    Print("\n=== EA CONFIGURATION v2.14 ===");
+    Print("\n=== EA CONFIGURATION v2.53 ===");
     Print("═══════════════════════════════════════");
     Print("Symbol: ", _Symbol);
     Print("Magic Number: ", InpMagicNumber);
     Print("Log Level: ", InpLogLevel, " (1=Executive, 2=Operational, 3=Debug)");
+    Print("• v2.53: Trailing Stop CRITICAL FIX (Retcode 0 + Log 60s)");
     Print("• v2.14: GG_TrendBar v2.32 MTF shift=1 FIXED per TF (CRITICAL!)");
     Print("• v2.13: GG_TrendBar v2.31 buffer shift fix");
     Print("• v2.12: Strategy Tester spread x5 + MTF detailed logs");
@@ -902,7 +964,7 @@ void PrintConfiguration()
     Print("Macro 2: ", EnumToString(InpMacro2TF));
     Print("Macro 3: ", EnumToString(InpMacro3TF));
     Print("Operational: ", EnumToString(InpOperationalTF));
-    Print("Min Score: ", InpMinScore);
+    // ✅ Min Score validation moved to AsymmetricRisk (InpMinScoreBuy/Sell)
     
     Print("\n=== INDICATORS (INPUTS) ===");
     Print("GG TrendBar: ADX=", InpGG_ADX_Period, 

@@ -159,7 +159,9 @@ int OnCalculate(const int rates_total,
       ArrayInitialize(HistColorBuffer, 0.0);
       ArrayInitialize(MacdLineBuffer, EMPTY_VALUE);
       ArrayInitialize(SignalLineBuffer, EMPTY_VALUE);
-      ArrayInitialize(ThresholdBuffer, 0.0);
+      // ✅ v2.50 CRITICAL FIX: DO NOT initialize ThresholdBuffer to zero!
+      // It causes overflow when calculating EMA from zero base
+      // ArrayInitialize(ThresholdBuffer, 0.0);  // REMOVED
       ArrayInitialize(FastObvEmaBuffer, 0.0);
       ArrayInitialize(SlowObvEmaBuffer, 0.0);
       ArrayInitialize(ObvRawBuffer, 0.0);
@@ -273,12 +275,8 @@ int OnCalculate(const int rates_total,
 
    // ═══════════════════════════════════════════════════════════════
    // STEP 6: Calculate Threshold = EMA(|hist| * mult)
-   // CRITICAL FIX: Multiply INPUT before EMA, not output after
+   // ✅ v2.50 CRITICAL FIX: Proper initialization to prevent overflow
    // ═══════════════════════════════════════════════════════════════
-   if(prev_calculated == 0)
-   {
-      ThresholdBuffer[0] = AbsHistCalc[0] * InpThreshMult;
-   }
    
    if(InpThreshPeriod <= 1)
    {
@@ -288,12 +286,25 @@ int OnCalculate(const int rates_total,
    }
    else
    {
+      // ✅ v2.50 FIX: Initialize ThresholdBuffer[0] if not set
+      if(prev_calculated == 0 || ThresholdBuffer[0] == 0.0)
+      {
+         // Seed with first non-zero value or minimal threshold
+         ThresholdBuffer[0] = MathMax(AbsHistCalc[0] * InpThreshMult, 0.00001);
+      }
+      
       // EMA of (|hist| * multiplier)
       double kT = 2.0 / (InpThreshPeriod + 1.0);
-      for(int i = start; i < rates_total; ++i)
+      for(int i = MathMax(start, 1); i < rates_total; ++i)  // ✅ Start from 1 minimum
       {
          double scaled_input = AbsHistCalc[i] * InpThreshMult;
          ThresholdBuffer[i] = ThresholdBuffer[i-1] + kT * (scaled_input - ThresholdBuffer[i-1]);
+         
+         // ✅ v2.50: Sanity check - prevent insane values
+         if(ThresholdBuffer[i] > 1e9 || ThresholdBuffer[i] < 0)
+         {
+            ThresholdBuffer[i] = MathMax(scaled_input, 0.00001);  // Reset to current value
+         }
       }
    }
 

@@ -2,6 +2,7 @@
 //|                                         TrailingStopManager.mqh |
 //|                      Nexus Confluence EA - Módulo Trailing Stop  |
 //|                       Gestão de Trailing Stop Individual BUY/SELL|
+//|                                   v2.54 - Directional Throttling |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
 #property version   "2.00"
@@ -29,6 +30,9 @@ private:
     bool     m_initialized;
     CTrade   m_trade;
     datetime m_last_market_closed_log;
+    
+    // ✅ v2.53: Throttling de log "Aguardando trigger"
+    datetime m_last_waiting_log_time;
     
     // Registro de última atualização (evita updates excessivos)
     struct TrailingRecord
@@ -95,6 +99,8 @@ CTrailingStopManager::CTrailingStopManager(void)
     m_total_updates_sell = 0;
     m_total_profits_protected = 0;
     
+    m_last_waiting_log_time = 0;  // ✅ v2.53: Inicializa throttling de log
+    
     ArrayResize(m_trailing_records, 0);
     m_last_market_closed_log = 0;
 }
@@ -133,6 +139,22 @@ bool CTrailingStopManager::Init(bool buy_enabled, int trigger_buy, int step_buy,
             return false;
         }
         
+        // ✅ v2.51 CRITICAL FIX: Validar proporção Trigger:Step
+        // Step muito pequeno causa throttling impossível (75% rule)
+        // Recomendação: Trigger deve ser no MÍNIMO 50x o Step
+        double ratio = (double)trigger_buy / (double)step_buy;
+        if(ratio < 20.0)
+        {
+            Print("❌ [TS] ERRO CRÍTICO: Proporção Trigger:Step BUY muito baixa!");
+            Print("   📊 Atual: Trigger=", trigger_buy, " / Step=", step_buy, " = ", DoubleToString(ratio, 1), ":1");
+            Print("   ⚠️ Com Step=", step_buy, " e throttling 75%, preço precisa mover ", DoubleToString(step_buy * 0.75, 1), " pontos entre updates");
+            Print("   💡 RECOMENDAÇÃO:");
+            Print("      Opção 1: Aumente Step para pelo menos ", (int)(trigger_buy / 20), " pontos (ratio 20:1)");
+            Print("      Opção 2: Reduza Trigger para ", (step_buy * 20), " pontos");
+            Print("   ✅ IDEAL: Trigger=", trigger_buy, " com Step entre ", (int)(trigger_buy / 50), "-", (int)(trigger_buy / 20), " pontos");
+            return false;
+        }
+        
         if(trigger_buy <= step_buy)
         {
             Print("⚠️ [TS] Aviso: TS Trigger BUY (", trigger_buy,
@@ -154,6 +176,20 @@ bool CTrailingStopManager::Init(bool buy_enabled, int trigger_buy, int step_buy,
         {
             Print("❌ [TS] ERRO CRÍTICO: Step SELL (", step_sell, ") deve ser MAIOR que STOPS_LEVEL (", stops_level, ")");
             Print("   💡 Configure InpTS_Sell_Step para pelo menos ", (stops_level + 10), " pontos");
+            return false;
+        }
+        
+        // ✅ v2.51 CRITICAL FIX: Validar proporção Trigger:Step
+        double ratio = (double)trigger_sell / (double)step_sell;
+        if(ratio < 20.0)
+        {
+            Print("❌ [TS] ERRO CRÍTICO: Proporção Trigger:Step SELL muito baixa!");
+            Print("   📊 Atual: Trigger=", trigger_sell, " / Step=", step_sell, " = ", DoubleToString(ratio, 1), ":1");
+            Print("   ⚠️ Com Step=", step_sell, " e throttling 75%, preço precisa mover ", DoubleToString(step_sell * 0.75, 1), " pontos entre updates");
+            Print("   💡 RECOMENDAÇÃO:");
+            Print("      Opção 1: Aumente Step para pelo menos ", (int)(trigger_sell / 20), " pontos (ratio 20:1)");
+            Print("      Opção 2: Reduza Trigger para ", (step_sell * 20), " pontos");
+            Print("   ✅ IDEAL: Trigger=", trigger_sell, " com Step entre ", (int)(trigger_sell / 50), "-", (int)(trigger_sell / 20), " pontos");
             return false;
         }
         
@@ -222,7 +258,17 @@ bool CTrailingStopManager::Update(ulong ticket)
     // CRITICAL: Bloquear modificações quando mercado fechado
     // ═══════════════════════════════════════════════════════
     
-    // Verificação 1: Trade mode do símbolo
+    // ═══════════════════════════════════════════════════════
+    // CRITICAL: Bloquear modificações quando mercado fechado
+    // ═══════════════════════════════════════════════════════
+    // ✅ CORREÇÃO v2.50: Trailing Stop pode modificar posições existentes
+    //    MESMO FORA do horário de abertura de novas ordens!
+    // ❌ ERRO ANTERIOR: Checava IsMarketOpenNow() que usa sessões TRADE
+    //    → Bloqueava TS às 11:05 (fora da sessão B3 mas mercado ABERTO)
+    // ✅ CORRETO: Apenas verificar se mercado não está FECHADO (TRADE_MODE)
+    // ═══════════════════════════════════════════════════════
+    
+    // Verificação ÚNICA: Trade mode do símbolo (mercado não pode estar completamente fechado)
     int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
     if(trade_mode == SYMBOL_TRADE_MODE_DISABLED || trade_mode == SYMBOL_TRADE_MODE_CLOSEONLY)
     {
@@ -235,17 +281,8 @@ bool CTrailingStopManager::Update(ulong ticket)
         return false;
     }
     
-    // Verificação 2: Sessão de negociação
-    if(!IsMarketOpenNow(symbol))
-    {
-        datetime now = TimeCurrent();
-        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
-        {
-            Print("⏸️ [TS] Fora do horário de negociação para ", symbol, " - aguardando sessão abrir");
-            m_last_market_closed_log = now;
-        }
-        return false;
-    }
+    // ✅ REMOVIDO: IsMarketOpenNow() - Trailing Stop pode operar a qualquer momento
+    //    que o mercado tenha quotes, mesmo fora do horário de abertura de novas posições
     
     // Obter preço atual
     double current_price;
@@ -268,23 +305,58 @@ bool CTrailingStopManager::Update(ulong ticket)
         trigger = m_trigger_buy;
         step = m_step_buy;
         
+        // ✅ v2.53 FIX: Log throttling - apenas a cada 60s para evitar spam
+        if(profit_points < trigger)
+        {
+            datetime now = TimeCurrent();
+            if(now - m_last_waiting_log_time >= 60)
+            {
+                Print("⏳ [TS] BUY #", ticket, ": Aguardando trigger (lucro=", DoubleToString(profit_points, 1), 
+                      " / ", trigger, " pontos) | ", DoubleToString((profit_points/trigger)*100, 1), "%");
+                m_last_waiting_log_time = now;
+            }
+            return false;
+        }
+        
         // Verificar se atingiu o trigger
         if(profit_points >= trigger)
         {
+            // ✅ v2.51 FIX: Log detalhado quando trigger é atingido
+            Print("🔍 [TS] BUY #", ticket, " TRIGGER ATINGIDO:");
+            Print("   💰 Lucro atual: +", DoubleToString(profit_points, 1), " pontos (trigger=", trigger, ")");
+            Print("   📍 Entry=", entry_price, " | Current=", current_price, " | SL=", current_sl, " | TP=", current_tp);
+            
             // Tempo da barra atual (limitar a 1 ajuste por barra)
             datetime bar_time = iTime(symbol, PERIOD_CURRENT, 0);
             // ═══════════════════════════════════════════════════════
             // THROTTLING: Evitar updates excessivos
+            // ✅ v2.54 FIX BUG #13: Throttling direcional (apenas movimentos favoráveis)
             // ═══════════════════════════════════════════════════════
             int record_idx = FindRecordIndex(ticket);
             if(record_idx >= 0)
             {
                 double last_price = m_trailing_records[record_idx].last_price;
-                double price_change = MathAbs(current_price - last_price) / point;
                 
-                // Só atualizar se preço moveu pelo menos 75% do step
-                if(price_change < step * 0.75)
+                // ✅ v2.54 CRITICAL FIX: Movimento DIRECIONAL (sem MathAbs)
+                // Para BUY: Apenas aceitar quando preço SUBIU (price_change > 0)
+                double price_change = (current_price - last_price) / point;
+                double min_required = step * 0.75;
+                
+                // ✅ v2.54 FIX: Log com sinal (positivo/negativo)
+                Print("   📊 Throttling: last_price=", last_price, 
+                      " | price_change=", (price_change >= 0 ? "+" : ""), DoubleToString(price_change, 1), 
+                      " pontos | min_required=+", DoubleToString(min_required, 1), " (75% de ", step, ")");
+                
+                // ✅ v2.54 CRITICAL: BUY só aceita movimento POSITIVO >= min_required
+                if(price_change < min_required)
                 {
+                    if(price_change < 0)
+                        Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: Preço CAIU (", 
+                              DoubleToString(price_change, 1), " pontos) - TS só sobe quando preço sobe");
+                    else
+                        Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: Movimento insuficiente (", 
+                              DoubleToString(price_change, 1), " < +", DoubleToString(min_required, 1), " pontos)");
+                    
                     // Se o preço não moveu o suficiente, bloquear updates
                     // inclusive na mesma barra
                     if(m_trailing_records[record_idx].last_update == bar_time)
@@ -294,8 +366,13 @@ bool CTrailingStopManager::Update(ulong ticket)
                 }
                 
                 // Permitir update na mesma barra se movimento significativo (>=75% step)
-                if(m_trailing_records[record_idx].last_update == bar_time && price_change < step * 0.75)
+                if(m_trailing_records[record_idx].last_update == bar_time && price_change < min_required)
                     return false;
+            }
+            else
+            {
+                // ✅ v2.51 FIX: Primeira vez que TS é acionado para este ticket
+                Print("   ✨ [TS] BUY #", ticket, " PRIMEIRA ATIVAÇÃO (sem registro anterior)");
             }
             
             // ═══════════════════════════════════════════════════════
@@ -310,13 +387,19 @@ bool CTrailingStopManager::Update(ulong ticket)
             else
                 candidate_sl = NormalizeDouble(entry_price + ((trigger - step) * point), digits);
             
+            // ✅ v2.51 FIX: Log detalhado do cálculo
+            Print("   🧮 Cálculo SL: target_sl=", target_sl, " | candidate_sl=", candidate_sl);
+            
             // CORREÇÃO CRÍTICA: Usar MathMax para BUY (SL deve SUBIR)
             double new_sl = MathMax(current_sl, MathMin(target_sl, candidate_sl));
             new_sl = NormalizeDouble(new_sl, digits);
             
+            Print("   🎯 Novo SL calculado: ", new_sl, " (current_sl=", current_sl, ")");
+            
             // Garantir que SL só SOBE (nunca desce em BUY)
             if(current_sl > 0 && new_sl <= current_sl)
             {
+                Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL não subiu (new=", new_sl, " <= current=", current_sl, ")");
                 // Preço não moveu o suficiente, manter SL atual
                 return false;
             }
@@ -326,6 +409,7 @@ bool CTrailingStopManager::Update(ulong ticket)
             // ═══════════════════════════════════════════════════════
             if(current_sl > 0 && MathAbs(new_sl - current_sl) < point)
             {
+                Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL já está no valor calculado (diff < 1 point)");
                 // SL já está no valor calculado, não modificar
                 return false;
             }
@@ -338,6 +422,8 @@ bool CTrailingStopManager::Update(ulong ticket)
                 // Para BUY: SL deve estar ABAIXO do TP
                 if(new_sl >= current_tp)
                 {
+                    Print("   ⚠️ [TS] BUY #", ticket, " AVISO: SL (", new_sl, ") >= TP (", current_tp, ") - ajustando...");
+                    
                     // Ajustar SL para ficar alguns pips abaixo do TP
                     double safe_distance = 10 * point; // 10 pontos de segurança
                     new_sl = NormalizeDouble(current_tp - safe_distance, digits);
@@ -345,41 +431,51 @@ bool CTrailingStopManager::Update(ulong ticket)
                     // Se ainda assim SL não é válido, não atualizar
                     if(new_sl <= current_sl)
                     {
-                        Print("⚠️ [TS] BUY #", ticket, ": SL já próximo ao TP. Não é possível trailing.");
+                        Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL já próximo ao TP. Não é possível trailing.");
                         return false;
                     }
                     
-                    Print("⚠️ [TS] BUY #", ticket, ": SL ajustado para ficar abaixo do TP");
+                    Print("   ✅ [TS] BUY #", ticket, ": SL ajustado para ", new_sl, " (abaixo do TP)");
                 }
             }
             
             // Verificar se novo SL é melhor que o atual
             if(new_sl > current_sl || current_sl == 0)
             {
+                Print("   ✅ [TS] BUY #", ticket, " VALIDANDO: new_sl=", new_sl, " > current_sl=", current_sl);
+                
                 // Verificar distância mínima do stop level
                 long stop_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
                 double min_distance = stop_level * point;
                 
+                Print("   📏 STOPS_LEVEL: ", stop_level, " pontos | min_distance: ", DoubleToString(min_distance, digits));
+                
                 if(stop_level > 0)
                 {
                     double distance_to_price = (current_price - new_sl) / point;
+                    Print("   📏 Distance to price: ", DoubleToString(distance_to_price, 1), " pontos (required > ", stop_level, ")");
+                    
                     if(distance_to_price <= stop_level)
                     {
-                        Print("⚠️ [TS] BUY #", ticket, ": SL muito próximo do preço (stops_level=", stop_level, ")");
-                        Print("   🔍 DEBUG: price=", DoubleToString(current_price, digits), 
+                        Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: SL muito próximo do preço");
+                        Print("      ❌ distance=", DoubleToString(distance_to_price, 1), " <= stops_level=", stop_level);
+                        Print("      🔍 DEBUG: price=", DoubleToString(current_price, digits), 
                               " | new_sl=", DoubleToString(new_sl, digits),
-                              " | distance=", DoubleToString(distance_to_price, 1), " pontos",
                               " | step=", step, " | point=", DoubleToString(point, digits));
-                        Print("   💡 Aumente InpTS_Buy_Step para pelo menos ", (stop_level + 10), " pontos");
+                        Print("      💡 Aumente InpTS_Buy_Step para pelo menos ", (stop_level + 10), " pontos");
                         return false;
                     }
                 }
                 
                 // Verificar FREEZE_LEVEL do broker (bloqueia modificações muito próximas)
                 long freeze_level = SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
+                Print("   ❄️ FREEZE_LEVEL: ", freeze_level, " pontos");
+                
                 if(freeze_level > 0)
                 {
                     double freeze_distance = (current_price - new_sl) / point;
+                    Print("   ❄️ Freeze distance: ", DoubleToString(freeze_distance, 1), " pontos (required > ", freeze_level, ")");
+                    
                     if(freeze_distance <= freeze_level)
                     {
                         // Logar no máximo uma vez por barra/valor de SL
@@ -392,8 +488,9 @@ bool CTrailingStopManager::Update(ulong ticket)
                         }
                         if(should_log)
                         {
-                            Print("⛔ [TS] BUY #", ticket, ": Dentro do FREEZE_LEVEL (", freeze_level, ") | distance=", DoubleToString(freeze_distance, 1), " pontos");
-                            Print("   📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
+                            Print("   ⏸️ [TS] BUY #", ticket, " BLOQUEADO: Dentro do FREEZE_LEVEL");
+                            Print("      ❌ freeze_distance=", DoubleToString(freeze_distance, 1), " <= freeze_level=", freeze_level);
+                            Print("      📍 Tentou: SL=", new_sl, " TP=", current_tp, " | Preço=", current_price);
                         }
                         // Bloquear novas tentativas nesta barra
                         UpdateRecord(ticket, current_price, bar_time);
@@ -409,8 +506,20 @@ bool CTrailingStopManager::Update(ulong ticket)
                     }
                 }
                 
-                // Modificar posição (usar símbolo em MT5)
-                if(m_trade.PositionModify(symbol, new_sl, current_tp))
+                // ✅ v2.53 CRITICAL FIX - BUY: PositionModify no MT5 usa TICKET, não símbolo
+                // ❌ ERRO ANTERIOR: m_trade.PositionModify(symbol, new_sl, tp) → Retcode: 0
+                // ✅ CORRETO: Selecionar posição primeiro, depois modificar com ticket
+                if(!PositionSelectByTicket(ticket))
+                {
+                    Print("   ❌ [TS] BUY #", ticket, ": Posição não encontrada para modificação");
+                    return false;
+                }
+                
+                // Modificar posição usando ticket (método correto MT5)
+                bool modify_result = m_trade.PositionModify(ticket, new_sl, current_tp);
+                uint retcode = m_trade.ResultRetcode();
+                
+                if(modify_result && retcode == TRADE_RETCODE_DONE)
                 {
                     m_total_updates_buy++;
                     
@@ -439,7 +548,6 @@ bool CTrailingStopManager::Update(ulong ticket)
                 }
                 else
                 {
-                    uint retcode = m_trade.ResultRetcode();
                     int error = GetLastError();
                     
                     // Tratamento especial para mercado fechado
@@ -500,27 +608,36 @@ bool CTrailingStopManager::Update(ulong ticket)
             datetime bar_time = iTime(symbol, PERIOD_CURRENT, 0);
             // ═══════════════════════════════════════════════════════
             // THROTTLING: Evitar updates excessivos
+            // v2.54 FIX BUG #13: Throttling direcional para SELL
             // ═══════════════════════════════════════════════════════
             int record_idx = FindRecordIndex(ticket);
             if(record_idx >= 0)
             {
                 double last_price = m_trailing_records[record_idx].last_price;
-                double price_change = MathAbs(current_price - last_price) / point;
+                // SELL: preço deve CAIR (negativo) para mover TS
+                double price_change = (current_price - last_price) / point; // Sem MathAbs
+                double min_required = step * 0.75;
                 
-                // Só atualizar se preço moveu pelo menos 75% do step
-                if(price_change < step * 0.75)
+                // SELL só aceita movimento NEGATIVO >= min_required
+                if(price_change > -min_required)
                 {
-                    // Se o preço não moveu o suficiente, bloquear updates
-                    // inclusive na mesma barra
-                    if(m_trailing_records[record_idx].last_update == bar_time)
-                        return false;
-                    
+                    if(price_change > 0)
+                    {
+                        Print("   ⏸️ [TS] SELL #", ticket, " BLOQUEADO: Preço SUBIU (", 
+                              DoubleToString(price_change, 1), " pontos) - TS só desce quando preço desce");
+                    }
+                    else
+                    {
+                        Print("   ⏸️ [TS] SELL #", ticket, " BLOQUEADO: Movimento insuficiente (", 
+                              DoubleToString(price_change, 1), " < -", DoubleToString(min_required, 1), " pontos)");
+                    }
                     return false;
                 }
                 
-                // Permitir update na mesma barra se movimento significativo (>=75% step)
-                if(m_trailing_records[record_idx].last_update == bar_time && price_change < step * 0.75)
-                    return false;
+                // Movimento válido (preço caiu >= 11.3 pontos), permitir update
+                Print("   ✅ [TS] SELL #", ticket, " Throttling OK: Preço caiu ", 
+                      DoubleToString(-price_change, 1), " pontos (>= ", 
+                      DoubleToString(min_required, 1), " requeridos)");
             }
             
             // ═══════════════════════════════════════════════════════
@@ -632,8 +749,18 @@ bool CTrailingStopManager::Update(ulong ticket)
                     }
                 }
                 
-                // Modificar posição (usar símbolo em MT5)
-                if(m_trade.PositionModify(symbol, new_sl, current_tp))
+                // ✅ v2.53 CRITICAL FIX - SELL: PositionModify no MT5 usa TICKET, não símbolo
+                if(!PositionSelectByTicket(ticket))
+                {
+                    Print("   ❌ [TS] SELL #", ticket, ": Posição não encontrada para modificação");
+                    return false;
+                }
+                
+                // Modificar posição usando ticket (método correto MT5)
+                bool modify_result = m_trade.PositionModify(ticket, new_sl, current_tp);
+                uint retcode = m_trade.ResultRetcode();
+                
+                if(modify_result && retcode == TRADE_RETCODE_DONE)
                 {
                     m_total_updates_sell++;
                     
@@ -662,7 +789,6 @@ bool CTrailingStopManager::Update(ulong ticket)
                 }
                 else
                 {
-                    uint retcode = m_trade.ResultRetcode();
                     int error = GetLastError();
                     
                     // Tratamento especial para mercado fechado

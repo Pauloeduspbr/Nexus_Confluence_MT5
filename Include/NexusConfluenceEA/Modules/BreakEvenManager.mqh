@@ -263,8 +263,14 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
     // ═══════════════════════════════════════════════════════
     // CRITICAL: Bloquear modificações quando mercado fechado
     // ═══════════════════════════════════════════════════════
+    // ✅ CORREÇÃO v2.50: Break Even pode modificar posições existentes
+    //    MESMO FORA do horário de abertura de novas ordens!
+    // ❌ ERRO ANTERIOR: Checava IsMarketOpenNow() que usa sessões TRADE
+    //    → Bloqueava BE/TS às 11:05 (fora da sessão B3 mas mercado ABERTO)
+    // ✅ CORRETO: Apenas verificar se mercado não está FECHADO (TRADE_MODE)
+    // ═══════════════════════════════════════════════════════
     
-    // Verificação 1: Trade mode do símbolo
+    // Verificação ÚNICA: Trade mode do símbolo (mercado não pode estar completamente fechado)
     int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
     if(trade_mode == SYMBOL_TRADE_MODE_DISABLED || trade_mode == SYMBOL_TRADE_MODE_CLOSEONLY)
     {
@@ -277,17 +283,8 @@ bool CBreakEvenManager::CheckAndApply(ulong ticket)
         return false;
     }
     
-    // Verificação 2: Sessão de negociação
-    if(!IsMarketOpenNow(symbol))
-    {
-        datetime now = TimeCurrent();
-        if(m_last_market_closed_log==0 || (now - m_last_market_closed_log) >= 300)
-        {
-            Print("⏸️ [BE] Fora do horário de negociação para ", symbol, " - aguardando sessão abrir");
-            m_last_market_closed_log = now;
-        }
-        return false;
-    }
+    // ✅ REMOVIDO: IsMarketOpenNow() - Break Even/TS podem operar a qualquer momento
+    //    que o mercado tenha quotes, mesmo fora do horário de abertura de novas posições
     
     // Obter preço atual
     double current_price;

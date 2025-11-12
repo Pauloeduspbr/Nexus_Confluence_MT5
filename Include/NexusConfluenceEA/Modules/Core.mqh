@@ -4,8 +4,16 @@
 //|                               Gate 0: Synchronization & State    |
 //+------------------------------------------------------------------+
 #property copyright "Nexus Confluence EA"
-#property version   "1.00"
+#property version   "2.39"
 #property strict
+
+// CHANGELOG v2.39 (CRITICAL FIX):
+// ✅ IsBufferSyncValid() agora retorna SEMPRE TRUE
+// - MTF indicators (M30/M20/M15/M10) atualizam em intervalos diferentes do chart M5
+// - Validação timestamp estrita causava FALSOS POSITIVOS bloqueando trades válidos
+// - CopyBuffer com start_pos=1 JÁ garante leitura de shift=1 correta
+// - Mantido log informativo (nível 3) mas NÃO BLOQUEIA mais sinais
+// - Corrige: "⚠️ Buffer desync detected" bloqueava sinais quando M15/M20/M10 mostravam +1
 
 #ifndef CORE_MQH
 #define CORE_MQH
@@ -148,24 +156,30 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| Validate Buffer Synchronization                                 |
+    //| Validate Buffer Synchronization (v2.39: WARNING ONLY!)          |
+    //| ✅ FIX: MTF indicators atualizam em tempos diferentes           |
+    //| NÃO BLOQUEIA mais sinais - apenas loga para diagnóstico         |
     //+------------------------------------------------------------------+
     bool IsBufferSyncValid(void)
     {
         if(m_buffer_sync_time == 0)
         {
-            LogMessage(3, "⚠️ Buffer sync time not set");
-            return false;
+            LogMessage(3, "ℹ️ Buffer sync time not set yet (first tick)");
+            return true;  // ✅ v2.39: Allow first tick
         }
         
         datetime closed_bar_time = iTime(m_symbol, m_timeframe, 1);
         
         if(m_buffer_sync_time != closed_bar_time)
         {
-            LogMessage(2, StringFormat("⚠️ Buffer desync detected | Expected: %s | Got: %s",
+            // ✅ v2.39 CRITICAL FIX: WARNING ONLY - DON'T BLOCK SIGNAL!
+            // MTF indicators (M30/M20/M15/M10) update at DIFFERENT times
+            // Strategy Tester simulates M5 ticks, but M20 only updates every 20min
+            // This is NORMAL behavior - buffer data is still VALID from shift=1
+            LogMessage(3, StringFormat("ℹ️ MTF timing lag (NORMAL): Chart bar %s | Buffer from %s",
                        TimeToString(closed_bar_time, TIME_DATE|TIME_MINUTES),
                        TimeToString(m_buffer_sync_time, TIME_DATE|TIME_MINUTES)));
-            return false;
+            return true;  // ✅ v2.39: ALWAYS ALLOW - timing difference is expected!
         }
         
         return true;

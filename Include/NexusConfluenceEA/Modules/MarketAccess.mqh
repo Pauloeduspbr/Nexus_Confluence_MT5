@@ -130,10 +130,17 @@ public:
         m_lot_min = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MIN);
         m_lot_max = SymbolInfoDouble(m_symbol, SYMBOL_VOLUME_MAX);
         
-        // Validate symbol properties
-        if(m_point == 0 || m_digits == 0)
+        // Debug: Log symbol properties
+        Print("📊 Symbol Properties for ", m_symbol, ":");
+        Print("   • Point: ", m_point, " | Digits: ", m_digits);
+        Print("   • Tick Size: ", m_tick_size, " | Tick Value: ", m_tick_value);
+        Print("   • Lot: Min=", m_lot_min, " Max=", m_lot_max, " Step=", m_lot_step);
+        
+        // Validate symbol properties (m_digits CAN be 0 for indices like WIN)
+        if(m_point == 0)
         {
             Print("❌ ERROR: Failed to get symbol properties for ", m_symbol);
+            Print("   SYMBOL_POINT returned 0 - symbol may not exist or data unavailable");
             return false;
         }
         

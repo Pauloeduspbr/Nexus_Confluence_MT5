@@ -133,7 +133,7 @@ input ENUM_TIMEFRAMES InpMacro1TF      = PERIOD_H4;  // Macro 1 Timeframe (H4)
 input ENUM_TIMEFRAMES InpMacro2TF      = PERIOD_H1;  // Macro 2 Timeframe (H1)
 input ENUM_TIMEFRAMES InpMacro3TF      = PERIOD_M30; // Macro 3 Timeframe (M30)
 input ENUM_TIMEFRAMES InpOperationalTF = PERIOD_M15; // Operational Timeframe (M15)
-input int             InpMinScore      = 2;          // Score Mínimo MTF (≥+2 BUY, ≤-2 SELL)
+// ✅ InpMinScore REMOVIDO - usa InpMinScoreBuy/Sell (linha 72-73) via AsymmetricRisk
 
 //+------------------------------------------------------------------+
 //| SEÇÃO 15: CONFIGURAÇÕES GERAIS                                   |

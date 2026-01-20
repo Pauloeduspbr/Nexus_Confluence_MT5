@@ -560,7 +560,7 @@ class RobustnessAnalyzer:
     # ROBUST PRESET GENERATION
     # =========================================================================
     
-    def generate_robust_preset(self, output_dir: str = "Presets") -> Optional[str]:
+    def generate_robust_preset(self, output_dir: str = "Presets", in_place: bool = False) -> Optional[str]:
         """Generate a preset with robustness-validated parameters."""
         self.log("Generating robust preset...")
         
@@ -610,17 +610,23 @@ class RobustnessAnalyzer:
             return None
         
         # Generate new filename
-        base_name = self.preset_path.stem
-        if '_robust' in base_name:
-            # Increment version
-            match = re.search(r'_robust_v(\d+)$', base_name)
-            if match:
-                new_version = int(match.group(1)) + 1
-                new_name = re.sub(r'_robust_v\d+$', f'_robust_v{new_version}', base_name)
-            else:
-                new_name = f"{base_name}_v2"
+        if in_place:
+            output_path = self.preset_path
+            self.log(f"Updating preset in-place: {output_path}")
         else:
-            new_name = f"{base_name}_robust_v1"
+            base_name = self.preset_path.stem
+            if '_robust' in base_name:
+                # Increment version
+                match = re.search(r'_robust_v(\d+)$', base_name)
+                if match:
+                    new_version = int(match.group(1)) + 1
+                    new_name = re.sub(r'_robust_v\d+$', f'_robust_v{new_version}', base_name)
+                else:
+                    new_name = f"{base_name}_v2"
+            else:
+                new_name = f"{base_name}_robust_v1"
+            
+            output_path = self.preset_path.parent / f"{new_name}.set"
         
         # Create preset content
         timestamp = datetime.now().strftime("%Y.%m.%d %H:%M:%S")
@@ -640,48 +646,54 @@ class RobustnessAnalyzer:
         # Read original and apply changes
         try:
             raw_bytes = self.preset_path.read_bytes()
+            content = None
             for encoding in ['utf-8-sig', 'utf-8', 'utf-16-le']:
                 try:
-                    original = raw_bytes.decode(encoding)
-                    if '=' in original:
+                    content = raw_bytes.decode(encoding)
+                    if '=' in content:
                         break
                 except:
                     continue
             
-            for line in original.split('\n'):
-                stripped = line.strip()
-                
-                if not stripped:
-                    continue
-                
-                if stripped.startswith(';') and '═' in stripped:
-                    lines.append(stripped)
-                    continue
-                
-                if stripped.startswith(';'):
-                    if 'saved on' in stripped.lower() or 'robust' in stripped.lower():
+            if content:
+                original = content
+                for line in original.split('\n'):
+                    stripped = line.strip()
+                    
+                    if not stripped:
                         continue
-                    lines.append(stripped)
-                    continue
-                
-                if '=' in stripped:
-                    name = stripped.split('=')[0].strip().replace('\ufeff', '')
-                    if name in params:
-                        p = params[name]
-                        if p.get('min') and p['min'] != '':
-                            line_out = f"{name}={p['value']}||{p['min']}||{p['step']}||{p['max']}||{p['optimize']}"
-                        else:
-                            line_out = f"{name}={p['value']}"
-                        lines.append(line_out)
-                    else:
+                    
+                    if stripped.startswith(';') and '═' in stripped:
                         lines.append(stripped)
-                        
+                        continue
+                    
+                    if stripped.startswith(';'):
+                        if 'saved on' in stripped.lower() or 'robust' in stripped.lower():
+                            continue
+                        lines.append(stripped)
+                        continue
+                    
+                    if '=' in stripped:
+                        name = stripped.split('=')[0].strip().replace('\ufeff', '')
+                        if name in params:
+                            p = params[name]
+                            if p.get('min') and p['min'] != '':
+                                line_out = f"{name}={p['value']}||{p['min']}||{p['step']}||{p['max']}||{p['optimize']}"
+                            else:
+                                line_out = f"{name}={p['value']}"
+                            lines.append(line_out)
+                        else:
+                            lines.append(stripped)
+            else:
+                self.log("Could not decode original content, writing fresh params")
+                for name, p in params.items():
+                   lines.append(f"{name}={p['value']}")
+                            
         except Exception as e:
             self.log(f"Error reading preset: {e}")
             return None
         
         # Write new preset
-        output_path = self.preset_path.parent / f"{new_name}.set"
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines))
         
@@ -886,6 +898,7 @@ def main():
     parser.add_argument("log_file", help="Path to MT5 log file")
     parser.add_argument("--preset", "-p", help="Path to current preset file")
     parser.add_argument("--output", "-o", help="Output JSON file", default=".tmp/robustness_report.json")
+    parser.add_argument("--inplace", action="store_true", help="Modify preset in-place if robustness improvements needed")
     parser.add_argument("--wfa-runs", type=int, default=10, help="Number of WFA runs")
     parser.add_argument("--monkey-runs", type=int, default=5000, help="Number of Monte Carlo simulations")
     parser.add_argument("--quiet", "-q", action="store_true", help="Suppress verbose output")
@@ -934,9 +947,9 @@ def main():
     
     # Generate robust preset if needed
     if not report.is_robust and args.preset:
-        new_preset = analyzer.generate_robust_preset()
+        new_preset = analyzer.generate_robust_preset(in_place=args.inplace)
         if new_preset:
-            print(f"\n🆕 New robust preset: {new_preset}")
+            print(f"\n🆕 Robust preset updated/created: {new_preset}")
     
     # Save report
     output_path = Path(args.output)

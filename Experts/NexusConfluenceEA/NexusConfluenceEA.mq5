@@ -421,11 +421,12 @@ void OnTick()
     
     // ──────────────────────────────────────────────────────────────
     // ✅ v2.63: SILENT TIME FILTER - Check BEFORE processing gates
-    // If outside trading hours, return silently (no logs!)
+    // If enabled AND outside trading hours, return (logging at Level 3)
     // ──────────────────────────────────────────────────────────────
-    if(!g_market.IsWithinTradingHours())
+    if(g_market.IsTimeFilterEnabled() && !g_market.IsWithinTradingHours())
     {
-        // Outside trading hours - return silently without any logs
+        // Outside trading hours - return (Level 3 log for diagnosis)
+        g_core.LogMessage(3, "⏸️ Time Filter blocking new signal (Outside Hours)");
         return;
     }
     

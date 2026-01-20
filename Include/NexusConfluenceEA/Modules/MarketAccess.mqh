@@ -570,6 +570,7 @@ public:
     double GetPoint(void) const { return m_point; }
     int GetDigits(void) const { return m_digits; }
     int GetStopsLevel(void) const { return m_stops_level; }
+    bool IsTimeFilterEnabled(void) const { return m_use_time_filter; }
     
     //+------------------------------------------------------------------+
     //| v2.57: Get price step for SL/TP calculation (TICK_SIZE or POINT)|

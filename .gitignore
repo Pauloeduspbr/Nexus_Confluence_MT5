@@ -63,3 +63,5 @@ rad.json
 venv/
 venv/bin/activate
 log/log
+*.set
+*.json

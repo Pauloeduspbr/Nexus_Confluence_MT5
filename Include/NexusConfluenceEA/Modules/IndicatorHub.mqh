@@ -974,33 +974,63 @@ public:
         // Log detalhado de quais indicadores falharam (primeiras 10x)
         // ═══════════════════════════════════════════════════════════════
         
-        // ✅ v2.15 FIX: Verificar BarsCalculated para cada handle GG MTF
+        // ✅ v3.0 FIX: Verificar BarsCalculated RESPEITANDO ENABLED FLAGS
+        // Apenas verifica indicadores que têm handle válido
+        
+        // 1. GG TrendBar
         int bars_calculated_gg_min = INT_MAX;
+        bool gg_active = false;
+        
         for(int i = 0; i < 4; i++)
         {
-            int bars = BarsCalculated(m_gg_handles[i]);
-            if(bars < bars_calculated_gg_min)
-                bars_calculated_gg_min = bars;
+            if(m_gg_handles[i] != INVALID_HANDLE)
+            {
+                int bars = BarsCalculated(m_gg_handles[i]);
+                if(bars < bars_calculated_gg_min)
+                    bars_calculated_gg_min = bars;
+                gg_active = true;
+            }
         }
+        // Se nenhum GG ativo (desabilitado), considera "pronto" (INT_MAX)
+        if(!gg_active) bars_calculated_gg_min = INT_MAX;
         
-        int bars_calculated_st = BarsCalculated(m_supertrend_handle);
-        int bars_calculated_mom = BarsCalculated(m_mom_handle);
-        int bars_calculated_rsi = BarsCalculated(m_rsi_oma_handle);
+        // 2. Supertrend
+        int bars_calculated_st = INT_MAX;
+        if(m_supertrend_handle != INVALID_HANDLE)
+            bars_calculated_st = BarsCalculated(m_supertrend_handle);
+            
+        // 3. Momentum
+        int bars_calculated_mom = INT_MAX;
+        if(m_mom_handle != INVALID_HANDLE)
+            bars_calculated_mom = BarsCalculated(m_mom_handle);
+            
+        // 4. RSI OMA
+        int bars_calculated_rsi = INT_MAX;
+        if(m_rsi_oma_handle != INVALID_HANDLE)
+            bars_calculated_rsi = BarsCalculated(m_rsi_oma_handle);
         
-        // ✅ FIX v2.36: Se BarsCalculated() falha, loga mas NÃO retorna false
-        // Permite EA continuar com valores anteriores do cache
+        // ✅ FIX v3.0: Check sync only for ENABLED indicators
+        // Se indicador desabilitado (=INT_MAX), não falha o check
         static int bars_fail_count = 0;
-        if(bars_calculated_gg_min <= 0 || bars_calculated_st <= 0 || 
-           bars_calculated_mom <= 0 || bars_calculated_rsi <= 0)
+        
+        bool gg_fail = (bars_calculated_gg_min <= 0 && gg_active);
+        bool st_fail = (bars_calculated_st <= 0 && m_supertrend_handle != INVALID_HANDLE);
+        bool mom_fail = (bars_calculated_mom <= 0 && m_mom_handle != INVALID_HANDLE);
+        bool rsi_fail = (bars_calculated_rsi <= 0 && m_rsi_oma_handle != INVALID_HANDLE);
+        
+        if(gg_fail || st_fail || mom_fail || rsi_fail)
         {
             if(bars_fail_count < 10)
             {
-                Print("[SYNC v2.15] BarsCalculated não pronto (usando cache anterior): GG_min=", bars_calculated_gg_min,
-                      " ST=", bars_calculated_st, " MOM=", bars_calculated_mom, " RSI=", bars_calculated_rsi);
+                Print("[SYNC v3.0] Aguardando cálculo (cache usado):",
+                      gg_fail ? StringFormat(" GG=%d", bars_calculated_gg_min) : "",
+                      st_fail ? StringFormat(" ST=%d", bars_calculated_st) : "",
+                      mom_fail ? StringFormat(" MOM=%d", bars_calculated_mom) : "",
+                      rsi_fail ? StringFormat(" RSI=%d", bars_calculated_rsi) : "");
                 bars_fail_count++;
             }
-            // ✅ v2.36: NÃO retorna false - continua com valores em cache
-            // return false;  // REMOVED
+            // ✅ v2.36/v3.0: NÃO retorna false - continua com valores em cache
+            // return false; 
         }
         
         // Currency Strength é opcional - se falhar, apenas desabilita Gate 5
@@ -1111,12 +1141,7 @@ public:
         
         if(m_supertrend_handle == INVALID_HANDLE)
         {
-            static int st_handle_warn = 0;
-            if(st_handle_warn < 3)
-            {
-                Print("[v2.49] ⚠️ Supertrend handle inválido - usando valores em cache");
-                st_handle_warn++;
-            }
+            // Disabled - skip silently
         }
         else
         {
@@ -1150,12 +1175,7 @@ public:
         
         if(m_mom_handle == INVALID_HANDLE)
         {
-            static int mom_handle_warn = 0;
-            if(mom_handle_warn < 3)
-            {
-                Print("[v2.49] ⚠️ Momentum (OBV MACD) handle inválido - usando valores em cache");
-                mom_handle_warn++;
-            }
+            // Disabled - skip silently
         }
         else
         {
@@ -1225,12 +1245,7 @@ public:
         
         if(m_rsi_oma_handle == INVALID_HANDLE)
         {
-            static int rsi_handle_warn = 0;
-            if(rsi_handle_warn < 3)
-            {
-                Print("[v2.36] ⚠️ RSI OMA handle inválido - usando valores em cache");
-                rsi_handle_warn++;
-            }
+            // Disabled - skip silently
         }
         else
         {

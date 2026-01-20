@@ -66,6 +66,9 @@ private:
     // Throttle for repetitive Gate 2 rejections (reduce log noise)
     string          m_last_gate2_reason;
     
+    // ✅ v4.0: Invert Logic Flag
+    bool            m_invert_logic;
+    
 public:
     //+------------------------------------------------------------------+
     //| Constructor                                                      |
@@ -88,6 +91,7 @@ public:
         
         ArrayInitialize(m_gate_results, false);
         m_last_gate2_reason = "";
+        m_invert_logic = false;
     }
     
     //+------------------------------------------------------------------+
@@ -102,7 +106,8 @@ public:
     //+------------------------------------------------------------------+
     bool Init(CCore *core, CMarketAccess *market, CIndicatorHub *indicators,
               ENUM_TIMEFRAMES macro1, ENUM_TIMEFRAMES macro2, 
-              ENUM_TIMEFRAMES macro3, ENUM_TIMEFRAMES operational)
+              ENUM_TIMEFRAMES macro3, ENUM_TIMEFRAMES operational,
+              bool invert_logic) // ✅ v4.0
     {
         if(core == NULL || market == NULL || indicators == NULL)
         {
@@ -119,6 +124,9 @@ public:
         m_macro3_tf = macro3;
         m_operational_tf = operational;
         // ✅ min_score parameter removed - validation in AsymmetricRisk
+        
+        m_invert_logic = invert_logic;
+        if(m_invert_logic) Print("🔄 SignalEngine: LOGIC INVERSION ENABLED (Buy->Sell / Sell->Buy)");
         
         Print(StringFormat("✅ SignalEngine initialized | MTF: %s/%s/%s/%s",
               EnumToString(m_macro1_tf), EnumToString(m_macro2_tf),
@@ -549,6 +557,24 @@ public:
         
         // All gates passed
         LogGateResults(true);
+        
+        // ══════════════════════════════════════════════════════════════════
+        // ✅ v4.0: APPLY LOGIC INVERSION (Last Step)
+        // ══════════════════════════════════════════════════════════════════
+        if(m_invert_logic)
+        {
+            if(m_signal_direction == SIGNAL_DIR_BUY)
+            {
+                m_signal_direction = SIGNAL_DIR_SELL;
+                m_core.LogMessage(2, "🔄 INVERT LOGIC APPLIED: Signal flipped BUY ➔ SELL");
+            }
+            else if(m_signal_direction == SIGNAL_DIR_SELL)
+            {
+                m_signal_direction = SIGNAL_DIR_BUY;
+                m_core.LogMessage(2, "🔄 INVERT LOGIC APPLIED: Signal flipped SELL ➔ BUY");
+            }
+        }
+        
         return true;
     }
     

@@ -184,7 +184,8 @@ int OnInit()
     
     // ✅ InpMinScore removed - score validation now in AsymmetricRisk only
     if(!g_signals.Init(g_core, g_market, g_indicators, 
-                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF))
+                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF,
+                       InpInvertLogic)) // ✅ v4.0
     {
         Print("❌ CRITICAL ERROR: SignalEngine initialization failed");
         CleanupModules();

@@ -143,6 +143,8 @@ input ENUM_TIMEFRAMES InpOperationalTF = PERIOD_M15; // Operational Timeframe (M
 input group "═══════════ ⚙️ CONFIGURAÇÕES GERAIS ═══════════"
 input int      InpMagicNumber    = 20241024;  // Magic Number
 input bool     InpShowPanel      = true;       // Exibir Painel no Gráfico
+// ✅ v4.0: INVERT LOGIC (Monkey Test < 50%)
+input bool     InpInvertLogic    = false;      // 🔄 Inverter Lógica de Sinal (Buy->Sell)
 input bool     InpEnableAlerts   = true;       // Ativar Alertas Sonoros
 input bool     InpEnableEmail    = false;      // Enviar Email em Operações
 input bool     InpEnablePush     = false;      // Enviar Notificação Push

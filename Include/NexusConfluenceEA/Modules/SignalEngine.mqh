@@ -57,8 +57,9 @@ private:
     ENUM_SIGNAL_DIRECTION m_signal_direction;
     
     // Gate results (for logging)
-    bool            m_gate_results[6];
-    string          m_gate_messages[6];
+    // ✅ v3.0: Increased to 7 gates (0-6)
+    bool            m_gate_results[7];
+    string          m_gate_messages[7];
     
     // ✅ m_min_score REMOVED - validation now in AsymmetricRisk only
 
@@ -473,6 +474,39 @@ public:
     }
     
     //+------------------------------------------------------------------+
+    //| GATE 6: Regime Filter (Flat Market / ADX)                        |
+    //| ✅ v3.0: Blocks trades during flat markets                       |
+    //+------------------------------------------------------------------+
+    bool ProcessGate6_Regime(void)
+    {
+        // Check if disabled (helper in IndicatorHub)
+        if(!m_indicators.IsRegimeFilterEnabled())
+        {
+             m_gate_results[6] = true;
+             m_gate_messages[6] = "G6✓ Disabled";
+             m_core.LogMessage(3, "Gate 6 BYPASSED: Regime Filter disabled");
+             return true;
+        }
+
+        double adx = m_indicators.GetRegimeADX();
+        double threshold = m_indicators.GetRegimeThreshold();
+        
+        // Logic: ADX < Threshold = FLAT
+        if(adx < threshold)
+        {
+            m_gate_results[6] = false;
+            m_gate_messages[6] = StringFormat("G6✗ Flat (%.1f<%.1f)", adx, threshold);
+            m_core.LogMessage(2, StringFormat("❌ Gate 6 REJECTED: Flat Market (ADX %.1f < %.1f)", adx, threshold));
+            return false;
+        }
+
+        m_gate_results[6] = true;
+        m_gate_messages[6] = StringFormat("G6✓ Trend (%.1f)", adx);
+        m_core.LogMessage(3, StringFormat("✅ Gate 6 PASSED: Strong Trend (ADX %.1f)", adx));
+        return true;
+    }
+    
+    //+------------------------------------------------------------------+
     //| Process All Gates Sequentially                                  |
     //+------------------------------------------------------------------+
     bool ProcessAllGates(void)
@@ -506,6 +540,12 @@ public:
         // Gate 5: Currency Strength Context
         if(!ProcessGate5_Context())
             return false;
+            
+        // Gate 6: Regime Filter (Flat Market)
+        if(!ProcessGate6_Regime())
+            return false;
+            
+
         
         // All gates passed
         LogGateResults(true);
@@ -518,10 +558,10 @@ public:
     void LogGateResults(bool all_passed)
     {
         string gate_summary = "Gates: ";
-        for(int i = 0; i < 6; i++)
+        for(int i = 0; i < 7; i++)
         {
             gate_summary += m_gate_messages[i];
-            if(i < 5) gate_summary += " ";
+            if(i < 6) gate_summary += " ";
         }
         
         if(all_passed)
@@ -536,7 +576,7 @@ public:
         {
             // Find first failed gate
             int failed_gate = -1;
-            for(int i = 0; i < 6; i++)
+            for(int i = 0; i < 7; i++)
             {
                 if(!m_gate_results[i])
                 {

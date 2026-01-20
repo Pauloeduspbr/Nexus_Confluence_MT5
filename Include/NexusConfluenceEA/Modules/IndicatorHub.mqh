@@ -140,6 +140,12 @@ private:
     int             m_attached_win_mom;
     int             m_attached_win_rsi;
     int             m_attached_win_cs;
+    
+    // ✅ v3.0 REGIME FILTER (ADX)
+    int             m_adx_handle;
+    int             m_regime_adx_period;
+    double          m_regime_adx_buffer[];
+    double          m_regime_threshold; // ✅ v3.0
 
     // Helper: Get error description
     string ErrorDescription(int error_code)
@@ -301,6 +307,12 @@ public:
         
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
         ArrayInitialize(m_st_lower, EMPTY_VALUE);
+        
+        // ✅ v3.0 REGIME
+        m_adx_handle = INVALID_HANDLE;
+        m_regime_adx_period = 14;
+        m_regime_threshold = 20.0;
+        ArraySetAsSeries(m_regime_adx_buffer, true);
     }
     
     //+------------------------------------------------------------------+
@@ -408,7 +420,9 @@ public:
               // RSI OMA
               int rsi_period, int rsi_ma_period, ENUM_MA_METHOD rsi_ma_method, double rsi_high_level, double rsi_low_level, bool rsi_show_levels,
               // Currency Strength
-              int cs_calc_period, int cs_smoothing, bool cs_show_percent)
+              int cs_calc_period, int cs_smoothing, bool cs_show_percent,
+              // ✅ v3.0 REGIME
+              bool enable_regime, int regime_adx_period, double regime_threshold, ENUM_TIMEFRAMES regime_tf)
     {
         m_symbol = symbol;
         m_operational_tf = operational_tf;
@@ -681,6 +695,32 @@ public:
         {
             Print("   ⚠️ Currency Strength DISABLED by user input");
             m_cs_available = false;
+        }
+        
+        // 6. Regime Filter (ADX)
+        // ✅ v3.0: Always load if enabled
+        if(enable_regime)
+        {
+            m_regime_adx_period = regime_adx_period;
+            m_regime_threshold = regime_threshold;
+            
+            // Handle iADX
+            m_adx_handle = iADX(m_symbol, (regime_tf == PERIOD_CURRENT ? m_operational_tf : regime_tf), m_regime_adx_period);
+            
+            if(m_adx_handle != INVALID_HANDLE)
+            {
+                Print("✅ Regime ADX loaded on ", EnumToString((regime_tf == PERIOD_CURRENT ? m_operational_tf : regime_tf)));
+            }
+            else
+            {
+                Print("❌ CRITICAL ERROR: Failed to load Regime ADX");
+                return false;
+            }
+        }
+        else
+        {
+             m_adx_handle = INVALID_HANDLE;
+             Print("   ⚠️ Regime ADX DISABLED by user input");
         }
         
         // ✅ v2.45 FIX: Indicator GG_TrendBar v2.34 agora se auto-gerencia
@@ -1580,6 +1620,12 @@ public:
     {
         return (m_rsi_oma_handle != INVALID_HANDLE);
     }
+
+    // ✅ v3.0: Check if Regime Filter is enabled
+    bool IsRegimeFilterEnabled(void) const
+    {
+        return (m_adx_handle != INVALID_HANDLE);
+    }
     
     //+------------------------------------------------------------------+
     //| Get last update time                                             |
@@ -1608,6 +1654,27 @@ public:
         Print("Currency Strength: Base=", m_cs_base, " Quote=", m_cs_quote, 
               " Available=", m_cs_available);
         Print("===============================");
+    }
+    //+------------------------------------------------------------------+
+    //| Get Regime ADX Value                                             |
+    //+------------------------------------------------------------------+
+    double GetRegimeADX(void)
+    {
+        if(m_adx_handle == INVALID_HANDLE) return 0.0;
+        
+        // Copy 1 value from buffer 0 (MAIN) at shift 1 (closed bar)
+        if(CopyBuffer(m_adx_handle, 0, 1, 1, m_regime_adx_buffer) < 1)
+        {
+            return 0.0;
+        }
+        
+        return m_regime_adx_buffer[0];
+    }
+    
+    // ✅ v3.0: Get Regime Threshold
+    double GetRegimeThreshold(void) const
+    {
+        return m_regime_threshold;
     }
 };
 //+------------------------------------------------------------------+

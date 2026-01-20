@@ -160,7 +160,9 @@ int OnInit()
                           // RSI OMA
                           InpRSI_Period, InpRSI_MA_Period, InpRSI_MA_Method, InpRSI_HighLevel, InpRSI_LowLevel, InpRSI_ShowLevels,
                           // Currency Strength
-                          InpCS_CalcPeriod, InpCS_Smoothing, InpCS_ShowPercent))
+                          InpCS_CalcPeriod, InpCS_Smoothing, InpCS_ShowPercent,
+                          // ✅ v3.0 REGIME
+                          InpRegime_Enable, InpRegime_ADX_Period, (double)InpRegime_ADX_Threshold, InpRegime_TF))
     {
         Print("❌ CRITICAL ERROR: IndicatorHub initialization failed");
         CleanupModules();

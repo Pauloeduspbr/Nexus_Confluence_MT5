@@ -233,6 +233,15 @@ input int               InpCS_Smoothing       = 5;                   // Suaviza�
 input bool              InpCS_ShowPercent     = true;                // Exibir em %
 
 //+------------------------------------------------------------------+
+//| SEÇÃO 23: FILTRO DE REGIME (FLAT MARKET)                         |
+//+------------------------------------------------------------------+
+input group "═══════════ 🐢 FILTRO DE REGIME ═══════════"
+input bool     InpRegime_Enable      = true;        // Ativar Filtro de Regime
+input int      InpRegime_ADX_Period  = 14;          // Período ADX
+input int      InpRegime_ADX_Threshold = 20;        // Nível Mínimo ADX (Absoluto)
+input ENUM_TIMEFRAMES InpRegime_TF   = PERIOD_CURRENT; // Timeframe do Filtro
+
+//+------------------------------------------------------------------+
 //| NOTAS IMPORTANTES                                                 |
 //+------------------------------------------------------------------+
 /*

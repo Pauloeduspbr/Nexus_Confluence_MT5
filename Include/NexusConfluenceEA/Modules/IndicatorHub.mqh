@@ -1543,6 +1543,30 @@ public:
     }
     
     //+------------------------------------------------------------------+
+    //| Check if Supertrend is enabled                                   |
+    //+------------------------------------------------------------------+
+    bool IsSupertrendEnabled(void) const
+    {
+        return (m_supertrend_handle != INVALID_HANDLE);
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Check if OBV MACD (Momentum) is enabled                          |
+    //+------------------------------------------------------------------+
+    bool IsMomentumEnabled(void) const
+    {
+        return (m_mom_handle != INVALID_HANDLE);
+    }
+    
+    //+------------------------------------------------------------------+
+    //| Check if RSI OMA is enabled                                      |
+    //+------------------------------------------------------------------+
+    bool IsRSIEnabled(void) const
+    {
+        return (m_rsi_oma_handle != INVALID_HANDLE);
+    }
+    
+    //+------------------------------------------------------------------+
     //| Get last update time                                             |
     //+------------------------------------------------------------------+
     datetime GetLastUpdateTime(void) const

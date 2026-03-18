@@ -15,11 +15,13 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
   Chart panel                 Risk management
 ```
 
-- **DLL Total**: ~9,700 linhas C++ | Compilada com MinGW-W64 GCC 15.2 x64
-- **MQL5 Wrapper**: ~500 linhas | Orquestra dados, ordens e visualizacao
-- **Indicadores visuais**: 5 arquivos `.ex5` para plot no grafico (calculo na DLL)
+- **DLL**: ~9,700 linhas C++ compiladas em binario nativo x64
+- **MQL5 Wrapper**: Orquestra dados, ordens e visualizacao
+- **Protecao IP**: Logica em DLL binaria (impossivel decompilar)
 
 ## Sistema de 6 Gates
+
+Cada trade passa por 6 validacoes sequenciais. Se qualquer gate rejeitar, o sinal e descartado.
 
 | Gate | Nome | Funcao |
 |------|------|--------|
@@ -30,27 +32,19 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
 | **Gate 5** | Trend Quality | Efficiency Ratio min + momentum ratio + ER decline filter |
 | **Gate 6** | Risk Check | Max positions, cooldown anti-churn, macro flip cooldown |
 
-## Indicadores Internos (DLL)
-
-| Indicador | Descricao |
-|-----------|-----------|
-| **GG TrendBar** | ADX + Parabolic SAR + DI em 15 timeframes. Bar-time guard |
-| **TrendMagic** | CCI + Kaufman ER + True Range EMA (sem ATR) |
-| **OBV MACD** | On-Balance Volume + MACD com threshold dinamico |
-| **RSI OMA** | RSI + Optimal Moving Average + hysteresis |
-| **Currency Strength** | Forca relativa das moedas do par |
-
 ## Gestao de Risco
 
-- **Break Even**: trigger + step configuravel por BUY/SELL
+- **Break Even**: trigger + step configuravel por BUY/SELL separadamente
 - **Trailing Stop**: ativacao independente BUY/SELL
 - **Drawdown Protection**: daily max %, consecutive loss limit, lot reduction
-- **Dynamic SL/TP**: escala baseada no Efficiency Ratio
+- **Dynamic SL/TP**: escala automatica baseada no Efficiency Ratio
 - **Cooldown Anti-Churn**: bloqueia re-entrada na mesma direcao apos SL
 
 ---
 
 ## Resultados de Backtest (2024.01 - 2026.03)
+
+Deposito inicial: $83.00 | Alavancagem: 1:200 | Every tick | Walk-Forward 1/3
 
 ### XAUUSD H1
 
@@ -63,10 +57,7 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
 | **Max DD (Balance)** | 13.64% | VERDE |
 | **Total Trades** | 214 | OK |
 | **Win Rate** | 85.05% | VERDE |
-| **Max Consec Wins** | 32 | VERDE |
-| **Max Consec Losses** | 3 | VERDE |
-| **Avg Win / Avg Loss** | $7.04 / $17.85 | Payoff 0.39 |
-| **Deposito Inicial** | $83.00 | |
+| **Max Consec Wins / Losses** | 32 / 3 | VERDE |
 
 ![XAUUSD Equity](Reports/XAUUSD/xauusd.png)
 
@@ -81,10 +72,7 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
 | **Max DD (Balance)** | 14.68% | VERDE |
 | **Total Trades** | 292 | OK |
 | **Win Rate** | 86.64% | VERDE |
-| **Max Consec Wins** | 37 | VERDE |
-| **Max Consec Losses** | 4 | VERDE |
-| **Avg Win / Avg Loss** | $4.02 / $13.74 | Payoff 0.29 |
-| **Deposito Inicial** | $83.00 | |
+| **Max Consec Wins / Losses** | 37 / 4 | VERDE |
 
 ![USDJPY Equity](Reports/USDJPY/usdjpy.png)
 
@@ -102,30 +90,48 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
 
 ---
 
-## Otimizacao 3 Rounds
-
-```
-R1 Foundation  -> TFs + GG TrendBar + Supertrend + Scores + State (16 params)
-R2 Signal      -> MACD + RSI + Gates 4/5 + Spread (16 params)
-R3 Exits       -> SL/TP + BE + TS + DD protection (16 params)
-```
-
-Cada round: MT5 Strategy Tester | Genetico | Every tick | WF 1/3 | Criterio complexo maximo
-
-## Presets Disponiveis
-
-| Arquivo | Ativo | Status |
-|---------|-------|--------|
-| `Presets/V3/NexusV3_FINAL_XAUUSD_H1.set` | XAUUSD H1 | FINAL |
-| `Presets/V3/NexusV3_FINAL_USDJPY_H1.set` | USDJPY H1 | FINAL |
-
 ## Instalacao
 
-1. Copiar `NexusConfluence.dll` para `MQL5/Libraries/`
-2. Copiar `NexusConfluenceV3.ex5` para `MQL5/Experts/NexusConfluenceV3/`
-3. Copiar indicadores `.ex5` para `MQL5/Indicators/NexusConfluenceEA/`
-4. Copiar `.set` para `MQL5/Experts/NexusConfluenceV3/set/`
-5. Abrir chart (ex: USDJPY H1) -> Attach EA -> Load preset -> Enable DLL imports
+### Estrutura de arquivos
+
+Copie o conteudo da pasta `dist/MQL5/` para o diretorio `MQL5/` do seu terminal MetaTrader 5:
+
+```
+dist/MQL5/
+  Libraries/
+    NexusConfluence.dll              <-- DLL principal (toda logica)
+  Experts/NexusConfluenceV3/
+    NexusConfluenceV3.ex5            <-- EA compilado
+    set/
+      NexusV3_FINAL_USDJPY_H1.set   <-- Preset USDJPY otimizado
+      NexusV3_FINAL_XAUUSD_H1.set   <-- Preset XAUUSD otimizado
+  Indicators/NexusConfluenceEA/
+    GG_TrendBar_Indicator.ex5        <-- Visualizacao (*)
+    TrendMagic_MT5.ex5               <-- Visualizacao (*)
+    OBV_MACD.ex5                     <-- Visualizacao (*)
+    RSIOMA_v2HHLSX_MT5.ex5           <-- Visualizacao (*)
+    CurrencyStrengthMeter_MT5.ex5    <-- Visualizacao (*)
+```
+
+> (*) **IMPORTANTE**: Os indicadores .ex5 sao apenas para VISUALIZACAO no grafico.
+> O EA NAO utiliza esses indicadores para tomar decisoes de trading.
+> Toda logica de calculo dos indicadores esta dentro da DLL (NexusConfluence.dll).
+> Voce pode operar sem os indicadores visuais — o EA funciona normalmente.
+
+### Passo a passo
+
+1. Localize a pasta de dados do MT5: **File > Open Data Folder**
+2. Copie `NexusConfluence.dll` para `MQL5/Libraries/`
+3. Copie `NexusConfluenceV3.ex5` para `MQL5/Experts/NexusConfluenceV3/`
+4. Copie os `.set` para `MQL5/Experts/NexusConfluenceV3/set/`
+5. Copie os indicadores `.ex5` para `MQL5/Indicators/NexusConfluenceEA/`
+6. Reinicie o MetaTrader 5
+7. Abra o chart desejado (ex: USDJPY H1)
+8. Arraste o EA **NexusConfluenceV3** para o chart
+9. Na aba **Common**: marque **"Allow DLL imports"**
+10. Na aba **Inputs**: clique **Load** e selecione o preset correspondente
+11. Preencha o campo **"Chave de Licenca"** com sua key
+12. Clique **OK**
 
 ## Requisitos
 
@@ -133,34 +139,16 @@ Cada round: MT5 Strategy Tester | Genetico | Every tick | WF 1/3 | Criterio comp
 - Windows x64 (DLL requer Windows)
 - Broker com hedging mode
 - Leverage: 1:200 recomendado
-
-## Estrutura do Projeto
-
-```
-DLL/
-  include/          # Headers C++ (gates, indicators, types)
-  src/              # Implementacao C++ (gate_system, indicators)
-  CMakeLists.txt    # Build system
-
-MQL5/
-  Experts/NexusConfluenceV3/
-    NexusConfluenceV3.mq5   # EA wrapper
-  Include/NexusConfluenceV3/
-    NexusV3Bridge.mqh       # DLL bridge
-    NexusV3Inputs.mqh       # Input parameters
-
-Presets/V3/         # .set files finais
-Reports/            # Backtest reports (HTML + PNG)
-```
+- Licenca valida (adquira em [contato])
 
 ## Licenciamento
 
 O EA utiliza sistema de licenciamento integrado na DLL com protecao multinivel:
 
-- **HWID Lock**: DLL valida hardware ID do cliente
 - **Account Lock**: Licenca vinculada a conta MT5 especifica
 - **Expiry Date**: Licencas com data de validade
-- **Checksum**: Deteccao de adulteracao da chave
+- **HWID Lock**: Validacao de hardware
+- **Checksum**: Deteccao de adulteracao
 
 ### Tipos de Licenca
 
@@ -173,27 +161,35 @@ O EA utiliza sistema de licenciamento integrado na DLL com protecao multinivel:
 
 ### Ativacao
 
-1. Adquira sua licenca
+1. Adquira sua licenca informando seu numero de conta MT5
 2. No EA, preencha o campo **"Chave de Licenca"** nos Inputs
-3. A DLL valida automaticamente no OnInit
+3. A DLL valida automaticamente na inicializacao
+4. Se valida: EA opera normalmente
+5. Se invalida/expirada: EA nao inicializa e mostra erro no log
 
-### Build System
+## Otimizacao
 
-```bash
-# Build comercial (licenca obrigatoria)
-cmake -DNEXUS_OPEN=OFF ..
+O EA foi otimizado usando metodologia de 3 rounds sequenciais:
 
-# Build desenvolvimento (sem licenca)
-cmake -DNEXUS_OPEN=ON ..
+```
+R1 Foundation  -> TFs + GG TrendBar + Supertrend + Scores + State (16 params)
+R2 Signal      -> MACD + RSI + Gates 4/5 + Spread (16 params)
+R3 Exits       -> SL/TP + BE + TS + DD protection (16 params)
 ```
 
-## Producao
+- Periodo: 2024.01.02 - 2026.01.19
+- Modelagem: Every tick
+- Walk-Forward: 1/3 (IS ~66%, OOS ~33%)
+- Criterio: Complexo maximo (Genetico)
 
-- **Servidor**: Oracle Cloud VM.Standard.E3.Flex (1 OCPU, 8GB RAM)
-- **OS**: Windows Server 2022 Standard
-- **Broker**: EasyMarkets (Blue Capital Markets Limited)
-- **Ativos em producao**: USDJPY, XAUUSD
+## Suporte
+
+- Problemas de instalacao: verifique se "Allow DLL imports" esta ativado
+- Licenca expirada: entre em contato para renovacao
+- Novos ativos: presets adicionais serao disponibilizados periodicamente
 
 ---
 
-*Nexus Confluence EA v3.0.1 - Desenvolvido para trading algoritmico profissional*
+*Nexus Confluence EA v3.0.1 - Trading algoritmico profissional com arquitetura C++ DLL*
+
+Copyright 2024-2026 Nexus EA. Todos os direitos reservados.

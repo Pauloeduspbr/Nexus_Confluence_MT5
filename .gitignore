@@ -1,17 +1,29 @@
+# Source code (NEVER publish)
+DLL/
+MQL5/Experts/**/*.mq5
+MQL5/Include/
+Experts/
+Include/
+Indicators/**/*.mq5
+
 # Build artifacts
-DLL/build/
-DLL/build_commercial/
 build/
 *.o
 *.obj
-*.exe
-*.dll
+*.pdb
 *.exp
 *.lib
-*.pdb
 
 # IDE
 .vscode/
+
+# Internal
+.claude/
+.github/
+.tmp/
+Deploy/
+tools/
+*.pdf
 
 # Python
 venv/
@@ -21,23 +33,8 @@ __pycache__/
 # Logs
 *.log
 
-# MT5 compiled
-*.ex5
-
-# Keygen (NEVER distribute)
-DLL/tools/keygen
-DLL/tools/keygen.exe
-DLL/tools/*.exe
-
 # Temp
 *.tmp
 C*Userssantospaulofn.exe
-
-# AL (legacy)
-.alcache/
-.alpackages/
-.snapshots/
-.output/
-*.app
-*.flf
-*.g.xlf
+install.sh
+gemini.md

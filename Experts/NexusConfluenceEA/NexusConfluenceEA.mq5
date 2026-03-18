@@ -154,15 +154,13 @@ int OnInit()
                           InpGG_ADX_Period, InpGG_ADX_Price, InpGG_PSAR_Step, InpGG_PSAR_Max,
                           // Supertrend (TrendMagic)
                           InpST_CCI_Period, InpST_ATR_Period, InpST_ATR_Multiplier,
-                          // Momentum (OBV MACD)
-                          InpMACD_FastEMA, InpMACD_SlowEMA, InpMACD_SignalSMA, InpMACD_ObvSmooth, InpMACD_UseTickVolume, InpMACD_ShowMACDLine, InpMACD_ShowSignalLine,
+                          // Momentum (OBV MACD) - v4.00: InpMACD_ObvWindow replaces ObvSmooth
+                          InpMACD_FastEMA, InpMACD_SlowEMA, InpMACD_SignalSMA, InpMACD_ObvWindow, InpMACD_UseTickVolume, InpMACD_ShowMACDLine, InpMACD_ShowSignalLine,
                           InpMACD_ThreshPeriod, InpMACD_ThreshMult,
                           // RSI OMA
                           InpRSI_Period, InpRSI_MA_Period, InpRSI_MA_Method, InpRSI_HighLevel, InpRSI_LowLevel, InpRSI_ShowLevels,
                           // Currency Strength
-                          InpCS_CalcPeriod, InpCS_Smoothing, InpCS_ShowPercent,
-                          // ✅ v3.0 REGIME
-                          InpRegime_Enable, InpRegime_ADX_Period, (double)InpRegime_ADX_Threshold, InpRegime_TF))
+                          InpCS_CalcPeriod, InpCS_Smoothing, InpCS_ShowPercent))
     {
         Print("❌ CRITICAL ERROR: IndicatorHub initialization failed");
         CleanupModules();
@@ -184,8 +182,7 @@ int OnInit()
     
     // ✅ InpMinScore removed - score validation now in AsymmetricRisk only
     if(!g_signals.Init(g_core, g_market, g_indicators, 
-                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF,
-                       InpInvertLogic)) // ✅ v4.0
+                       InpMacro1TF, InpMacro2TF, InpMacro3TF, InpOperationalTF))
     {
         Print("❌ CRITICAL ERROR: SignalEngine initialization failed");
         CleanupModules();
@@ -424,12 +421,11 @@ void OnTick()
     
     // ──────────────────────────────────────────────────────────────
     // ✅ v2.63: SILENT TIME FILTER - Check BEFORE processing gates
-    // If enabled AND outside trading hours, return (logging at Level 3)
+    // If outside trading hours, return silently (no logs!)
     // ──────────────────────────────────────────────────────────────
-    if(g_market.IsTimeFilterEnabled() && !g_market.IsWithinTradingHours())
+    if(!g_market.IsWithinTradingHours())
     {
-        // Outside trading hours - return (Level 3 log for diagnosis)
-        g_core.LogMessage(3, "⏸️ Time Filter blocking new signal (Outside Hours)");
+        // Outside trading hours - return silently without any logs
         return;
     }
     
@@ -987,10 +983,10 @@ void PrintConfiguration()
     Print("TrendMagic: CCI=", InpST_CCI_Period,
         " | ATR=", InpST_ATR_Period,
         " | Mult=", DoubleToString(InpST_ATR_Multiplier, 2));
-    Print("Momentum (OBV MACD): FastEMA=", InpMACD_FastEMA,
+    Print("Momentum (OBV MACD v4.00): FastEMA=", InpMACD_FastEMA,
         " | SlowEMA=", InpMACD_SlowEMA,
-        " | SignalSMA=", InpMACD_SignalSMA,
-        " | OBV Smooth=", InpMACD_ObvSmooth,
+        " | SignalEMA=", InpMACD_SignalSMA,
+        " | OBV Window=", InpMACD_ObvWindow,
         " | TickVol=", (InpMACD_UseTickVolume ? "ON" : "OFF"),
         " | Show MACD=", (InpMACD_ShowMACDLine ? "ON" : "OFF"),
         " | Show Signal=", (InpMACD_ShowSignalLine ? "ON" : "OFF"));

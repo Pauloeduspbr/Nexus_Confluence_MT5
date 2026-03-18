@@ -140,12 +140,6 @@ private:
     int             m_attached_win_mom;
     int             m_attached_win_rsi;
     int             m_attached_win_cs;
-    
-    // ✅ v3.0 REGIME FILTER (ADX)
-    int             m_adx_handle;
-    int             m_regime_adx_period;
-    double          m_regime_adx_buffer[];
-    double          m_regime_threshold; // ✅ v3.0
 
     // Helper: Get error description
     string ErrorDescription(int error_code)
@@ -251,7 +245,7 @@ private:
     int                 m_obv_fast_ema;
     int                 m_obv_slow_ema;
     int                 m_obv_signal_sma;
-    int                 m_obv_smooth;
+    int                 m_obv_window;          // v4.00: OBV lookback window (replaces smooth)
     bool                m_obv_use_tick_volume;
     bool                m_obv_show_macd;
     bool                m_obv_show_signal;
@@ -307,12 +301,6 @@ public:
         
         ArrayInitialize(m_st_upper, EMPTY_VALUE);
         ArrayInitialize(m_st_lower, EMPTY_VALUE);
-        
-        // ✅ v3.0 REGIME
-        m_adx_handle = INVALID_HANDLE;
-        m_regime_adx_period = 14;
-        m_regime_threshold = 20.0;
-        ArraySetAsSeries(m_regime_adx_buffer, true);
     }
     
     //+------------------------------------------------------------------+
@@ -414,15 +402,13 @@ public:
               int gg_adx_period, ENUM_APPLIED_PRICE gg_adx_price, double gg_psar_step, double gg_psar_max,
               // Supertrend (TrendMagic)
               int st_cci_period, int st_atr_period, double st_atr_multiplier,
-              // Momentum (OBV MACD)
-              int macd_fast_ema, int macd_slow_ema, int macd_signal_sma, int macd_obv_smooth, bool macd_use_tick_volume, bool macd_show_macd, bool macd_show_signal,
+              // Momentum (OBV MACD) - v4.00: obv_window replaces obv_smooth
+              int macd_fast_ema, int macd_slow_ema, int macd_signal_sma, int macd_obv_window, bool macd_use_tick_volume, bool macd_show_macd, bool macd_show_signal,
               int macd_thresh_period, double macd_thresh_mult,
               // RSI OMA
               int rsi_period, int rsi_ma_period, ENUM_MA_METHOD rsi_ma_method, double rsi_high_level, double rsi_low_level, bool rsi_show_levels,
               // Currency Strength
-              int cs_calc_period, int cs_smoothing, bool cs_show_percent,
-              // ✅ v3.0 REGIME
-              bool enable_regime, int regime_adx_period, double regime_threshold, ENUM_TIMEFRAMES regime_tf)
+              int cs_calc_period, int cs_smoothing, bool cs_show_percent)
     {
         m_symbol = symbol;
         m_operational_tf = operational_tf;
@@ -446,7 +432,7 @@ public:
     m_obv_fast_ema = macd_fast_ema;
     m_obv_slow_ema = macd_slow_ema;
     m_obv_signal_sma = macd_signal_sma;
-    m_obv_smooth = macd_obv_smooth;
+    m_obv_window = macd_obv_window;  // v4.00: OBV window (not smooth)
     m_obv_use_tick_volume = macd_use_tick_volume;
     m_obv_show_macd = macd_show_macd;
     m_obv_show_signal = macd_show_signal;
@@ -581,6 +567,7 @@ public:
         
     // 3. Momentum (OBV MACD) – legacy WAE removed
         // ✅ v2.15: Conditionally load based on enable_macd flag
+        // ✅ v4.00: Updated parameters for windowed OBV
         if(enable_macd)
         {
             string paths[] = { "NexusConfluenceEA\\", "\\NexusConfluenceEA\\", "", "Market\\" };
@@ -588,9 +575,10 @@ public:
             for(int i = 0; i < ArraySize(paths); i++)
             {
                 string full_path = paths[i] + "OBV_MACD.ex5";
+                // v4.00: New parameter order - InpObvWindow replaces InpObvSmooth
                 handle = iCustom(m_symbol, operational_tf, full_path,
                                  m_obv_fast_ema, m_obv_slow_ema, m_obv_signal_sma,
-                                 m_obv_smooth, m_obv_use_tick_volume, m_obv_show_macd, m_obv_show_signal,
+                                 m_obv_window, m_obv_use_tick_volume, m_obv_show_macd, m_obv_show_signal,
                                  macd_thresh_period, macd_thresh_mult);
                 if(handle != INVALID_HANDLE)
                 {
@@ -601,7 +589,7 @@ public:
                 string base_path = paths[i] + "OBV_MACD";
                 handle = iCustom(m_symbol, operational_tf, base_path,
                                  m_obv_fast_ema, m_obv_slow_ema, m_obv_signal_sma,
-                                 m_obv_smooth, m_obv_use_tick_volume, m_obv_show_macd, m_obv_show_signal,
+                                 m_obv_window, m_obv_use_tick_volume, m_obv_show_macd, m_obv_show_signal,
                                  macd_thresh_period, macd_thresh_mult);
                 if(handle != INVALID_HANDLE)
                 {
@@ -695,32 +683,6 @@ public:
         {
             Print("   ⚠️ Currency Strength DISABLED by user input");
             m_cs_available = false;
-        }
-        
-        // 6. Regime Filter (ADX)
-        // ✅ v3.0: Always load if enabled
-        if(enable_regime)
-        {
-            m_regime_adx_period = regime_adx_period;
-            m_regime_threshold = regime_threshold;
-            
-            // Handle iADX
-            m_adx_handle = iADX(m_symbol, (regime_tf == PERIOD_CURRENT ? m_operational_tf : regime_tf), m_regime_adx_period);
-            
-            if(m_adx_handle != INVALID_HANDLE)
-            {
-                Print("✅ Regime ADX loaded on ", EnumToString((regime_tf == PERIOD_CURRENT ? m_operational_tf : regime_tf)));
-            }
-            else
-            {
-                Print("❌ CRITICAL ERROR: Failed to load Regime ADX");
-                return false;
-            }
-        }
-        else
-        {
-             m_adx_handle = INVALID_HANDLE;
-             Print("   ⚠️ Regime ADX DISABLED by user input");
         }
         
         // ✅ v2.45 FIX: Indicator GG_TrendBar v2.34 agora se auto-gerencia
@@ -1014,63 +976,33 @@ public:
         // Log detalhado de quais indicadores falharam (primeiras 10x)
         // ═══════════════════════════════════════════════════════════════
         
-        // ✅ v3.0 FIX: Verificar BarsCalculated RESPEITANDO ENABLED FLAGS
-        // Apenas verifica indicadores que têm handle válido
-        
-        // 1. GG TrendBar
+        // ✅ v2.15 FIX: Verificar BarsCalculated para cada handle GG MTF
         int bars_calculated_gg_min = INT_MAX;
-        bool gg_active = false;
-        
         for(int i = 0; i < 4; i++)
         {
-            if(m_gg_handles[i] != INVALID_HANDLE)
-            {
-                int bars = BarsCalculated(m_gg_handles[i]);
-                if(bars < bars_calculated_gg_min)
-                    bars_calculated_gg_min = bars;
-                gg_active = true;
-            }
+            int bars = BarsCalculated(m_gg_handles[i]);
+            if(bars < bars_calculated_gg_min)
+                bars_calculated_gg_min = bars;
         }
-        // Se nenhum GG ativo (desabilitado), considera "pronto" (INT_MAX)
-        if(!gg_active) bars_calculated_gg_min = INT_MAX;
         
-        // 2. Supertrend
-        int bars_calculated_st = INT_MAX;
-        if(m_supertrend_handle != INVALID_HANDLE)
-            bars_calculated_st = BarsCalculated(m_supertrend_handle);
-            
-        // 3. Momentum
-        int bars_calculated_mom = INT_MAX;
-        if(m_mom_handle != INVALID_HANDLE)
-            bars_calculated_mom = BarsCalculated(m_mom_handle);
-            
-        // 4. RSI OMA
-        int bars_calculated_rsi = INT_MAX;
-        if(m_rsi_oma_handle != INVALID_HANDLE)
-            bars_calculated_rsi = BarsCalculated(m_rsi_oma_handle);
+        int bars_calculated_st = BarsCalculated(m_supertrend_handle);
+        int bars_calculated_mom = BarsCalculated(m_mom_handle);
+        int bars_calculated_rsi = BarsCalculated(m_rsi_oma_handle);
         
-        // ✅ FIX v3.0: Check sync only for ENABLED indicators
-        // Se indicador desabilitado (=INT_MAX), não falha o check
+        // ✅ FIX v2.36: Se BarsCalculated() falha, loga mas NÃO retorna false
+        // Permite EA continuar com valores anteriores do cache
         static int bars_fail_count = 0;
-        
-        bool gg_fail = (bars_calculated_gg_min <= 0 && gg_active);
-        bool st_fail = (bars_calculated_st <= 0 && m_supertrend_handle != INVALID_HANDLE);
-        bool mom_fail = (bars_calculated_mom <= 0 && m_mom_handle != INVALID_HANDLE);
-        bool rsi_fail = (bars_calculated_rsi <= 0 && m_rsi_oma_handle != INVALID_HANDLE);
-        
-        if(gg_fail || st_fail || mom_fail || rsi_fail)
+        if(bars_calculated_gg_min <= 0 || bars_calculated_st <= 0 || 
+           bars_calculated_mom <= 0 || bars_calculated_rsi <= 0)
         {
             if(bars_fail_count < 10)
             {
-                Print("[SYNC v3.0] Aguardando cálculo (cache usado):",
-                      gg_fail ? StringFormat(" GG=%d", bars_calculated_gg_min) : "",
-                      st_fail ? StringFormat(" ST=%d", bars_calculated_st) : "",
-                      mom_fail ? StringFormat(" MOM=%d", bars_calculated_mom) : "",
-                      rsi_fail ? StringFormat(" RSI=%d", bars_calculated_rsi) : "");
+                Print("[SYNC v2.15] BarsCalculated não pronto (usando cache anterior): GG_min=", bars_calculated_gg_min,
+                      " ST=", bars_calculated_st, " MOM=", bars_calculated_mom, " RSI=", bars_calculated_rsi);
                 bars_fail_count++;
             }
-            // ✅ v2.36/v3.0: NÃO retorna false - continua com valores em cache
-            // return false; 
+            // ✅ v2.36: NÃO retorna false - continua com valores em cache
+            // return false;  // REMOVED
         }
         
         // Currency Strength é opcional - se falhar, apenas desabilita Gate 5
@@ -1181,7 +1113,12 @@ public:
         
         if(m_supertrend_handle == INVALID_HANDLE)
         {
-            // Disabled - skip silently
+            static int st_handle_warn = 0;
+            if(st_handle_warn < 3)
+            {
+                Print("[v2.49] ⚠️ Supertrend handle inválido - usando valores em cache");
+                st_handle_warn++;
+            }
         }
         else
         {
@@ -1215,7 +1152,12 @@ public:
         
         if(m_mom_handle == INVALID_HANDLE)
         {
-            // Disabled - skip silently
+            static int mom_handle_warn = 0;
+            if(mom_handle_warn < 3)
+            {
+                Print("[v2.49] ⚠️ Momentum (OBV MACD) handle inválido - usando valores em cache");
+                mom_handle_warn++;
+            }
         }
         else
         {
@@ -1285,7 +1227,12 @@ public:
         
         if(m_rsi_oma_handle == INVALID_HANDLE)
         {
-            // Disabled - skip silently
+            static int rsi_handle_warn = 0;
+            if(rsi_handle_warn < 3)
+            {
+                Print("[v2.36] ⚠️ RSI OMA handle inválido - usando valores em cache");
+                rsi_handle_warn++;
+            }
         }
         else
         {
@@ -1403,66 +1350,95 @@ public:
     
     //+------------------------------------------------------------------+
     //| Check Supertrend direction (with 1 candle tolerance)            |
-    //| ✅ v2.50 CRITICAL FIX: COMPARE PRICE WITH LINE VALUE!           |
+    //| ✅ v2.65 CRITICAL FIX: STRICT close vs line validation          |
     //| TrendMagic_MT5 buffers:                                          |
     //|   Buffer 0 (bufferUp) = BLUE line (support) drawn when CCI≥0    |
     //|   Buffer 1 (bufferDn) = RED line (resistance) drawn when CCI≤0  |
-    //| LOGIC: Price ABOVE blue support = +1 | Price BELOW red resist = -1 |
-    //|        BUT if price BREAKS line = OPPOSITE signal!              |
+    //|                                                                  |
+    //| IndicatorHub mapping (names backwards but consistent):          |
+    //|   m_st_lower = Buffer 0 (BLUE support line)                     |
+    //|   m_st_upper = Buffer 1 (RED resistance line)                   |
+    //|                                                                  |
+    //| CRITICAL RULE:                                                   |
+    //|   BUY: Close MUST be ABOVE blue line (support respected)        |
+    //|   SELL: Close MUST be BELOW red line (resistance respected)     |
     //+------------------------------------------------------------------+
     int GetSupertrendSignal(void)
     {
-        // Get current close price for comparison
+        // Get CLOSED candle price (shift=1) - ALWAYS use closed candle!
         double close_price[1];
         if(CopyClose(m_symbol, m_operational_tf, 1, 1, close_price) != 1)
         {
-            return 0;  // Failed to get close price, return neutral
+            return 0;  // Failed to get close price
         }
         
-        // ✅ v2.50 FIX: Check which line is active AND compare price position
-        // BLUE line active (CCI was ≥0, bullish context)
-        if(m_st_lower[0] != EMPTY_VALUE && m_st_upper[0] == EMPTY_VALUE)
+        // ✅ v2.65: Robust validation - EMPTY_VALUE is DBL_MAX (~1.79e308)
+        double blue_line = m_st_lower[0];  // Buffer 0 = BLUE (support)
+        double red_line = m_st_upper[0];   // Buffer 1 = RED (resistance)
+        
+        // Check for valid values (not EMPTY and within reasonable price range)
+        bool blue_valid = (blue_line != EMPTY_VALUE && blue_line > 0 && blue_line < 1e10);
+        bool red_valid = (red_line != EMPTY_VALUE && red_line > 0 && red_line < 1e10);
+        
+        // ✅ CASE 1: BLUE line active (bullish trend context)
+        if(blue_valid && !red_valid)
         {
-            // Price ABOVE blue support line = bullish confirmed
-            if(close_price[0] > m_st_lower[0])
-                return 1;  // ✅ BULLISH - price respecting support
+            // BUY only if close is STRICTLY ABOVE blue support
+            if(close_price[0] > blue_line)
+                return 1;  // ✅ BULLISH - close respecting support
             else
-                return -1; // ❌ BEARISH - price BROKE BELOW support (reversal!)
+                return -1; // ❌ BEARISH - close BROKE BELOW support
         }
         
-        // RED line active (CCI was ≤0, bearish context)
-        if(m_st_upper[0] != EMPTY_VALUE && m_st_lower[0] == EMPTY_VALUE)
+        // ✅ CASE 2: RED line active (bearish trend context)
+        if(red_valid && !blue_valid)
         {
-            // Price BELOW red resistance line = bearish confirmed
-            if(close_price[0] < m_st_upper[0])
-                return -1; // ✅ BEARISH - price respecting resistance
+            // SELL only if close is STRICTLY BELOW red resistance
+            if(close_price[0] < red_line)
+                return -1; // ✅ BEARISH - close respecting resistance
             else
-                return 1;  // ❌ BULLISH - price BROKE ABOVE resistance (reversal!)
+                return 1;  // ❌ BULLISH - close BROKE ABOVE resistance
         }
         
-        // Tolerance: Check previous candle if both are EMPTY
-        if(ArraySize(m_st_lower) > 1 && ArraySize(m_st_upper) > 1)
+        // ✅ CASE 3: Both lines valid (rare transition period)
+        if(blue_valid && red_valid)
         {
-            if(m_st_lower[0] == EMPTY_VALUE && m_st_upper[0] == EMPTY_VALUE)
+            // Use price position relative to both lines
+            if(close_price[0] > blue_line && close_price[0] > red_line)
+                return 1;  // Clearly bullish
+            else if(close_price[0] < blue_line && close_price[0] < red_line)
+                return -1; // Clearly bearish
+            else
+                return 0;  // Ambiguous - reject signal
+        }
+        
+        // ✅ CASE 4: Neither valid - 1 candle tolerance check
+        if(!blue_valid && !red_valid)
+        {
+            if(ArraySize(m_st_lower) > 1 && ArraySize(m_st_upper) > 1)
             {
-                // Get previous close price
+                double prev_blue = m_st_lower[1];
+                double prev_red = m_st_upper[1];
+                bool prev_blue_valid = (prev_blue != EMPTY_VALUE && prev_blue > 0 && prev_blue < 1e10);
+                bool prev_red_valid = (prev_red != EMPTY_VALUE && prev_red > 0 && prev_red < 1e10);
+                
+                // Get previous close price (shift=2)
                 double prev_close[1];
                 if(CopyClose(m_symbol, m_operational_tf, 2, 1, prev_close) == 1)
                 {
-                    // Check previous candle [1] = shift=2
-                    if(m_st_lower[1] != EMPTY_VALUE && m_st_upper[1] == EMPTY_VALUE)
+                    if(prev_blue_valid && !prev_red_valid)
                     {
-                        if(prev_close[0] > m_st_lower[1])
-                            return 1;  // ✅ BULLISH on previous candle
+                        if(prev_close[0] > prev_blue)
+                            return 1;
                         else
-                            return -1; // ❌ BEARISH - broke support
+                            return -1;
                     }
-                    if(m_st_upper[1] != EMPTY_VALUE && m_st_lower[1] == EMPTY_VALUE)
+                    if(prev_red_valid && !prev_blue_valid)
                     {
-                        if(prev_close[0] < m_st_upper[1])
-                            return -1; // ✅ BEARISH on previous candle
+                        if(prev_close[0] < prev_red)
+                            return -1;
                         else
-                            return 1;  // ❌ BULLISH - broke resistance
+                            return 1;
                     }
                 }
             }
@@ -1473,28 +1449,22 @@ public:
     
     //+------------------------------------------------------------------+
     //| Check if Momentum is expanding (Gate 4 - FIRST check)           |
-    //| ✅ v2.49 CRITICAL FIX: Uses Buffer 4 (adaptive threshold)       |
-    //| OBV_MACD Buffer 4 = Adaptive threshold (EMA of |histogram|)     |
-    //| LOGIC: Histogram must be ABOVE threshold AND expanding          |
-    //|        Verde CLARO (below threshold) = REJECT                   |
-    //|        Verde ESCURO (above threshold) = ACCEPT                  |
+    //| ✅ v4.00 CRITICAL FIX: With windowed OBV, just check threshold  |
+    //| The windowed OBV responds quickly to direction changes, so      |
+    //| we only need to verify the histogram exceeds the threshold.     |
+    //| Direction check happens separately in GetMomentumDirection()    |
     //+------------------------------------------------------------------+
     bool IsMomentumExpanding(void)
     {
-        // ✅ v2.49 NEW LOGIC: Compare histogram with REAL adaptive threshold
-        // 1. Get absolute value of current histogram
-        double hist_current = MathAbs(m_mom_histogram_current);
-        double hist_previous = MathAbs(m_mom_histogram_previous);
+        // v4.00 SIMPLIFIED: With windowed OBV, histogram sign already 
+        // reflects current direction quickly. Just check magnitude.
+        double hist_abs = MathAbs(m_mom_histogram_current);
         
-        // 2. Check if histogram is EXPANDING (growing in absolute value)
-        bool expanding = (hist_current >= hist_previous * 0.95); // 5% tolerance
-        
-        // 3. ✅ v2.49 CRITICAL FIX: Compare with Buffer 4 (adaptive threshold)
-        // If threshold is not yet calculated (first bars), use minimal value
+        // Threshold validation - must exceed adaptive threshold
         double threshold = (m_mom_threshold > 0.00001) ? m_mom_threshold : 0.00001;
-        bool above_threshold = (hist_current > threshold);
+        bool above_threshold = (hist_abs > threshold);
         
-        return (expanding && above_threshold);
+        return above_threshold;
     }
     
     //+------------------------------------------------------------------+
@@ -1598,36 +1568,6 @@ public:
     }
     
     //+------------------------------------------------------------------+
-    //| Check if Supertrend is enabled                                   |
-    //+------------------------------------------------------------------+
-    bool IsSupertrendEnabled(void) const
-    {
-        return (m_supertrend_handle != INVALID_HANDLE);
-    }
-    
-    //+------------------------------------------------------------------+
-    //| Check if OBV MACD (Momentum) is enabled                          |
-    //+------------------------------------------------------------------+
-    bool IsMomentumEnabled(void) const
-    {
-        return (m_mom_handle != INVALID_HANDLE);
-    }
-    
-    //+------------------------------------------------------------------+
-    //| Check if RSI OMA is enabled                                      |
-    //+------------------------------------------------------------------+
-    bool IsRSIEnabled(void) const
-    {
-        return (m_rsi_oma_handle != INVALID_HANDLE);
-    }
-
-    // ✅ v3.0: Check if Regime Filter is enabled
-    bool IsRegimeFilterEnabled(void) const
-    {
-        return (m_adx_handle != INVALID_HANDLE);
-    }
-    
-    //+------------------------------------------------------------------+
     //| Get last update time                                             |
     //+------------------------------------------------------------------+
     datetime GetLastUpdateTime(void) const
@@ -1654,27 +1594,6 @@ public:
         Print("Currency Strength: Base=", m_cs_base, " Quote=", m_cs_quote, 
               " Available=", m_cs_available);
         Print("===============================");
-    }
-    //+------------------------------------------------------------------+
-    //| Get Regime ADX Value                                             |
-    //+------------------------------------------------------------------+
-    double GetRegimeADX(void)
-    {
-        if(m_adx_handle == INVALID_HANDLE) return 0.0;
-        
-        // Copy 1 value from buffer 0 (MAIN) at shift 1 (closed bar)
-        if(CopyBuffer(m_adx_handle, 0, 1, 1, m_regime_adx_buffer) < 1)
-        {
-            return 0.0;
-        }
-        
-        return m_regime_adx_buffer[0];
-    }
-    
-    // ✅ v3.0: Get Regime Threshold
-    double GetRegimeThreshold(void) const
-    {
-        return m_regime_threshold;
     }
 };
 //+------------------------------------------------------------------+

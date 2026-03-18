@@ -143,8 +143,6 @@ input ENUM_TIMEFRAMES InpOperationalTF = PERIOD_M15; // Operational Timeframe (M
 input group "═══════════ ⚙️ CONFIGURAÇÕES GERAIS ═══════════"
 input int      InpMagicNumber    = 20241024;  // Magic Number
 input bool     InpShowPanel      = true;       // Exibir Painel no Gráfico
-// ✅ v4.0: INVERT LOGIC (Monkey Test < 50%)
-input bool     InpInvertLogic    = false;      // 🔄 Inverter Lógica de Sinal (Buy->Sell)
 input bool     InpEnableAlerts   = true;       // Ativar Alertas Sonoros
 input bool     InpEnableEmail    = false;      // Enviar Email em Operações
 input bool     InpEnablePush     = false;      // Enviar Notificação Push
@@ -203,15 +201,15 @@ input double            InpST_ATR_Multiplier  = 1.0;                 // ATR Mult
 //+------------------------------------------------------------------+
 input group "═══════════ 💥 OBV MACD (Momentum) ═══════════"
 input bool              InpMACD_Enable        = true;                // ✅ ATIVAR OBV MACD
-input int               InpMACD_FastEMA       = 12;                  // Fast EMA (OBV MACD)
-input int               InpMACD_SlowEMA       = 26;                  // Slow EMA (OBV MACD)
-input int               InpMACD_SignalSMA     = 9;                   // Signal SMA (OBV MACD)
-input int               InpMACD_ObvSmooth     = 5;                   // OBV Smoothing Period
+input int               InpMACD_FastEMA       = 5;                   // Fast EMA (OBV MACD) [v4.00]
+input int               InpMACD_SlowEMA       = 13;                  // Slow EMA (OBV MACD) [v4.00]
+input int               InpMACD_SignalSMA     = 4;                   // Signal EMA (OBV MACD) [v4.00]
+input int               InpMACD_ObvWindow     = 20;                  // OBV Lookback Window [v4.00 NEW]
 input bool              InpMACD_UseTickVolume = true;                // Use Tick Volume (Forex)
 input bool              InpMACD_ShowMACDLine  = true;                // Show MACD Line
 input bool              InpMACD_ShowSignalLine= true;                // Show Signal Line
-input int               InpMACD_ThreshPeriod  = 34;                  // Threshold Period (|hist| EMA)
-input double            InpMACD_ThreshMult    = 0.6;                 // Threshold Multiplier
+input int               InpMACD_ThreshPeriod  = 14;                  // Threshold Period [v4.00]
+input double            InpMACD_ThreshMult    = 0.4;                 // Threshold Multiplier [v4.00]
 
 //+------------------------------------------------------------------+
 //| SEÇÃO 21: INDICADOR - RSI OMA                                    |
@@ -233,15 +231,6 @@ input bool              InpCS_Enable          = true;                // ✅ ATIV
 input int               InpCS_CalcPeriod      = 24;                  // Período Cálculo
 input int               InpCS_Smoothing       = 5;                   // Suavização (EMA)
 input bool              InpCS_ShowPercent     = true;                // Exibir em %
-
-//+------------------------------------------------------------------+
-//| SEÇÃO 23: FILTRO DE REGIME (FLAT MARKET)                         |
-//+------------------------------------------------------------------+
-input group "═══════════ 🐢 FILTRO DE REGIME ═══════════"
-input bool     InpRegime_Enable      = true;        // Ativar Filtro de Regime
-input int      InpRegime_ADX_Period  = 14;          // Período ADX
-input int      InpRegime_ADX_Threshold = 20;        // Nível Mínimo ADX (Absoluto)
-input ENUM_TIMEFRAMES InpRegime_TF   = PERIOD_CURRENT; // Timeframe do Filtro
 
 //+------------------------------------------------------------------+
 //| NOTAS IMPORTANTES                                                 |
@@ -553,8 +542,8 @@ bool ValidateInputs()
             Print("⚠️ AVISO: Períodos do MACD/Signal devem ser > 0.");
         if(InpMACD_FastEMA >= InpMACD_SlowEMA)
             Print("⚠️ AVISO: Fast EMA >= Slow EMA – recomenda-se Fast < Slow para MACD.");
-        if(InpMACD_ObvSmooth < 1)
-            Print("⚠️ AVISO: OBV Smooth < 1 – usando OBV bruto pode aumentar ruído.");
+        if(InpMACD_ObvWindow < 5)
+            Print("⚠️ AVISO: OBV Window < 5 – janela muito curta pode aumentar ruído.");
         if(InpGG_CreateObjects == false)
             Print("ℹ️ GG_TrendBar em modo DATA-ONLY (objetos visuais desativados). Para ver no gráfico, ative InpGG_CreateObjects=TRUE.");
 

@@ -153,6 +153,40 @@ Presets/V3/         # .set files finais
 Reports/            # Backtest reports (HTML + PNG)
 ```
 
+## Licenciamento
+
+O EA utiliza sistema de licenciamento integrado na DLL com protecao multinivel:
+
+- **HWID Lock**: DLL valida hardware ID do cliente
+- **Account Lock**: Licenca vinculada a conta MT5 especifica
+- **Expiry Date**: Licencas com data de validade
+- **Checksum**: Deteccao de adulteracao da chave
+
+### Tipos de Licenca
+
+| Tipo | Duracao | Contas | Preco |
+|------|---------|--------|-------|
+| **TRIAL** | 14 dias | 1 | Gratis |
+| **STARTER** | 1 ano | 1 | $497 |
+| **PRO** | 1 ano | 3 | $997 |
+| **LIFETIME** | Vitalicia | 5 | $1,997 |
+
+### Ativacao
+
+1. Adquira sua licenca
+2. No EA, preencha o campo **"Chave de Licenca"** nos Inputs
+3. A DLL valida automaticamente no OnInit
+
+### Build System
+
+```bash
+# Build comercial (licenca obrigatoria)
+cmake -DNEXUS_OPEN=OFF ..
+
+# Build desenvolvimento (sem licenca)
+cmake -DNEXUS_OPEN=ON ..
+```
+
 ## Producao
 
 - **Servidor**: Oracle Cloud VM.Standard.E3.Flex (1 OCPU, 8GB RAM)

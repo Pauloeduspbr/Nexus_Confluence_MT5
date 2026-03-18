@@ -137,7 +137,9 @@ enum NX_ErrorCode {
     NX_ERR_INVALID_DATA      = -3,
     NX_ERR_INSUFFICIENT_BARS = -4,
     NX_ERR_INTERNAL          = -5,
-    NX_ERR_ALREADY_INIT      = -6
+    NX_ERR_ALREADY_INIT      = -6,
+    NX_ERR_LICENSE_INVALID   = -7,
+    NX_ERR_LICENSE_EXPIRED   = -8
 };
 
 //+------------------------------------------------------------------+
@@ -312,6 +314,10 @@ struct NX_Config {
     // --- General ---
     int    magic_number;
     int    log_level;           // NX_LogLevel
+
+    // --- License ---
+    int    account_number;      // MT5 account number for license validation
+    char   license_key[32];     // License key (XXXX-XXXX-XXXX-XXXX format)
 };
 
 // Multi-position context (MQL5 -> DLL, passed with each tick)

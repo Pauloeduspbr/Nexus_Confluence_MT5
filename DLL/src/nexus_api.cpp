@@ -9,6 +9,7 @@
 #include "../include/nexus_api.h"
 #include "../include/nexus_config.h"
 #include "../include/nexus_logger.h"
+#include "../include/nexus_license.h"
 #include "../include/engine/state_machine.h"
 #include "../include/gates/gate_system.h"
 #include "../include/risk/break_even.h"
@@ -74,6 +75,13 @@ NEXUS_API int NEXUS_CALL NX_Init(
         return NX_ERR_INVALID_CONFIG;
     }
 
+    // License check (skipped in NEXUS_OPEN builds)
+    int lic_result = NX_CheckLicense(config->account_number, config->license_key);
+    if (lic_result != NX_OK) {
+        SetError("License validation failed: %s", NX_GetLicenseStatus());
+        return lic_result;
+    }
+
     // Initialize config (validates and converts units)
     if (!g_config.Init(config, symbol)) {
         SetError("Configuration validation failed. Check SL/TP/BE/TS parameters.");
@@ -95,10 +103,11 @@ NEXUS_API int NEXUS_CALL NX_Init(
     g_trailing_stop.Init(&g_config, &g_logger);
     g_dd_protection.Init(&g_config, &g_logger);
 
-    g_logger.Executive("Nexus Confluence V3 initialized. Symbol: %s | Market: %d | Version: %d",
+    g_logger.Executive("Nexus Confluence V3 initialized. Symbol: %s | Market: %d | Version: %d | %s",
         symbol->symbol,
         (int)g_config.GetMarketType(),
-        NEXUS_VERSION);
+        NEXUS_VERSION,
+        NX_GetLicenseStatus());
 
     g_logger.Operational("Config: SL_Buy=%d TP_Buy=%d SL_Sell=%d TP_Sell=%d MinScore_Buy=%d MinScore_Sell=%d",
         config->sl_buy, config->tp_buy,

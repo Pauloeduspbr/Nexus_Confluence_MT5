@@ -102,6 +102,7 @@ Copie o conteudo da pasta `dist/MQL5/` para o diretorio `MQL5/` do seu terminal 
 dist/MQL5/
   Libraries/
     NexusConfluence.dll              <-- DLL principal (toda logica)
+    api-ms-win-crt-*.dll             <-- Runtime C/C++ (15 DLLs, para Windows Server)
   Experts/NexusConfluenceV3/
     NexusConfluenceV3.ex5            <-- EA compilado
     set/
@@ -125,11 +126,17 @@ dist/MQL5/
 ### Passo a passo
 
 1. Localize a pasta de dados do MT5: **File > Open Data Folder**
-2. Copie `NexusConfluence.dll` para `MQL5/Libraries/`
+2. Copie **TODOS** os arquivos de `dist/MQL5/Libraries/` para `MQL5/Libraries/`
+   - `NexusConfluence.dll` (DLL principal)
+   - `api-ms-win-crt-*.dll` (15 DLLs de runtime — obrigatorias em Windows Server)
 3. Copie `NexusConfluenceV3.ex5` para `MQL5/Experts/NexusConfluenceV3/`
 4. Copie os `.set` para `MQL5/Experts/NexusConfluenceV3/set/`
 5. Copie os indicadores `.ex5` para `MQL5/Indicators/NexusConfluenceEA/`
 6. Reinicie o MetaTrader 5
+
+> **Nota**: As DLLs `api-ms-win-crt-*` sao o runtime C/C++ (UCRT).
+> No Windows 10/11 desktop geralmente ja estao instaladas.
+> Em **Windows Server** (VPS/Cloud) podem estar ausentes — copie-as para a pasta Libraries.
 7. Abra o chart desejado (ex: USDJPY H1)
 8. Arraste o EA **NexusConfluenceV3** para o chart
 9. Na aba **Common**: marque **"Allow DLL imports"**

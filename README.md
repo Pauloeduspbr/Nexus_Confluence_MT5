@@ -18,6 +18,8 @@ MQL5 (Wrapper fino)          C++ DLL (Toda logica)
 - **DLL**: ~9,700 linhas C++ compiladas em binario nativo x64
 - **MQL5 Wrapper**: Orquestra dados, ordens e visualizacao
 - **Protecao IP**: Logica em DLL binaria (impossivel decompilar)
+- **Shared Memory**: Indicadores visuais leem da DLL via Windows Named Memory-Mapped Files
+- **Multi-Instancia**: Ate 20 simbolos simultaneos no mesmo terminal
 
 ## Sistema de 6 Gates
 
@@ -105,6 +107,7 @@ dist/MQL5/
     set/
       NexusV3_FINAL_USDJPY_H1.set   <-- Preset USDJPY otimizado
       NexusV3_FINAL_XAUUSD_H1.set   <-- Preset XAUUSD otimizado
+      NexusV3_FINAL_GBPUSD_H1.set   <-- Preset GBPUSD otimizado
   Indicators/NexusConfluenceEA/
     GG_TrendBar_Indicator.ex5        <-- Visualizacao (*)
     TrendMagic_MT5.ex5               <-- Visualizacao (*)
@@ -113,9 +116,10 @@ dist/MQL5/
     CurrencyStrengthMeter_MT5.ex5    <-- Visualizacao (*)
 ```
 
-> (*) **IMPORTANTE**: Os indicadores .ex5 sao apenas para VISUALIZACAO no grafico.
-> O EA NAO utiliza esses indicadores para tomar decisoes de trading.
-> Toda logica de calculo dos indicadores esta dentro da DLL (NexusConfluence.dll).
+> (*) **IMPORTANTE**: Os indicadores .ex5 sao wrappers visuais da DLL.
+> Eles NAO calculam nada — leem os valores diretamente da DLL via shared memory.
+> O que voce ve no grafico e EXATAMENTE o que o EA usa para decidir.
+> Funciona tanto em live chart quanto no Strategy Tester visual.
 > Voce pode operar sem os indicadores visuais — o EA funciona normalmente.
 
 ### Passo a passo

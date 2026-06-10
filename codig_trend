@@ -1,0 +1,1623 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
+// © yigdeli
+
+//@version=6
+indicator("Volumetric Gann Style", shorttitle="Volumetric Gann Style [yigdeli] 1.0.0", overlay = true, max_lines_count = 500, max_boxes_count = 200, max_labels_count = 500, max_bars_back = 5000)
+
+//=====================================================
+// INPUTS
+//=====================================================
+groupPivot         = "PIVOT"
+groupFanCore       = "GANN FAN"
+groupFanLevels     = "GANN FAN LEVELS"
+groupBoxCore       = "GANN BOX"
+groupBoxLevels     = "GANN BOX LEVELS"
+groupSignal        = "SIGNAL ENGINE"
+groupSq9           = "SQUARE OF 9"
+groupLabels        = "LABELS / PANEL"
+
+//-----------------------------------------------------
+// PIVOT
+//-----------------------------------------------------
+leftBars           = input.int(30, "Pivot Left", minval = 1, maxval = 500, group = groupPivot, inline = "pv1")
+rightBars          = input.int(30, "Pivot Right", minval = 1, maxval = 500, group = groupPivot, inline = "pv1")
+
+//-----------------------------------------------------
+// GANN FAN
+//-----------------------------------------------------
+showFan           = input.bool(true, "Fibonacci Fan", group = groupFanCore, inline = "gf0")
+showAngleNames    = input.bool(true, "Labels", group = groupFanCore, inline = "gf01")
+showExtremeAngles = input.bool(true, "Extreme", group = groupFanCore, inline = "gf02")
+showFanFill       = input.bool(true, "Fill", group = groupFanCore, inline = "gf03")
+gannEngineMode    = input.string("Gann Style", "Engine", options = ["Gann Style", "Classic Gann"], group = groupFanCore, inline = "gf1")
+fanColorMode      = input.string("Trend Based", "Color Mode ", options = ["Trend Based", "Per Level"], group = groupFanCore, inline = "gf1")
+fanMode           = input.string("Box-Normalized", "Mode  ", options = ["Box-Normalized", "Free Fan"], group = groupFanCore, inline = "gf3")
+fanOriginMode     = input.string("Auto Flip", "Origin Mode", options = ["Auto Flip", "Manual"], group = groupFanCore, inline = "gf3")
+fanOriginManual   = input.string("Top Left", "Manual Origin Position                      ", options = ["Top Left", "Bottom Left", "Top Right", "Bottom Right"], group = groupFanCore, inline = "gf4")
+fanFillAlphaNear  = input.int(90, "Fill Near", minval = 0, maxval = 100, group = groupFanCore, inline = "gf6")
+fanFillAlphaFar   = input.int(94, "Fill Far     ", minval = 0, maxval = 100, group = groupFanCore, inline = "gf6")
+fanWidth          = input.int(1, "F. Width", minval = 1, maxval = 10, group = groupFanCore, inline = "gf7")
+mainFanWidth      = input.int(2, "1x1 Width", minval = 1, maxval = 10, group = groupFanCore, inline = "gf7")
+colBull           = input.color(#089981, "Bull", group = groupFanCore, inline = "gf8")
+colBear           = input.color(#f23645, "Bear", group = groupFanCore, inline = "gf8")
+colNeutral        = input.color(color.orange, "Neutral", group = groupFanCore, inline = "gf8")
+
+//-----------------------------------------------------
+// GANN FAN LEVELS
+//-----------------------------------------------------
+show1x8     = input.bool(true, "1x8", group = groupFanLevels, inline = "fl1")
+fan1x8Value = input.string("1x8", "Label", group = groupFanLevels, inline = "fl1")
+fan1x8Color = input.color(color.new(color.gray, 0), "", group = groupFanLevels, inline = "fl1")
+fan1x8Style = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl1")
+
+show1x4     = input.bool(true, "1x4", group = groupFanLevels, inline = "fl2")
+fan1x4Value = input.string("1x4", "Label", group = groupFanLevels, inline = "fl2")
+fan1x4Color = input.color(color.new(color.lime, 0), "", group = groupFanLevels, inline = "fl2")
+fan1x4Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl2")
+
+show1x3     = input.bool(true, "1x3", group = groupFanLevels, inline = "fl3")
+fan1x3Value = input.string("1x3", "Label", group = groupFanLevels, inline = "fl3")
+fan1x3Color = input.color(color.new(color.yellow, 0), "", group = groupFanLevels, inline = "fl3")
+fan1x3Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl3")
+
+show1x2     = input.bool(true, "1x2", group = groupFanLevels, inline = "fl4")
+fan1x2Value = input.string("1x2", "Label", group = groupFanLevels, inline = "fl4")
+fan1x2Color = input.color(color.new(color.silver, 0), "", group = groupFanLevels, inline = "fl4")
+fan1x2Style = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl4")
+
+show1x1     = input.bool(true, "1x1", group = groupFanLevels, inline = "fl5")
+fan1x1Value = input.string("1x1", "Label", group = groupFanLevels, inline = "fl5")
+fan1x1Color = input.color(color.new(color.orange, 0), "", group = groupFanLevels, inline = "fl5")
+fan1x1Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl5")
+
+show2x1     = input.bool(true, "2x1", group = groupFanLevels, inline = "fl6")
+fan2x1Value = input.string("2x1", "Label", group = groupFanLevels, inline = "fl6")
+fan2x1Color = input.color(color.new(color.aqua, 0), "", group = groupFanLevels, inline = "fl6")
+fan2x1Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl6")
+
+show3x1     = input.bool(true, "3x1", group = groupFanLevels, inline = "fl7")
+fan3x1Value = input.string("3x1", "Label", group = groupFanLevels, inline = "fl7")
+fan3x1Color = input.color(color.new(color.teal, 0), "", group = groupFanLevels, inline = "fl7")
+fan3x1Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl7")
+
+show4x1     = input.bool(true, "4x1", group = groupFanLevels, inline = "fl8")
+fan4x1Value = input.string("4x1", "Label", group = groupFanLevels, inline = "fl8")
+fan4x1Color = input.color(color.new(color.blue, 0), "", group = groupFanLevels, inline = "fl8")
+fan4x1Style = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl8")
+
+show8x1     = input.bool(true, "8x1", group = groupFanLevels, inline = "fl9")
+fan8x1Value = input.string("8x1", "Label", group = groupFanLevels, inline = "fl9")
+fan8x1Color = input.color(color.new(color.red, 0), "", group = groupFanLevels, inline = "fl9")
+fan8x1Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupFanLevels, inline = "fl9")
+
+//-----------------------------------------------------
+// GANN BOX
+//-----------------------------------------------------
+showBox        = input.bool(true, "Box", group = groupBoxCore, inline = "gb01")
+colBoxBorder   = input.color(color.new(#0078d4, 0), "Border", group = groupBoxCore, inline = "gb01")
+showGrid       = input.bool(true, "Grid", group = groupBoxCore, inline = "gb02")
+colGrid        = input.color(color.new(#0078d4, 0), "Color", group = groupBoxCore, inline = "gb02")
+showSwing      = input.bool(true, "Swing", group = groupBoxCore, inline = "gb03")
+showHeatZone   = input.bool(true, "Heat Zone", group = groupBoxCore, inline = "gb04")
+showBoxLevels  = input.bool(true, "Box Levels", group = groupBoxCore, inline = "gb05")
+boxForwardBars = input.int(50, "Forward Bars", minval = 10, maxval = 100, group = groupBoxCore, inline = "gb06")
+boxDivs        = input.int(8, "Grid Divs     ", minval = 2, maxval = 16, group = groupBoxCore, inline = "gb07")
+gridWidth      = input.int(1, "Grid Width   ", minval = 1, maxval = 4, group = groupBoxCore, inline = "gb08")
+swingWidth     = input.int(1, "Swing Width", minval = 1, maxval = 4, group = groupBoxCore, inline = "gb08")
+heatFillAlpha1 = input.int(91, "Heat Fill1    ", minval = 0, maxval = 100, group = groupBoxCore, inline = "gb5")
+heatFillAlpha2 = input.int(93, "Heat Fill2    ", minval = 0, maxval = 100, group = groupBoxCore, inline = "gb5")
+
+//-----------------------------------------------------
+// GANN BOX LEVELS
+//-----------------------------------------------------
+boxLvl1On    = input.bool(true, "0.236", group = groupBoxLevels, inline = "bl1")
+boxLvl1Value = input.float(0.236, "Value", step = 0.001, group = groupBoxLevels, inline = "bl1")
+boxLvl1Color = input.color(color.new(color.lime, 0), "", group = groupBoxLevels, inline = "bl1")
+boxLvl1Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupBoxLevels, inline = "bl1")
+
+boxLvl2On    = input.bool(true, "0.382", group = groupBoxLevels, inline = "bl2")
+boxLvl2Value = input.float(0.382, "Value", step = 0.001, group = groupBoxLevels, inline = "bl2")
+boxLvl2Color = input.color(color.new(color.yellow, 0), "", group = groupBoxLevels, inline = "bl2")
+boxLvl2Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupBoxLevels, inline = "bl2")
+
+boxLvl3On    = input.bool(true, "0.500", group = groupBoxLevels, inline = "bl3")
+boxLvl3Value = input.float(0.500, "Value", step = 0.001, group = groupBoxLevels, inline = "bl3")
+boxLvl3Color = input.color(color.new(color.silver, 0), "", group = groupBoxLevels, inline = "bl3")
+boxLvl3Style = input.string("Dashed", "", options = ["Solid", "Dashed", "Dotted"], group = groupBoxLevels, inline = "bl3")
+
+boxLvl4On    = input.bool(true, "0.618", group = groupBoxLevels, inline = "bl4")
+boxLvl4Value = input.float(0.618, "Value", step = 0.001, group = groupBoxLevels, inline = "bl4")
+boxLvl4Color = input.color(color.new(color.orange, 0), "", group = groupBoxLevels, inline = "bl4")
+boxLvl4Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupBoxLevels, inline = "bl4")
+
+boxLvl5On    = input.bool(true, "0.786", group = groupBoxLevels, inline = "bl5")
+boxLvl5Value = input.float(0.786, "Value", step = 0.001, group = groupBoxLevels, inline = "bl5")
+boxLvl5Color = input.color(color.new(color.red, 0), "", group = groupBoxLevels, inline = "bl5")
+boxLvl5Style = input.string("Solid", "", options = ["Solid", "Dashed", "Dotted"], group = groupBoxLevels, inline = "bl5")
+
+//-----------------------------------------------------
+// SIGNAL ENGINE
+//-----------------------------------------------------
+showSignals       = input.bool(true, "Signals", group = groupSignal, inline = "sg01")
+showBreakLb       = input.bool(true, "Break Labels", group = groupSignal, inline = "sg1")
+signalAtrMult     = input.float(0.35, "ATR Mult     ", minval = 0.05, step = 0.05, group = groupSignal, inline = "sg02")
+signalCooldown    = input.int(6, "Cooldown    ", minval = 1, group = groupSignal, inline = "sg2")
+signalLabelOffset = input.int(25, "Label Offset", minval = 0, maxval = 50, group = groupSignal, inline = "sg3")
+
+//-----------------------------------------------------
+// SQUARE OF 9
+//-----------------------------------------------------
+showSq9           = input.bool(true, "SQ9", group = groupSq9, inline = "sq1")
+colSq9            = input.color(color.purple, "", group = groupSq9, inline = "sq1")
+sq9AutoPivotScale = input.bool(true, "Auto Scale", group = groupSq9, inline = "sq2")
+sq9StepCount      = input.int(4, "Levels Per Side", minval = 1, maxval = 12, group = groupSq9, inline = "sq13")
+sq9StepFrac       = input.float(0.5, "Root Step        ", minval = 0.01, step = 0.01, group = groupSq9, inline = "sq14")
+sq9LabelOffset    = input.int(5, "Forward Bars   ", minval = 1, maxval = 100, group = groupSq9, inline = "gq1")
+
+//-----------------------------------------------------
+// LABELS / PANEL
+//-----------------------------------------------------
+compactMode        = input.bool(false, "Compact / Mobile", group = groupLabels, inline = "lb01")
+showScorePanel     = input.bool(true, "Trend Panel", group = groupLabels, inline = "lb1")
+labelTxtSizeOpt    = input.string("normal", "Label Text        ", options = ["auto", "tiny", "small", "normal", "large", "huge"], group = groupLabels, inline = "lb2")
+boxTxtSizeOpt      = input.string("auto", "Box Text          ", options = ["auto", "tiny", "small", "normal", "large", "huge"], group = groupLabels, inline = "lb3")
+styleTotalBoxWidth = input.int(5, "Total Box Width", minval = 2, maxval = 20, group = groupLabels, inline = "lb4")
+styleInfoBoxWidth  = input.int(10, "Info Box Width ", minval = 2, maxval = 20, group = groupLabels, inline = "lb5")
+styleGapMode       = input.string("Auto", "Info Gap Mode ", options = ["Auto", "Manual"], group = groupLabels, inline = "lb6")
+styleGapBars       = input.int(4, "Gap Bars         ", minval = 0, maxval = 50, group = groupLabels, inline = "lb7")
+
+//=====================================================
+// HELPERS
+//=====================================================
+f_line_style(_s) =>
+    _s == "Solid" ? line.style_solid : _s == "Dashed" ? line.style_dashed : line.style_dotted
+
+f_txt_size(_s, _compact) =>
+    _compact ? size.tiny :
+     _s == "auto"   ? size.auto   :
+     _s == "tiny"   ? size.tiny   :
+     _s == "small"  ? size.small  :
+     _s == "normal" ? size.normal :
+     _s == "large"  ? size.large  :
+     _s == "huge"   ? size.huge   : size.normal
+
+f_classic_x2(_startX, _originLeft, _frameRangeY, _frameRunBars, _baseSlope, _mult) =>
+    slopePerBar = math.max(_baseSlope * _mult, syminfo.mintick)
+    barsToEdge  = int(math.floor(_frameRangeY / slopePerBar))
+    runBars     = math.max(1, math.min(_frameRunBars, barsToEdge))
+    _originLeft ? _startX + runBars : _startX - runBars
+
+f_classic_y2(_startYFan, _ySign, _baseSlope, _mult, _x2, _startX) =>
+    runBarsSigned = math.abs(_x2 - _startX)
+    _startYFan + _ySign * _baseSlope * _mult * runBarsSigned
+
+f_clear_lines(line[] arr) =>
+    sz = array.size(arr)
+    if sz > 0
+        for i = 0 to sz - 1
+            line.delete(array.get(arr, i))
+        array.clear(arr)
+
+f_clear_labels(label[] arr) =>
+    sz = array.size(arr)
+    if sz > 0
+        for i = 0 to sz - 1
+            label.delete(array.get(arr, i))
+        array.clear(arr)
+
+f_clear_boxes(box[] arr) =>
+    sz = array.size(arr)
+    if sz > 0
+        for i = 0 to sz - 1
+            box.delete(array.get(arr, i))
+        array.clear(arr)
+
+f_sq9_price(float basePrice, float stepFrac, int n, bool up) =>
+    root = math.sqrt(math.max(basePrice, syminfo.mintick))
+    lvlRoot = up ? root + stepFrac * n : root - stepFrac * n
+    math.pow(math.max(lvlRoot, 0.0), 2)
+
+f_line_y(line ln, int x) =>
+    not na(ln) ? line.get_price(ln, x) : na
+
+f_clamp(float v, float lo, float hi) =>
+    math.max(lo, math.min(v, hi))
+
+f_is_left_origin(string origin) =>
+    origin == "Top Left" or origin == "Bottom Left"
+
+f_is_top_origin(string origin) =>
+    origin == "Top Left" or origin == "Top Right"
+
+f_target_y(string origin, float topY, float botY, float frac) =>
+    rng = math.max(topY - botY, syminfo.mintick)
+    f_is_top_origin(origin) ? topY - rng * frac : botY + rng * frac
+
+f_target_x(string origin, int leftX, int rightX, float frac) =>
+    span = math.max(rightX - leftX, 1)
+    f_is_left_origin(origin) ? leftX + int(math.round(span * frac)) : rightX - int(math.round(span * frac))
+
+f_fan_line_color(_mode, _trendColor, _levelColor, _alpha) =>
+    _mode == "Per Level" ? color.new(_levelColor, _alpha) : color.new(_trendColor, _alpha)
+
+f_fan_label_color(_mode, _trendColor, _levelColor, _isMain) =>
+    _mode == "Per Level" ? _levelColor : _isMain ? color.white : color.new(_trendColor, 5)
+
+f_panel_bg_base() =>
+    color.new(color.blue, 75)
+
+f_panel_bg_soft() =>
+    color.new(color.black, 18)
+
+f_panel_bg_trend(int _dir) =>
+    _dir == 1 ? color.new(colBull, 82) : _dir == -1 ? color.new(colBear, 82) : color.new(colNeutral, 82)
+
+f_panel_bg_trend_strong(int _dir) =>
+    _dir == 1 ? color.new(colBull, 68) : _dir == -1 ? color.new(colBear, 68) : color.new(colNeutral, 68)
+
+f_panel_text_trend(int _dir) =>
+    _dir == 1 ? color.new(colBull, 0) : _dir == -1 ? color.new(colBear, 0) : color.new(colNeutral, 0)
+
+f_panel_text_trend_soft(int _dir) =>
+    _dir == 1 ? color.new(colBull, 12) : _dir == -1 ? color.new(colBear, 12) : color.new(colNeutral, 12)
+
+f_interp_y(_x1, _y1, _x2, _y2, _x) =>
+    dx = _x2 - _x1
+    dx == 0 ? _y1 : _y1 + (_y2 - _y1) * ((_x - _x1) / dx)
+
+float sq9StepFinal = sq9StepFrac
+//=====================================================
+// PIVOTS + ACTIVE CONFIRMED PIVOT / LIVE EXTREMUM ENGINE
+//=====================================================
+ph = ta.pivothigh(high, leftBars, rightBars)
+pl = ta.pivotlow(low, leftBars, rightBars)
+
+var float lastHighPrice = na
+var int   lastHighBar   = na
+var float lastLowPrice  = na
+var int   lastLowBar    = na
+
+if not na(ph)
+    lastHighPrice := ph
+    lastHighBar   := bar_index - rightBars
+
+if not na(pl)
+    lastLowPrice := pl
+    lastLowBar   := bar_index - rightBars
+
+haveHigh = not na(lastHighPrice) and not na(lastHighBar)
+haveLow  = not na(lastLowPrice) and not na(lastLowBar)
+
+float anchorPrice1 = na
+float anchorPrice2 = na
+int   anchorBar1   = na
+int   anchorBar2   = na
+int   trendDir     = 0
+
+float bullAnchorPrice1 = na
+float bullAnchorPrice2 = na
+int   bullAnchorBar1   = na
+int   bullAnchorBar2   = na
+
+float bearAnchorPrice1 = na
+float bearAnchorPrice2 = na
+int   bearAnchorBar1   = na
+int   bearAnchorBar2   = na
+
+if haveLow
+    bullAnchorPrice1 := lastLowPrice
+    bullAnchorBar1   := lastLowBar
+
+    bullSpan = math.max(0, math.min(bar_index - bullAnchorBar1, 500))
+
+    float liveHigh = na
+    int   liveHighBar = na
+
+    for j = 0 to bullSpan
+        i = bullSpan - j
+        v = high[i]
+        b = bar_index - i
+
+        if na(liveHigh) or v > liveHigh
+            liveHigh    := v
+            liveHighBar := b
+
+    bullAnchorPrice2 := liveHigh
+    bullAnchorBar2   := liveHighBar
+
+if haveHigh
+    bearAnchorPrice1 := lastHighPrice
+    bearAnchorBar1   := lastHighBar
+
+    bearSpan = math.max(0, math.min(bar_index - bearAnchorBar1, 500))
+
+    float liveLow = na
+    int   liveLowBar = na
+
+    for j = 0 to bearSpan
+        i = bearSpan - j
+        v = low[i]
+        b = bar_index - i
+
+        if na(liveLow) or v < liveLow
+            liveLow    := v
+            liveLowBar := b
+
+    bearAnchorPrice2 := liveLow
+    bearAnchorBar2   := liveLowBar
+
+bullValid =
+     not na(bullAnchorPrice1) and
+     not na(bullAnchorPrice2) and
+     not na(bullAnchorBar1) and
+     not na(bullAnchorBar2) and
+     bullAnchorBar2 >= bullAnchorBar1
+
+bearValid =
+     not na(bearAnchorPrice1) and
+     not na(bearAnchorPrice2) and
+     not na(bearAnchorBar1) and
+     not na(bearAnchorBar2) and
+     bearAnchorBar2 >= bearAnchorBar1
+
+if bullValid and bearValid
+    if bullAnchorBar2 > bearAnchorBar2
+        trendDir     := 1
+        anchorPrice1 := bullAnchorPrice1
+        anchorPrice2 := bullAnchorPrice2
+        anchorBar1   := bullAnchorBar1
+        anchorBar2   := bullAnchorBar2
+    else if bearAnchorBar2 > bullAnchorBar2
+        trendDir     := -1
+        anchorPrice1 := bearAnchorPrice1
+        anchorPrice2 := bearAnchorPrice2
+        anchorBar1   := bearAnchorBar1
+        anchorBar2   := bearAnchorBar2
+    else
+        if bullAnchorBar1 >= bearAnchorBar1
+            trendDir     := 1
+            anchorPrice1 := bullAnchorPrice1
+            anchorPrice2 := bullAnchorPrice2
+            anchorBar1   := bullAnchorBar1
+            anchorBar2   := bullAnchorBar2
+        else
+            trendDir     := -1
+            anchorPrice1 := bearAnchorPrice1
+            anchorPrice2 := bearAnchorPrice2
+            anchorBar1   := bearAnchorBar1
+            anchorBar2   := bearAnchorBar2
+else if bullValid
+    trendDir     := 1
+    anchorPrice1 := bullAnchorPrice1
+    anchorPrice2 := bullAnchorPrice2
+    anchorBar1   := bullAnchorBar1
+    anchorBar2   := bullAnchorBar2
+else if bearValid
+    trendDir     := -1
+    anchorPrice1 := bearAnchorPrice1
+    anchorPrice2 := bearAnchorPrice2
+    anchorBar1   := bearAnchorBar1
+    anchorBar2   := bearAnchorBar2
+
+haveAnchors =
+     not na(anchorPrice1) and
+     not na(anchorPrice2) and
+     not na(anchorBar1) and
+     not na(anchorBar2) and
+     anchorBar2 >= anchorBar1 and
+     trendDir != 0
+
+if haveAnchors and sq9AutoPivotScale
+    float priceSpanFromAnchor = math.max(math.abs(anchorPrice2 - anchorPrice1), syminfo.mintick)
+    float targetPriceStep     = priceSpanFromAnchor / math.max(sq9StepCount * 3.0, 1.0)
+    float baseRoot            = math.sqrt(math.max(anchorPrice2, syminfo.mintick))
+    float nextRoot            = math.sqrt(math.max(anchorPrice2 + targetPriceStep, syminfo.mintick))
+    sq9StepFinal := math.max(nextRoot - baseRoot, 0.000001)
+else
+    sq9StepFinal := sq9StepFrac
+
+fanColor = trendDir == 1 ? colBull : colBear
+atrVal   = ta.atr(14)
+
+//=====================================================
+// STORAGE
+//=====================================================
+var label[] sq9Labs          = array.new_label()
+var linefill fanFillA        = na
+var linefill fanFillB        = na
+var linefill fanFillC        = na
+var linefill fanFillD        = na
+var box[] styleInfoBoxes     = array.new_box()
+var box[] fibBuySellBoxes    = array.new_box()
+var box[] mainBoxes          = array.new_box()
+var line[] gridLines         = array.new_line()
+var line[] sq9Lines          = array.new_line()
+var line[] swingLines        = array.new_line()
+var label[] swingLabs        = array.new_label()
+var label[] angleLabs        = array.new_label()
+var label[] boxLevelLabs     = array.new_label()
+var label[] boxPriceLabs     = array.new_label()
+var line[] boxLevelLines     = array.new_line()
+var line[] fanExtraLines     = array.new_line()
+
+var line fan1x8 = na
+var line fan1x4 = na
+var line fan1x3 = na
+var line fan1x2 = na
+var line fan1x1 = na
+var line fan2x1 = na
+var line fan3x1 = na
+var line fan4x1 = na
+var line fan8x1 = na
+
+var linefill heatFill1 = na
+var linefill heatFill2 = na
+
+var table scoreTable = table.new(position.top_right, 2, 16, border_width = 1)
+
+var int lastSignalBar = na
+var string panelPocLevel = "na"
+var float panelPocPrice  = na
+var float panelPocVol    = na
+
+var int prevAnchorBar1 = na
+var int prevTrendDir   = na
+
+var int bullReactionCount = 0
+var int bearReactionCount = 0
+var int breakEventCount   = 0
+
+var string lastBreakSideText     = "na"
+var string lastBreakStrengthText = "na"
+var int    lastBreakBar          = na
+
+var label lbBreakDown = na
+var label lbReclaim   = na
+var label lbBreakUp   = na
+var label lbReject    = na
+var label lbAggBuy    = na
+var label lbAggSell   = na
+var label lbRevWatch  = na
+var label lbTrendCont = na
+
+var line lnBreakDown = na
+var line lnReclaim   = na
+var line lnBreakUp   = na
+var line lnReject    = na
+var line lnAggBuy    = na
+var line lnAggSell   = na
+var line lnRevWatch  = na
+var line lnTrendCont = na
+
+var int srcBreakDown = na
+var int srcReclaim   = na
+var int srcBreakUp   = na
+var int srcReject    = na
+var int srcAggBuy    = na
+var int srcAggSell   = na
+var int srcRevWatch  = na
+var int srcTrendCont = na
+
+structureChanged =
+     haveAnchors and
+     (
+         na(prevAnchorBar1) or
+         na(prevTrendDir)   or
+         anchorBar1 != prevAnchorBar1 or
+         trendDir   != prevTrendDir
+     )
+
+if structureChanged
+    lastSignalBar := na
+
+    bullReactionCount := 0
+    bearReactionCount := 0
+    breakEventCount   := 0
+    lastBreakSideText := "na"
+    lastBreakStrengthText := "na"
+    lastBreakBar := na
+        
+    prevAnchorBar1 := anchorBar1
+    prevTrendDir   := trendDir
+
+//=====================================================
+// BASE GEOMETRY
+//=====================================================
+leftX     = haveAnchors ? anchorBar1 : na
+fanRightX = haveAnchors ? bar_index + boxForwardBars : na
+boxRightX = haveAnchors ? bar_index + boxForwardBars : na
+sq9RightX = haveAnchors ? bar_index + boxForwardBars : na
+topY      = haveAnchors ? math.max(anchorPrice1, anchorPrice2) : na
+botY      = haveAnchors ? math.min(anchorPrice1, anchorPrice2) : na
+
+labelSize = f_txt_size(labelTxtSizeOpt, compactMode)
+boxTextSize = f_txt_size(boxTxtSizeOpt, compactMode)
+
+//=====================================================
+// FAN
+//=====================================================
+if barstate.islast
+    if not showFan or not haveAnchors
+        if not na(fan1x8)
+            line.delete(fan1x8)
+            fan1x8 := na
+        if not na(fan1x4)
+            line.delete(fan1x4)
+            fan1x4 := na
+        if not na(fan1x3)
+            line.delete(fan1x3)
+            fan1x3 := na
+        if not na(fan1x2)
+            line.delete(fan1x2)
+            fan1x2 := na
+        if not na(fan1x1)
+            line.delete(fan1x1)
+            fan1x1 := na
+        if not na(fan2x1)
+            line.delete(fan2x1)
+            fan2x1 := na
+        if not na(fan3x1)
+            line.delete(fan3x1)
+            fan3x1 := na
+        if not na(fan4x1)
+            line.delete(fan4x1)
+            fan4x1 := na
+        if not na(fan8x1)
+            line.delete(fan8x1)
+            fan8x1 := na
+        if not na(fanFillA)
+            linefill.delete(fanFillA)
+            fanFillA := na
+        if not na(fanFillB)
+            linefill.delete(fanFillB)
+            fanFillB := na
+        if not na(fanFillC)
+            linefill.delete(fanFillC)
+            fanFillC := na
+        if not na(fanFillD)
+            linefill.delete(fanFillD)
+            fanFillD := na
+        f_clear_labels(angleLabs)
+        f_clear_lines(fanExtraLines)
+
+if showFan and haveAnchors and barstate.islast
+    if not na(fan1x8)
+        line.delete(fan1x8)
+    if not na(fan1x4)
+        line.delete(fan1x4)
+    if not na(fan1x3)
+        line.delete(fan1x3)
+    if not na(fan1x2)
+        line.delete(fan1x2)
+    if not na(fan1x1)
+        line.delete(fan1x1)
+    if not na(fan2x1)
+        line.delete(fan2x1)
+    if not na(fan3x1)
+        line.delete(fan3x1)
+    if not na(fan4x1)
+        line.delete(fan4x1)
+    if not na(fan8x1)
+        line.delete(fan8x1)
+
+    f_clear_labels(angleLabs)
+    f_clear_lines(fanExtraLines)
+
+    originResolved = fanOriginMode == "Auto Flip" ? (trendDir == 1 ? "Bottom Left" : "Top Left") : fanOriginManual
+    originLeft = f_is_left_origin(originResolved)
+    originTop  = f_is_top_origin(originResolved)
+
+    startX      = originLeft ? leftX : fanRightX
+    startYFan   = originTop ? topY : botY
+    vertTargetX = originLeft ? fanRightX : leftX
+    horzTargetY = originTop ? botY : topY
+
+    if gannEngineMode == "Gann Style" and fanMode == "Box-Normalized"
+        y0    = f_target_y(originResolved, topY, botY, 0.000)
+        y236  = f_target_y(originResolved, topY, botY, boxLvl1Value)
+        y382  = f_target_y(originResolved, topY, botY, boxLvl2Value)
+        y50   = f_target_y(originResolved, topY, botY, boxLvl3Value)
+        y618  = f_target_y(originResolved, topY, botY, boxLvl4Value)
+        y786  = f_target_y(originResolved, topY, botY, boxLvl5Value)
+        y100  = f_target_y(originResolved, topY, botY, 1.000)
+
+        x236  = f_target_x(originResolved, leftX, fanRightX, boxLvl1Value)
+        x382  = f_target_x(originResolved, leftX, fanRightX, boxLvl2Value)
+        x50   = f_target_x(originResolved, leftX, fanRightX, boxLvl3Value)
+        x618  = f_target_x(originResolved, leftX, fanRightX, boxLvl4Value)
+        x786  = f_target_x(originResolved, leftX, fanRightX, boxLvl5Value)
+        x100  = f_target_x(originResolved, leftX, fanRightX, 1.000)
+
+        if show1x8 and showExtremeAngles
+            fan1x8 := line.new(startX, startYFan, vertTargetX, y0, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x8Color, 78), width = fanWidth, style = f_line_style(fan1x8Style))
+        if show1x4
+            fan1x4 := line.new(startX, startYFan, vertTargetX, y236, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x4Color, 72), width = fanWidth, style = f_line_style(fan1x4Style))
+        if show1x3
+            fan1x3 := line.new(startX, startYFan, vertTargetX, y382, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x3Color, 66), width = fanWidth, style = f_line_style(fan1x3Style))
+        if show1x2
+            fan1x2 := line.new(startX, startYFan, vertTargetX, y50, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x2Color, 48), width = fanWidth, style = f_line_style(fan1x2Style))
+        if show1x1
+            fan1x1 := line.new(startX, startYFan, vertTargetX, y618, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x1Color, 5), width = mainFanWidth, style = f_line_style(fan1x1Style))
+        if show2x1
+            fan2x1 := line.new(startX, startYFan, vertTargetX, y786, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan2x1Color, 48), width = fanWidth, style = f_line_style(fan2x1Style))
+        if show3x1
+            fan3x1 := line.new(startX, startYFan, x50, horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan3x1Color, 66), width = fanWidth, style = f_line_style(fan3x1Style))
+        if show4x1
+            fan4x1 := line.new(startX, startYFan, x786, horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan4x1Color, 72), width = fanWidth, style = f_line_style(fan4x1Style))
+        if show8x1 and showExtremeAngles
+            fan8x1 := line.new(startX, startYFan, x100, horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan8x1Color, 78), width = fanWidth, style = f_line_style(fan8x1Style))
+
+        array.push(fanExtraLines, line.new(startX, startYFan, x236,  horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = color.new(fanColor, 78), width = fanWidth))
+        array.push(fanExtraLines, line.new(startX, startYFan, x382, horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = color.new(fanColor, 72), width = fanWidth))
+        array.push(fanExtraLines, line.new(startX, startYFan, x50,  horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = color.new(fanColor, 66), width = fanWidth))
+        array.push(fanExtraLines, line.new(startX, startYFan, x618, horzTargetY, xloc = xloc.bar_index, extend = extend.none, color = color.new(fanColor, 60), width = fanWidth))
+
+    if gannEngineMode == "Gann Style" and fanMode == "Free Fan"
+        barSpanFromAnchor   = math.max(math.abs(anchorBar2 - anchorBar1), 1)
+        priceSpanFromAnchor = math.max(math.abs(anchorPrice2 - anchorPrice1), syminfo.mintick)
+        freeRunBars         = math.max(math.abs(fanRightX - leftX), 1)
+        baseSlope           = priceSpanFromAnchor / barSpanFromAnchor
+        ySign               = originTop ? -1.0 : 1.0
+        freeX2              = originLeft ? fanRightX : leftX
+
+        freeY1x8 = startYFan + ySign * baseSlope * 0.125 * freeRunBars
+        freeY1x4 = startYFan + ySign * baseSlope * 0.250 * freeRunBars
+        freeY1x3 = startYFan + ySign * baseSlope * 0.333333 * freeRunBars
+        freeY1x2 = startYFan + ySign * baseSlope * 0.500 * freeRunBars
+        freeY1x1 = startYFan + ySign * baseSlope * 1.000 * freeRunBars
+        freeY2x1 = startYFan + ySign * baseSlope * 2.000 * freeRunBars
+        freeY3x1 = startYFan + ySign * baseSlope * 3.000 * freeRunBars
+        freeY4x1 = startYFan + ySign * baseSlope * 4.000 * freeRunBars
+        freeY8x1 = startYFan + ySign * baseSlope * 8.000 * freeRunBars
+
+        if show1x8 and showExtremeAngles
+            fan1x8 := line.new(startX, startYFan, freeX2, freeY1x8, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x8Color, 78), width = fanWidth, style = f_line_style(fan1x8Style))
+        if show1x4
+            fan1x4 := line.new(startX, startYFan, freeX2, freeY1x4, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x4Color, 72), width = fanWidth, style = f_line_style(fan1x4Style))
+        if show1x3
+            fan1x3 := line.new(startX, startYFan, freeX2, freeY1x3, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x3Color, 66), width = fanWidth, style = f_line_style(fan1x3Style))
+        if show1x2
+            fan1x2 := line.new(startX, startYFan, freeX2, freeY1x2, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x2Color, 48), width = fanWidth, style = f_line_style(fan1x2Style))
+        if show1x1
+            fan1x1 := line.new(startX, startYFan, freeX2, freeY1x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x1Color, 5), width = mainFanWidth, style = f_line_style(fan1x1Style))
+        if show2x1
+            fan2x1 := line.new(startX, startYFan, freeX2, freeY2x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan2x1Color, 48), width = fanWidth, style = f_line_style(fan2x1Style))
+        if show3x1
+            fan3x1 := line.new(startX, startYFan, freeX2, freeY3x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan3x1Color, 66), width = fanWidth, style = f_line_style(fan3x1Style))
+        if show4x1
+            fan4x1 := line.new(startX, startYFan, freeX2, freeY4x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan4x1Color, 72), width = fanWidth, style = f_line_style(fan4x1Style))
+        if show8x1 and showExtremeAngles
+            fan8x1 := line.new(startX, startYFan, freeX2, freeY8x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan8x1Color, 78), width = fanWidth, style = f_line_style(fan8x1Style))
+
+    float x1x8 = na
+    float x1x4 = na
+    float x1x3 = na
+    float x1x2 = na
+    float x1x1 = na
+    float x2x1 = na
+    float x3x1 = na
+    float x4x1 = na
+    float x8x1 = na
+
+    float y1x8 = na
+    float y1x4 = na
+    float y1x3 = na
+    float y1x2 = na
+    float y1x1 = na
+    float y2x1 = na
+    float y3x1 = na
+    float y4x1 = na
+    float y8x1 = na
+
+    if gannEngineMode == "Classic Gann"
+        barSpanFromAnchor   = math.max(math.abs(anchorBar2 - anchorBar1), 1)
+        priceSpanFromAnchor = math.max(math.abs(anchorPrice2 - anchorPrice1), syminfo.mintick)
+        baseSlope           = priceSpanFromAnchor / barSpanFromAnchor
+        ySign               = originTop ? -1.0 : 1.0
+
+        if fanMode == "Box-Normalized"
+            frameRangeY  = math.max(topY - botY, syminfo.mintick)
+            frameRunBars = math.max(boxRightX - leftX, 1)
+
+            x1x8 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 0.125)
+            x1x4 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 0.250)
+            x1x3 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 0.333333)
+            x1x2 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 0.500)
+            x1x1 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 1.000)
+            x2x1 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 2.000)
+            x3x1 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 3.000)
+            x4x1 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 4.000)
+            x8x1 := f_classic_x2(startX, originLeft, frameRangeY, frameRunBars, baseSlope, 8.000)
+
+            y1x8 := f_classic_y2(startYFan, ySign, baseSlope, 0.125, x1x8, startX)
+            y1x4 := f_classic_y2(startYFan, ySign, baseSlope, 0.250, x1x4, startX)
+            y1x3 := f_classic_y2(startYFan, ySign, baseSlope, 0.333333, x1x3, startX)
+            y1x2 := f_classic_y2(startYFan, ySign, baseSlope, 0.500, x1x2, startX)
+            y1x1 := f_classic_y2(startYFan, ySign, baseSlope, 1.000, x1x1, startX)
+            y2x1 := f_classic_y2(startYFan, ySign, baseSlope, 2.000, x2x1, startX)
+            y3x1 := f_classic_y2(startYFan, ySign, baseSlope, 3.000, x3x1, startX)
+            y4x1 := f_classic_y2(startYFan, ySign, baseSlope, 4.000, x4x1, startX)
+            y8x1 := f_classic_y2(startYFan, ySign, baseSlope, 8.000, x8x1, startX)
+        else
+            freeRunBars = math.max(math.abs(fanRightX - leftX), 1)
+            freeX2      = originLeft ? fanRightX : leftX
+
+            x1x8 := freeX2
+            x1x4 := freeX2
+            x1x3 := freeX2
+            x1x2 := freeX2
+            x1x1 := freeX2
+            x2x1 := freeX2
+            x3x1 := freeX2
+            x4x1 := freeX2
+            x8x1 := freeX2
+
+            y1x8 := startYFan + ySign * baseSlope * 0.125 * freeRunBars
+            y1x4 := startYFan + ySign * baseSlope * 0.250 * freeRunBars
+            y1x3 := startYFan + ySign * baseSlope * 0.333333 * freeRunBars
+            y1x2 := startYFan + ySign * baseSlope * 0.500 * freeRunBars
+            y1x1 := startYFan + ySign * baseSlope * 1.000 * freeRunBars
+            y2x1 := startYFan + ySign * baseSlope * 2.000 * freeRunBars
+            y3x1 := startYFan + ySign * baseSlope * 3.000 * freeRunBars
+            y4x1 := startYFan + ySign * baseSlope * 4.000 * freeRunBars
+            y8x1 := startYFan + ySign * baseSlope * 8.000 * freeRunBars
+
+        if show1x8 and showExtremeAngles
+            fan1x8 := line.new(startX, startYFan, int(x1x8), y1x8, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x8Color, 78), width = fanWidth, style = f_line_style(fan1x8Style))
+        if show1x4
+            fan1x4 := line.new(startX, startYFan, int(x1x4), y1x4, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x4Color, 72), width = fanWidth, style = f_line_style(fan1x4Style))
+        if show1x3
+            fan1x3 := line.new(startX, startYFan, int(x1x3), y1x3, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x3Color, 66), width = fanWidth, style = f_line_style(fan1x3Style))
+        if show1x2
+            fan1x2 := line.new(startX, startYFan, int(x1x2), y1x2, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x2Color, 48), width = fanWidth, style = f_line_style(fan1x2Style))
+        if show1x1
+            fan1x1 := line.new(startX, startYFan, int(x1x1), y1x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan1x1Color, 5), width = mainFanWidth, style = f_line_style(fan1x1Style))
+        if show2x1
+            fan2x1 := line.new(startX, startYFan, int(x2x1), y2x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan2x1Color, 48), width = fanWidth, style = f_line_style(fan2x1Style))
+        if show3x1
+            fan3x1 := line.new(startX, startYFan, int(x3x1), y3x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan3x1Color, 66), width = fanWidth, style = f_line_style(fan3x1Style))
+        if show4x1
+            fan4x1 := line.new(startX, startYFan, int(x4x1), y4x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan4x1Color, 72), width = fanWidth, style = f_line_style(fan4x1Style))
+        if show8x1 and showExtremeAngles
+            fan8x1 := line.new(startX, startYFan, int(x8x1), y8x1, xloc = xloc.bar_index, extend = extend.none, color = f_fan_line_color(fanColorMode, fanColor, fan8x1Color, 78), width = fanWidth, style = f_line_style(fan8x1Style))
+
+    if not na(fanFillA)
+        linefill.delete(fanFillA)
+    if not na(fanFillB)
+        linefill.delete(fanFillB)
+    if not na(fanFillC)
+        linefill.delete(fanFillC)
+    if not na(fanFillD)
+        linefill.delete(fanFillD)
+
+    if showFanFill and gannEngineMode == "Gann Style"
+        if not na(fan1x4) and not na(fan1x3)
+            fanFillA := linefill.new(fan1x4, fan1x3, color.new(fanColor, fanFillAlphaFar))
+        if not na(fan1x3) and not na(fan1x2)
+            fanFillB := linefill.new(fan1x3, fan1x2, color.new(fanColor, fanFillAlphaFar))
+        if not na(fan1x2) and not na(fan1x1)
+            fanFillC := linefill.new(fan1x2, fan1x1, color.new(fanColor, fanFillAlphaNear))
+        if not na(fan1x1) and not na(fan2x1)
+            fanFillD := linefill.new(fan1x1, fan2x1, color.new(fanColor, fanFillAlphaNear))
+
+    if showAngleNames
+        lblBaseX    = gannEngineMode == "Classic Gann" ? (originLeft ? boxRightX - 2 : leftX + 2) : (originLeft ? fanRightX - 2 : leftX + 2)
+        anglePrefix = gannEngineMode == "Classic Gann" ? "G " : ""
+
+        if not na(fan1x8)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan1x8) - 2) : math.max(lblBaseX, line.get_x2(fan1x8) + 2)
+            ly = f_clamp(f_line_y(fan1x8, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan1x8Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan1x8Color, false), size = labelSize))
+
+        if not na(fan1x4)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan1x4) - 2) : math.max(lblBaseX, line.get_x2(fan1x4) + 2)
+            ly = f_clamp(f_line_y(fan1x4, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan1x4Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan1x4Color, false), size = labelSize))
+
+        if not na(fan1x3)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan1x3) - 2) : math.max(lblBaseX, line.get_x2(fan1x3) + 2)
+            ly = f_clamp(f_line_y(fan1x3, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan1x3Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan1x3Color, false), size = labelSize))
+
+        if not na(fan1x2)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan1x2) - 2) : math.max(lblBaseX, line.get_x2(fan1x2) + 2)
+            ly = f_clamp(f_line_y(fan1x2, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan1x2Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan1x2Color, false), size = labelSize))
+
+        if not na(fan1x1)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan1x1) - 2) : math.max(lblBaseX, line.get_x2(fan1x1) + 2)
+            ly = f_clamp(f_line_y(fan1x1, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan1x1Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan1x1Color, true), size = labelSize))
+
+        if not na(fan2x1)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan2x1) - 2) : math.max(lblBaseX, line.get_x2(fan2x1) + 2)
+            ly = f_clamp(f_line_y(fan2x1, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan2x1Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan2x1Color, false), size = labelSize))
+
+        if not na(fan3x1)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan3x1) - 2) : math.max(lblBaseX, line.get_x2(fan3x1) + 2)
+            ly = f_clamp(f_line_y(fan3x1, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan3x1Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan3x1Color, false), size = labelSize))
+
+        if not na(fan4x1)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan4x1) - 2) : math.max(lblBaseX, line.get_x2(fan4x1) + 2)
+            ly = f_clamp(f_line_y(fan4x1, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan4x1Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan4x1Color, false), size = labelSize))
+
+        if not na(fan8x1)
+            lx = originLeft ? math.min(lblBaseX, line.get_x2(fan8x1) - 2) : math.max(lblBaseX, line.get_x2(fan8x1) + 2)
+            ly = f_clamp(f_line_y(fan8x1, lx), botY, topY)
+            array.push(angleLabs, label.new(lx, ly, anglePrefix + fan8x1Value, xloc = xloc.bar_index, style = label.style_none, textcolor = f_fan_label_color(fanColorMode, fanColor, fan8x1Color, false), size = labelSize))
+
+//=====================================================
+// HEAT ZONE
+//=====================================================
+if barstate.islast
+    if not showHeatZone or not haveAnchors
+        if not na(heatFill1)
+            linefill.delete(heatFill1)
+            heatFill1 := na
+        if not na(heatFill2)
+            linefill.delete(heatFill2)
+            heatFill2 := na
+
+if showHeatZone and haveAnchors and barstate.islast
+    if not na(heatFill1)
+        linefill.delete(heatFill1)
+    if not na(heatFill2)
+        linefill.delete(heatFill2)
+
+    if trendDir == 1
+        if not na(fan1x1) and not na(fan2x1)
+            heatFill1 := linefill.new(fan1x1, fan2x1, color.new(colBull, heatFillAlpha1))
+        if not na(fan1x2) and not na(fan1x1)
+            heatFill2 := linefill.new(fan1x2, fan1x1, color.new(colNeutral, heatFillAlpha2))
+    if trendDir == -1
+        if not na(fan1x1) and not na(fan1x2)
+            heatFill1 := linefill.new(fan1x1, fan1x2, color.new(colBear, heatFillAlpha1))
+        if not na(fan2x1) and not na(fan1x1)
+            heatFill2 := linefill.new(fan2x1, fan1x1, color.new(colNeutral, heatFillAlpha2))
+
+//=====================================================
+// MAIN BOX + GRID + LEVELS "Classic Gann"
+//=====================================================
+if barstate.islast
+    if gannEngineMode == "Classic Gann"
+        if not (showBox or showGrid or showBoxLevels) or not haveAnchors
+            f_clear_boxes(mainBoxes)
+            f_clear_boxes(styleInfoBoxes)
+            f_clear_lines(gridLines)
+            f_clear_lines(boxLevelLines)
+            f_clear_labels(boxLevelLabs)
+            f_clear_labels(boxPriceLabs)
+
+if gannEngineMode == "Classic Gann" and (showBox or showGrid or showBoxLevels) and haveAnchors and barstate.islast
+    f_clear_boxes(mainBoxes)
+    f_clear_boxes(styleInfoBoxes)
+    f_clear_lines(gridLines)
+    f_clear_lines(boxLevelLines)
+    f_clear_labels(boxLevelLabs)
+    f_clear_labels(boxPriceLabs)
+
+    rangeY = math.max(topY - botY, syminfo.mintick)
+    rangeX = math.max(boxRightX - leftX, 1)
+
+    panelPocLevel := "na"
+    panelPocPrice := na
+    panelPocVol   := na
+
+    if showBox
+        mainBox = box.new(leftX, topY, boxRightX, botY, xloc = xloc.bar_index, bgcolor = na, border_color = colBoxBorder, border_width = 1)
+        array.push(mainBoxes, mainBox)
+
+    if showGrid
+        for i = 1 to boxDivs - 1
+            xPos = leftX + int(math.round(rangeX * i / boxDivs))
+            yPos = botY + rangeY * i / boxDivs
+            array.push(gridLines, line.new(xPos, botY, xPos, topY, xloc = xloc.bar_index, color = color.new(colGrid, 58), width = gridWidth, style = line.style_dotted))
+            array.push(gridLines, line.new(leftX, yPos, boxRightX, yPos, xloc = xloc.bar_index, color = color.new(colGrid, 58), width = gridWidth, style = line.style_dotted))
+
+    if showBoxLevels
+        vals   = array.new_float()
+        cols   = array.new_color()
+        names  = array.new_string()
+        styles = array.new_string()
+
+        array.push(vals, 0.000), array.push(cols, colBoxBorder), array.push(names, "0"),   array.push(styles, "Solid")
+        if boxLvl1On
+            array.push(vals, boxLvl1Value), array.push(cols, boxLvl1Color), array.push(names, str.tostring(boxLvl1Value)), array.push(styles, boxLvl1Style)
+        if boxLvl2On
+            array.push(vals, boxLvl2Value), array.push(cols, boxLvl2Color), array.push(names, str.tostring(boxLvl2Value)), array.push(styles, boxLvl2Style)
+        if boxLvl3On
+            array.push(vals, boxLvl3Value), array.push(cols, boxLvl3Color), array.push(names, str.tostring(boxLvl3Value)), array.push(styles, boxLvl3Style)
+        if boxLvl4On
+            array.push(vals, boxLvl4Value), array.push(cols, boxLvl4Color), array.push(names, str.tostring(boxLvl4Value)), array.push(styles, boxLvl4Style)
+        if boxLvl5On
+            array.push(vals, boxLvl5Value), array.push(cols, boxLvl5Color), array.push(names, str.tostring(boxLvl5Value)), array.push(styles, boxLvl5Style)
+        array.push(vals, 1.000), array.push(cols, colBoxBorder), array.push(names, "100"), array.push(styles, "Solid")
+
+        topLblY    = topY + rangeY * 0.035
+        bottomLblY = botY - rangeY * 0.035
+        leftLblX   = leftX - 1
+        rightLblX  = boxRightX + 3
+
+        for i = 0 to array.size(vals) - 1
+            frac = array.get(vals, i)
+            name = array.get(names, i)
+            colL = array.get(cols, i)
+            styL = array.get(styles, i)
+
+            xLev = leftX + int(math.round(rangeX * frac))
+            yLev = topY - rangeY * frac
+
+            array.push(boxLevelLines, line.new(leftX, yLev, boxRightX, yLev, xloc = xloc.bar_index, color = colL, width = 1, style = f_line_style(styL)))
+            array.push(boxLevelLabs, label.new(xLev, topLblY, name, xloc = xloc.bar_index, style = label.style_none, textcolor = colL, size = labelSize))
+            array.push(boxLevelLabs, label.new(xLev, bottomLblY, name, xloc = xloc.bar_index, style = label.style_none, textcolor = colL, size = labelSize))
+            array.push(boxPriceLabs, label.new(leftLblX, yLev, str.tostring(yLev, format.mintick), xloc = xloc.bar_index, style = label.style_none, textcolor = colL, size = labelSize))
+            array.push(boxPriceLabs, label.new(rightLblX, yLev, str.tostring(yLev, format.mintick), xloc = xloc.bar_index, style = label.style_none, textcolor = colL, size = labelSize))
+
+//=====================================================
+// MAIN BOX + GRID + LEVELS 2
+//=====================================================
+if barstate.islast
+    if gannEngineMode == "Gann Style"
+        if not (showBox or showGrid or showBoxLevels) or not haveAnchors
+            f_clear_boxes(mainBoxes)
+            f_clear_boxes(fibBuySellBoxes)
+            f_clear_boxes(styleInfoBoxes)
+            f_clear_lines(gridLines)
+            f_clear_lines(boxLevelLines)
+            f_clear_labels(boxLevelLabs)
+            f_clear_labels(boxPriceLabs)
+
+if gannEngineMode == "Gann Style" and (showBox or showGrid or showBoxLevels) and haveAnchors and barstate.islast
+    f_clear_boxes(mainBoxes)
+    f_clear_boxes(fibBuySellBoxes)
+    f_clear_boxes(styleInfoBoxes)
+    f_clear_lines(gridLines)
+    f_clear_lines(boxLevelLines)
+    f_clear_labels(boxLevelLabs)
+    f_clear_labels(boxPriceLabs)
+
+    rangeY = math.max(topY - botY, syminfo.mintick)
+    rangeX = math.max(boxRightX - leftX, 1)
+
+    vals   = array.new_float()
+    cols   = array.new_color()
+    names  = array.new_string()
+    styles = array.new_string()
+
+    array.push(vals, 0.000), array.push(cols, colBoxBorder), array.push(names, "0"),   array.push(styles, "Dashed")
+    if boxLvl1On
+        array.push(vals, boxLvl1Value), array.push(cols, boxLvl1Color), array.push(names, str.tostring(boxLvl1Value)), array.push(styles, "Dashed")
+    if boxLvl2On
+        array.push(vals, boxLvl2Value), array.push(cols, boxLvl2Color), array.push(names, str.tostring(boxLvl2Value)), array.push(styles, "Dashed")
+    if boxLvl3On
+        array.push(vals, boxLvl3Value), array.push(cols, boxLvl3Color), array.push(names, str.tostring(boxLvl3Value)), array.push(styles, "Dashed")
+    if boxLvl4On
+        array.push(vals, boxLvl4Value), array.push(cols, boxLvl4Color), array.push(names, str.tostring(boxLvl4Value)), array.push(styles, "Dashed")
+    if boxLvl5On
+        array.push(vals, boxLvl5Value), array.push(cols, boxLvl5Color), array.push(names, str.tostring(boxLvl5Value)), array.push(styles, "Dashed")
+    array.push(vals, 1.000), array.push(cols, colBoxBorder), array.push(names, "100"), array.push(styles, "Dashed")
+
+    fibHalfH     = math.max(rangeY * 0.030, syminfo.mintick * 6) * 0.5
+    scanStartOff = math.min(math.max(0, bar_index - leftX), 4999)
+    scanEndOff   = 0
+    barsToScan   = math.max(1, scanStartOff - scanEndOff + 1)
+
+    if showBox
+        for i = 0 to array.size(vals) - 1
+            frac = array.get(vals, i)
+            colL = array.get(cols, i)
+            name = array.get(names, i)
+
+            float yLev = topY - rangeY * frac
+            float yTop = na
+            float yBot = na
+
+            if i == 0
+                yTop := topY
+                yBot := math.max(topY - fibHalfH * 2.0, botY)
+                yLev := (yTop + yBot) * 0.5
+            else if i == array.size(vals) - 1
+                yTop := math.min(botY + fibHalfH * 2.0, topY)
+                yBot := botY
+                yLev := (yTop + yBot) * 0.5
+            else
+                yTop := math.min(yLev + fibHalfH, topY)
+                yBot := math.max(yLev - fibHalfH, botY)
+
+            fibBox = box.new(leftX, yTop, boxRightX, yBot, xloc = xloc.bar_index, bgcolor = color.new(colL, 86), border_color = na, border_width = 1)
+            array.push(mainBoxes, fibBox)
+
+            float buyVol  = 0.0
+            float sellVol = 0.0
+
+            for j = 0 to barsToScan - 1
+                idx = scanStartOff - j
+
+                float bHigh  = high[idx]
+                float bLow   = low[idx]
+                float bClose = close[idx]
+                float bVol   = nz(volume[idx], 0)
+
+                if bVol > 0
+                    float overlapTop = math.min(bHigh, yTop)
+                    float overlapBot = math.max(bLow, yBot)
+                    float overlap    = math.max(overlapTop - overlapBot, 0.0)
+
+                    if overlap > 0
+                        float barRange = math.max(bHigh - bLow, syminfo.mintick)
+                        float zoneVol  = bVol * (overlap / barRange)
+
+                        float buyShare  = f_clamp((bClose - bLow) / barRange, 0.0, 1.0)
+                        float sellShare = f_clamp((bHigh - bClose) / barRange, 0.0, 1.0)
+
+                        buyVol  += zoneVol * buyShare
+                        sellVol += zoneVol * sellShare
+
+            float totalVol = buyVol + sellVol
+            if na(panelPocVol) or totalVol > panelPocVol
+                panelPocVol   := totalVol
+                panelPocLevel := name
+                panelPocPrice := yLev
+
+            if totalVol > 0
+                int totalWidth = math.max(boxRightX - leftX, 1)
+                int buyW  = int(math.round(totalWidth * buyVol / totalVol))
+                int sellW = int(math.round(totalWidth * sellVol / totalVol))
+
+                if buyVol > 0 and buyW == 0
+                    buyW := 1
+                if sellVol > 0 and sellW == 0
+                    sellW := 1
+
+                color buyColor  = color.new(colBull, buyVol >= sellVol ? 30 : 65)
+                color sellColor = color.new(colBear, sellVol > buyVol ? 30 : 65)
+
+                if buyW > 0
+                    box buyBox = box.new(leftX, yTop, leftX + buyW, yLev, xloc = xloc.bar_index, border_color = na, bgcolor = buyColor, text = str.tostring(buyVol, format.volume), text_color = color.white, text_halign = text.align_right, text_valign = text.align_center, text_size = boxTextSize)
+                    array.push(fibBuySellBoxes, buyBox)
+
+                if sellW > 0
+                    box sellBox = box.new(leftX, yLev, leftX + sellW, yBot, xloc = xloc.bar_index, border_color = na, bgcolor = sellColor, text = str.tostring(sellVol, format.volume), text_color = color.white, text_halign = text.align_right, text_valign = text.align_center, text_size = boxTextSize)
+                    array.push(fibBuySellBoxes, sellBox)
+
+            array.push(boxLevelLines, line.new(leftX, yLev, boxRightX, yLev, xloc = xloc.bar_index, color = colL, width = 1, style = line.style_dashed))
+
+            if showBoxLevels
+                int fibX2      = boxRightX
+                int structureW = math.max(boxRightX - leftX, 1)
+                int autoGapW   = math.max(10, int(math.round(structureW * 0.035)))
+                int gapW       = styleGapMode == "Manual" ? styleGapBars : autoGapW
+                int totalW     = int(math.round(f_clamp(structureW * 0.055, styleTotalBoxWidth, 40)))
+                int infoW      = int(math.round(f_clamp(structureW * 0.085, styleInfoBoxWidth, 60)))
+
+                int totalX1 = fibX2 + gapW
+                int totalX2 = totalX1 + totalW
+                int infoX1  = totalX2
+                int infoX2  = infoX1 + infoW
+
+                box totalInfoBox = box.new(totalX1, yTop, totalX2, yBot, xloc = xloc.bar_index, border_color = na, bgcolor = color.new(colL, 85), text = str.tostring(totalVol, format.volume), text_color = color.white, text_halign = text.align_right, text_valign = text.align_center, text_size = boxTextSize)
+                array.push(styleInfoBoxes, totalInfoBox)
+
+                box levelInfoBox = box.new(infoX1, yTop, infoX2, yLev, xloc = xloc.bar_index, border_color = chart.bg_color, bgcolor = color.new(colL, 85), text = name, text_color = color.white, text_halign = text.align_center, text_valign = text.align_center, text_size = boxTextSize)
+                array.push(styleInfoBoxes, levelInfoBox)
+
+                box priceInfoBox = box.new(infoX1, yLev, infoX2, yBot, xloc = xloc.bar_index, border_color = chart.bg_color, bgcolor = color.new(colL, 85), text = str.tostring(yLev, format.mintick), text_color = color.white, text_halign = text.align_center, text_valign = text.align_center, text_size = boxTextSize)
+                array.push(styleInfoBoxes, priceInfoBox)
+
+    if showGrid
+        for i = 1 to boxDivs - 1
+            xPos = leftX + int(math.round(rangeX * i / boxDivs))
+            array.push(gridLines, line.new(xPos, botY, xPos, topY, xloc = xloc.bar_index, color = color.new(colGrid, 58), width = gridWidth, style = line.style_dotted))
+
+//=====================================================
+// ACTIVE STRUCTURE LABELS
+//=====================================================
+if barstate.islast
+    if not showSwing or not haveAnchors
+        f_clear_lines(swingLines)
+        f_clear_labels(swingLabs)
+
+if showSwing and haveAnchors and barstate.islast
+    f_clear_lines(swingLines)
+    f_clear_labels(swingLabs)
+
+    swingRightX = boxRightX
+
+    if trendDir == 1
+        array.push(swingLines, line.new(anchorBar1, anchorPrice1, swingRightX, anchorPrice1, xloc = xloc.bar_index, color = color.new(colBull, 0), width = swingWidth))
+        array.push(swingLabs, label.new(anchorBar1, anchorPrice1, "Swing Low", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(colBull, 0), textcolor = color.white, size = labelSize))
+
+        array.push(swingLines, line.new(anchorBar2, anchorPrice2, swingRightX, anchorPrice2, xloc = xloc.bar_index, color = color.new(colBear, 0), width = swingWidth))
+        array.push(swingLabs, label.new(anchorBar2, anchorPrice2, "Active High", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(colBear, 0), textcolor = color.white, size = labelSize))
+
+    if trendDir == -1
+        array.push(swingLines, line.new(anchorBar1, anchorPrice1, swingRightX, anchorPrice1, xloc = xloc.bar_index, color = color.new(colBear, 0), width = swingWidth))
+        array.push(swingLabs, label.new(anchorBar1, anchorPrice1, "Swing High", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(colBear, 0), textcolor = color.white, size = labelSize))
+
+        array.push(swingLines, line.new(anchorBar2, anchorPrice2, swingRightX, anchorPrice2, xloc = xloc.bar_index, color = color.new(colBull, 0), width = swingWidth))
+        array.push(swingLabs, label.new(anchorBar2, anchorPrice2, "Active Low", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(colBull, 0), textcolor = color.white, size = labelSize))
+
+//=====================================================
+// SQ9
+//=====================================================
+
+if barstate.islast
+    if not showSq9 or not haveAnchors
+        f_clear_lines(sq9Lines)
+        f_clear_labels(sq9Labs)
+
+if showSq9 and haveAnchors and barstate.islast
+    f_clear_lines(sq9Lines)
+    f_clear_labels(sq9Labs)
+
+    basePrice = anchorPrice2
+    x1 = anchorBar2
+    x2 = sq9RightX 
+
+    structureW = math.max(sq9RightX  - leftX, 1)
+    autoGapW   = math.max(0, int(math.round(structureW * 0.035)))
+    gapW       = styleGapMode == "Manual" ? styleGapBars : autoGapW
+    totalW     = int(math.round(f_clamp(structureW * 0.055, styleTotalBoxWidth, 40)))
+    infoW      = int(math.round(f_clamp(structureW * 0.085, styleInfoBoxWidth, 60)))
+
+    classicSq9X = sq9RightX + sq9LabelOffset
+    styleSq9X   = sq9RightX + sq9LabelOffset
+
+    lblX = gannEngineMode == "Gann Style" and showBoxLevels ? styleSq9X : classicSq9X
+
+    for i = 1 to sq9StepCount
+        upLvl = f_sq9_price(basePrice, sq9StepFinal, i, true)
+        dnLvl = f_sq9_price(basePrice, sq9StepFinal, i, false)
+
+        upLn = line.new(x1, upLvl, x2, upLvl, xloc = xloc.bar_index, color = color.new(colSq9, math.min(15 + i * 8, 92)), style = line.style_dashed)
+        dnLn = line.new(x1, dnLvl, x2, dnLvl, xloc = xloc.bar_index, color = color.new(colSq9, math.min(15 + i * 8, 92)), style = line.style_dashed)
+
+        array.push(sq9Lines, upLn)
+        array.push(sq9Lines, dnLn)
+
+        array.push(sq9Labs, label.new(lblX, upLvl, str.tostring(upLvl, format.mintick), xloc = xloc.bar_index, style = label.style_none, textcolor = color.new(colSq9, 0), size = labelSize))
+        array.push(sq9Labs, label.new(lblX, dnLvl, str.tostring(dnLvl, format.mintick), xloc = xloc.bar_index, style = label.style_none, textcolor = color.new(colSq9, 0), size = labelSize))
+
+if barstate.islast and gannEngineMode != "Gann Style"
+    panelPocLevel := "na"
+    panelPocPrice := na
+    panelPocVol   := na
+
+//=====================================================
+// CORE LEVELS
+//=====================================================
+float gann1x1 = na
+float gann1x2 = na
+float gann2x1 = na
+
+if haveAnchors
+    originResolvedCore = fanOriginMode == "Auto Flip" ? (trendDir == 1 ? "Bottom Left" : "Top Left") : fanOriginManual
+    originLeftCore = f_is_left_origin(originResolvedCore)
+    originTopCore  = f_is_top_origin(originResolvedCore)
+
+    startXCore = originLeftCore ? leftX : fanRightX
+    startYCore = originTopCore ? topY : botY
+
+    barSpanFromAnchorCore   = math.max(math.abs(anchorBar2 - anchorBar1), 1)
+    priceSpanFromAnchorCore = math.max(math.abs(anchorPrice2 - anchorPrice1), syminfo.mintick)
+    baseSlopeCore           = priceSpanFromAnchorCore / barSpanFromAnchorCore
+    ySignCore               = originTopCore ? -1.0 : 1.0
+
+    if gannEngineMode == "Gann Style" and fanMode == "Box-Normalized"
+        y50Core  = f_target_y(originResolvedCore, topY, botY, 0.500)
+        y618Core = f_target_y(originResolvedCore, topY, botY, 0.618)
+        y75Core  = f_target_y(originResolvedCore, topY, botY, 0.750)
+
+        endXCore = originLeftCore ? fanRightX : leftX
+
+        gann1x2 := f_interp_y(startXCore, startYCore, endXCore, y50Core,  bar_index)
+        gann1x1 := f_interp_y(startXCore, startYCore, endXCore, y618Core, bar_index)
+        gann2x1 := f_interp_y(startXCore, startYCore, endXCore, y75Core,  bar_index)
+
+    if gannEngineMode == "Gann Style" and fanMode == "Free Fan"
+        freeRunBarsCore = math.max(math.abs(fanRightX - leftX), 1)
+        freeX2Core      = originLeftCore ? fanRightX : leftX
+
+        freeY1x2Core = startYCore + ySignCore * baseSlopeCore * 0.500 * freeRunBarsCore
+        freeY1x1Core = startYCore + ySignCore * baseSlopeCore * 1.000 * freeRunBarsCore
+        freeY2x1Core = startYCore + ySignCore * baseSlopeCore * 2.000 * freeRunBarsCore
+
+        gann1x2 := f_interp_y(startXCore, startYCore, freeX2Core, freeY1x2Core, bar_index)
+        gann1x1 := f_interp_y(startXCore, startYCore, freeX2Core, freeY1x1Core, bar_index)
+        gann2x1 := f_interp_y(startXCore, startYCore, freeX2Core, freeY2x1Core, bar_index)
+
+    if gannEngineMode == "Classic Gann"
+        if fanMode == "Box-Normalized"
+            frameRangeYCore  = math.max(topY - botY, syminfo.mintick)
+            frameRunBarsCore = math.max(boxRightX - leftX, 1)
+
+            x1x2Core = f_classic_x2(startXCore, originLeftCore, frameRangeYCore, frameRunBarsCore, baseSlopeCore, 0.500)
+            x1x1Core = f_classic_x2(startXCore, originLeftCore, frameRangeYCore, frameRunBarsCore, baseSlopeCore, 1.000)
+            x2x1Core = f_classic_x2(startXCore, originLeftCore, frameRangeYCore, frameRunBarsCore, baseSlopeCore, 2.000)
+
+            y1x2Core = f_classic_y2(startYCore, ySignCore, baseSlopeCore, 0.500, x1x2Core, startXCore)
+            y1x1Core = f_classic_y2(startYCore, ySignCore, baseSlopeCore, 1.000, x1x1Core, startXCore)
+            y2x1Core = f_classic_y2(startYCore, ySignCore, baseSlopeCore, 2.000, x2x1Core, startXCore)
+
+            gann1x2 := f_interp_y(startXCore, startYCore, x1x2Core, y1x2Core, bar_index)
+            gann1x1 := f_interp_y(startXCore, startYCore, x1x1Core, y1x1Core, bar_index)
+            gann2x1 := f_interp_y(startXCore, startYCore, x2x1Core, y2x1Core, bar_index)
+        else
+            freeRunBarsCore = math.max(math.abs(fanRightX - leftX), 1)
+            freeX2Core      = originLeftCore ? fanRightX : leftX
+
+            freeY1x2Core = startYCore + ySignCore * baseSlopeCore * 0.500 * freeRunBarsCore
+            freeY1x1Core = startYCore + ySignCore * baseSlopeCore * 1.000 * freeRunBarsCore
+            freeY2x1Core = startYCore + ySignCore * baseSlopeCore * 2.000 * freeRunBarsCore
+
+            gann1x2 := f_interp_y(startXCore, startYCore, freeX2Core, freeY1x2Core, bar_index)
+            gann1x1 := f_interp_y(startXCore, startYCore, freeX2Core, freeY1x1Core, bar_index)
+            gann2x1 := f_interp_y(startXCore, startYCore, freeX2Core, freeY2x1Core, bar_index)
+
+heatTopNowRaw = trendDir == 1 ? gann2x1 : gann1x1
+heatBotNowRaw = trendDir == 1 ? gann1x1 : gann1x2
+
+heatTopNow = not na(heatTopNowRaw) and not na(heatBotNowRaw) ? math.max(heatTopNowRaw, heatBotNowRaw) : na
+heatBotNow = not na(heatTopNowRaw) and not na(heatBotNowRaw) ? math.min(heatTopNowRaw, heatBotNowRaw) : na
+
+inHeatZone = not na(heatTopNow) and not na(heatBotNow) and close <= heatTopNow and close >= heatBotNow
+
+//=====================================================
+// BREAK / SIGNAL LOGIC
+//=====================================================
+bullBreak1x1Down = trendDir == 1 and not na(gann1x1) and ta.crossunder(close, gann1x1)
+bullReclaim1x1   = trendDir == 1 and not na(gann1x1) and ta.crossover(close, gann1x1)
+
+bearBreak1x1Up   = trendDir == -1 and not na(gann1x1) and ta.crossover(close, gann1x1)
+bearReject1x1    = trendDir == -1 and not na(gann1x1) and ta.crossunder(close, gann1x1)
+
+currentBreakDistance = not na(gann1x1) ? math.abs(close - gann1x1) : 0.0
+currentBreakStrong   = atrVal > 0 and currentBreakDistance >= atrVal * signalAtrMult
+
+bullHeatTouch = inHeatZone and not na(heatBotNow) and low <= heatBotNow
+bearHeatTouch = inHeatZone and not na(heatTopNow) and high >= heatTopNow
+
+heatBullReaction =
+     trendDir == 1 and
+     bullHeatTouch and
+     close > open
+
+heatBearReaction =
+     trendDir == -1 and
+     bearHeatTouch and
+     close < open
+
+heatReactionText = heatBullReaction ? "Bull Confirmed" : heatBearReaction ? "Bear Confirmed" : "None"
+
+cooldownPassed = na(lastSignalBar) or bar_index - lastSignalBar > signalCooldown
+isInsideCurrentDrawing = haveAnchors and bar_index >= anchorBar1 and bar_index <= boxRightX
+
+aggressiveBuy =
+     trendDir == 1 and
+     inHeatZone and
+     heatBullReaction and
+     not na(gann1x1) and
+     close > gann1x1 and
+     cooldownPassed
+
+aggressiveSell =
+     trendDir == -1 and
+     inHeatZone and
+     heatBearReaction and
+     not na(gann1x1) and
+     close < gann1x1 and
+     cooldownPassed
+
+reversalWatch =
+     currentBreakStrong and
+     ((trendDir == 1 and bullBreak1x1Down) or (trendDir == -1 and bearBreak1x1Up)) and
+     cooldownPassed
+
+trendContinuation =
+     ((trendDir == 1 and bullReclaim1x1) or (trendDir == -1 and bearReject1x1)) and
+     cooldownPassed
+
+if barstate.isconfirmed and isInsideCurrentDrawing and not structureChanged
+    if heatBullReaction
+        bullReactionCount += 1
+    if heatBearReaction
+        bearReactionCount += 1
+    if bullBreak1x1Down or bearBreak1x1Up
+        breakEventCount += 1
+        lastBreakSideText     := bullBreak1x1Down ? "Down" : "Up"
+        lastBreakStrengthText := currentBreakStrong ? "STRONG" : "NORMAL"
+        lastBreakBar          := bar_index
+
+if barstate.isconfirmed and showBreakLb and isInsideCurrentDrawing and not structureChanged
+    sigX = bar_index + signalLabelOffset
+
+    if bullBreak1x1Down
+        if not na(lbBreakDown)
+            label.delete(lbBreakDown)
+        if not na(lnBreakDown)
+            line.delete(lnBreakDown)
+        lbBreakDown := label.new(sigX, low, "1x1 Break Down", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(colBear, 0), textcolor = color.white, size = labelSize)
+        lnBreakDown := line.new(bar_index, low, sigX, low, xloc = xloc.bar_index, color = color.new(colBear, 0), width = 1)
+        srcBreakDown := bar_index
+
+    if bullReclaim1x1
+        if not na(lbReclaim)
+            label.delete(lbReclaim)
+        if not na(lnReclaim)
+            line.delete(lnReclaim)
+        lbReclaim := label.new(sigX, high, "1x1 Reclaim", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(colBull, 0), textcolor = color.white, size = labelSize)
+        lnReclaim := line.new(bar_index, high, sigX, high, xloc = xloc.bar_index, color = color.new(colBull, 0), width = 1)
+        srcReclaim := bar_index
+
+    if bearBreak1x1Up
+        if not na(lbBreakUp)
+            label.delete(lbBreakUp)
+        if not na(lnBreakUp)
+            line.delete(lnBreakUp)
+        lbBreakUp := label.new(sigX, high, "1x1 Break Up", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(colBull, 0), textcolor = color.white, size = labelSize)
+        lnBreakUp := line.new(bar_index, high, sigX, high, xloc = xloc.bar_index, color = color.new(colBull, 0), width = 1)
+        srcBreakUp := bar_index
+
+    if bearReject1x1
+        if not na(lbReject)
+            label.delete(lbReject)
+        if not na(lnReject)
+            line.delete(lnReject)
+        lbReject := label.new(sigX, low, "1x1 Reject", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(colBear, 0), textcolor = color.white, size = labelSize)
+        lnReject := line.new(bar_index, low, sigX, low, xloc = xloc.bar_index, color = color.new(colBear, 0), width = 1)
+        srcReject := bar_index
+
+if barstate.isconfirmed and showSignals and isInsideCurrentDrawing and not structureChanged
+    sigX = bar_index + signalLabelOffset
+
+    if aggressiveBuy
+        if not na(lbAggBuy)
+            label.delete(lbAggBuy)
+        if not na(lnAggBuy)
+            line.delete(lnAggBuy)
+        lbAggBuy := label.new(sigX, low, "Aggressive Buy", xloc = xloc.bar_index, style = label.style_label_up, color = color.new(colBull, 0), textcolor = color.white, size = labelSize)
+        lnAggBuy := line.new(bar_index, low, sigX, low, xloc = xloc.bar_index, color = color.new(colBull, 0), width = 1)
+        srcAggBuy := bar_index
+        lastSignalBar := bar_index
+
+    if aggressiveSell
+        if not na(lbAggSell)
+            label.delete(lbAggSell)
+        if not na(lnAggSell)
+            line.delete(lnAggSell)
+        lbAggSell := label.new(sigX, high, "Aggressive Sell", xloc = xloc.bar_index, style = label.style_label_down, color = color.new(colBear, 0), textcolor = color.white, size = labelSize)
+        lnAggSell := line.new(bar_index, high, sigX, high, xloc = xloc.bar_index, color = color.new(colBear, 0), width = 1)
+        srcAggSell := bar_index
+        lastSignalBar := bar_index
+
+    if reversalWatch
+        if not na(lbRevWatch)
+            label.delete(lbRevWatch)
+        if not na(lnRevWatch)
+            line.delete(lnRevWatch)
+        lbRevWatch := label.new(sigX, close, "Reversal Watch", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(colNeutral, 0), textcolor = color.white, size = labelSize)
+        lnRevWatch := line.new(bar_index, close, sigX, close, xloc = xloc.bar_index, color = color.new(colNeutral, 0), width = 1)
+        srcRevWatch := bar_index
+        lastSignalBar := bar_index
+
+    if trendContinuation
+        if not na(lbTrendCont)
+            label.delete(lbTrendCont)
+        if not na(lnTrendCont)
+            line.delete(lnTrendCont)
+        lbTrendCont := label.new(sigX, close, "Trend Cont.", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(color.blue, 25), textcolor = color.white, size = labelSize)
+        lnTrendCont := line.new(bar_index, close, sigX, close, xloc = xloc.bar_index, color = color.new(color.blue, 25), width = 1)
+        srcTrendCont := bar_index
+        lastSignalBar := bar_index
+
+if barstate.islast and haveAnchors
+    xMin = anchorBar1
+    xMax = boxRightX
+
+    if not na(lbBreakDown) and (na(srcBreakDown) or srcBreakDown < xMin or srcBreakDown > xMax)
+        label.delete(lbBreakDown)
+        lbBreakDown := na
+        srcBreakDown := na
+        if not na(lnBreakDown)
+            line.delete(lnBreakDown)
+            lnBreakDown := na
+
+    if not na(lbReclaim) and (na(srcReclaim) or srcReclaim < xMin or srcReclaim > xMax)
+        label.delete(lbReclaim)
+        lbReclaim := na
+        srcReclaim := na
+        if not na(lnReclaim)
+            line.delete(lnReclaim)
+            lnReclaim := na
+
+    if not na(lbBreakUp) and (na(srcBreakUp) or srcBreakUp < xMin or srcBreakUp > xMax)
+        label.delete(lbBreakUp)
+        lbBreakUp := na
+        srcBreakUp := na
+        if not na(lnBreakUp)
+            line.delete(lnBreakUp)
+            lnBreakUp := na
+
+    if not na(lbReject) and (na(srcReject) or srcReject < xMin or srcReject > xMax)
+        label.delete(lbReject)
+        lbReject := na
+        srcReject := na
+        if not na(lnReject)
+            line.delete(lnReject)
+            lnReject := na
+
+    if not na(lbAggBuy) and (na(srcAggBuy) or srcAggBuy < xMin or srcAggBuy > xMax)
+        label.delete(lbAggBuy)
+        lbAggBuy := na
+        srcAggBuy := na
+        if not na(lnAggBuy)
+            line.delete(lnAggBuy)
+            lnAggBuy := na
+
+    if not na(lbAggSell) and (na(srcAggSell) or srcAggSell < xMin or srcAggSell > xMax)
+        label.delete(lbAggSell)
+        lbAggSell := na
+        srcAggSell := na
+        if not na(lnAggSell)
+            line.delete(lnAggSell)
+            lnAggSell := na
+
+    if not na(lbRevWatch) and (na(srcRevWatch) or srcRevWatch < xMin or srcRevWatch > xMax)
+        label.delete(lbRevWatch)
+        lbRevWatch := na
+        srcRevWatch := na
+        if not na(lnRevWatch)
+            line.delete(lnRevWatch)
+            lnRevWatch := na
+
+    if not na(lbTrendCont) and (na(srcTrendCont) or srcTrendCont < xMin or srcTrendCont > xMax)
+        label.delete(lbTrendCont)
+        lbTrendCont := na
+        srcTrendCont := na
+        if not na(lnTrendCont)
+            line.delete(lnTrendCont)
+            lnTrendCont := na
+//=====================================================
+// SCORE
+//=====================================================
+float score = 0.0
+
+if trendDir == 1 and not na(gann1x1) and close > gann1x1
+    score += 3
+if trendDir == -1 and not na(gann1x1) and close < gann1x1
+    score -= 3
+
+if inHeatZone
+    score += trendDir == 1 ? 1 : trendDir == -1 ? -1 : 0
+
+sq9Up1 = haveAnchors ? f_sq9_price(anchorPrice2, sq9StepFinal, 1, true) : na
+sq9Dn1 = haveAnchors ? f_sq9_price(anchorPrice2, sq9StepFinal, 1, false) : na
+
+if not na(sq9Up1) and close > sq9Up1
+    score += 1
+if not na(sq9Dn1) and close < sq9Dn1
+    score -= 1
+
+if heatBullReaction
+    score += 1
+if heatBearReaction
+    score -= 1
+
+scoreClamped = f_clamp(score, -8, 8)
+
+trendText = "NEUTRAL"
+
+if scoreClamped >= 4
+    trendText := "STRONG BULL"
+else if scoreClamped >= 1
+    trendText := "BULL BIAS"
+else if scoreClamped <= -4
+    trendText := "STRONG BEAR"
+else if scoreClamped <= -1
+    trendText := "BEAR BIAS"
+
+//=====================================================
+// PANEL
+//=====================================================
+if barstate.islast and not showScorePanel
+    table.clear(scoreTable, 0, 0, 1, 15)
+
+if barstate.islast and showScorePanel
+    panel1x1State = "na"
+    if not na(gann1x1)
+        panel1x1State := math.abs(close - gann1x1) <= syminfo.mintick ? "At 1x1" : close > gann1x1 ? "Above" : "Below"
+
+    panel1x1Price = not na(gann1x1) ? str.tostring(gann1x1, format.mintick) : "na"
+
+    panelMode          = (trendDir == 1 ? "Bullish" : trendDir == -1 ? "Bearish" : "Neutral") + " / " + (gannEngineMode == "Classic Gann" ? "Classic Gann" : "Gann Style")
+    panelPocLevelText  = gannEngineMode == "Gann Style" ? panelPocLevel : "na"
+    panelPocPriceText  = gannEngineMode == "Gann Style" and not na(panelPocPrice) ? str.tostring(panelPocPrice, format.mintick) : "na"
+    panelLastBreakText = na(lastBreakBar) ? "na" : lastBreakSideText + " / " + lastBreakStrengthText
+    panelRejectText = bearReject1x1 ? "Active" : "None"
+
+    panelHdrBg      = f_panel_bg_base()
+    panelTrendBg    = f_panel_bg_trend(trendDir)
+    panelTrendBgHi  = f_panel_bg_trend_strong(trendDir)
+
+    panelHdrTxt     = color.new(color.blue, 0)
+    panelTrendTxt   = f_panel_text_trend(trendDir)
+    panelTrendTxt2  = f_panel_text_trend_soft(trendDir)
+
+    biasText      = scoreClamped > 0 ? "Bullish" : scoreClamped < 0 ? "Bearish" : "Neutral"
+    biasTextColor = scoreClamped > 0 ? color.new(colBull, 0) : scoreClamped < 0 ? color.new(colBear, 0) : color.new(colNeutral, 0)
+
+    panelTrendBgRow  = trendDir == 1 ? color.new(colBull, 72) : trendDir == -1 ? color.new(colBear, 72) : color.new(colNeutral, 72)
+    panelTrendTxtRow = trendDir == 1 ? color.new(colBull, 0)  : trendDir == -1 ? color.new(colBear, 0)  : color.new(colNeutral, 0)
+
+    panelFocusBg      = color.new(color.yellow, 78)
+    panelFocusBgHi    = color.new(color.yellow, 70)
+    panelFocusTxt     = color.new(color.yellow, 0)
+    panelFocusTxtSoft = color.new(color.orange, 0)
+
+    table.cell(scoreTable, 0, 0, "Metric", text_color = panelHdrTxt, bgcolor = panelHdrBg)
+    table.cell(scoreTable, 1, 0, "State",  text_color = panelHdrTxt, bgcolor = panelHdrBg)
+
+    table.cell(scoreTable, 0, 1, "Mode", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 1, panelMode, text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 2, "Trend", text_color = panelTrendTxtRow, bgcolor = panelTrendBgRow)
+    table.cell(scoreTable, 1, 2, trendText, text_color = panelTrendTxtRow, bgcolor = panelTrendBgRow)
+
+    table.cell(scoreTable, 0, 3, "Score", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 3, str.tostring(scoreClamped), text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 4, "1x1 Now", text_color = panelFocusTxtSoft, bgcolor = panelFocusBg)
+    table.cell(scoreTable, 1, 4, panel1x1Price, text_color = panelFocusTxt, bgcolor = panelFocusBgHi)
+
+    table.cell(scoreTable, 0, 5, "POC Level", text_color = panelFocusTxtSoft, bgcolor = panelFocusBg)
+    table.cell(scoreTable, 1, 5, panelPocLevelText, text_color = panelFocusTxt, bgcolor = panelFocusBgHi)
+
+    table.cell(scoreTable, 0, 6, "POC Price", text_color = panelFocusTxtSoft, bgcolor = panelFocusBg)
+    table.cell(scoreTable, 1, 6, panelPocPriceText, text_color = panelFocusTxt, bgcolor = panelFocusBgHi)
+
+    table.cell(scoreTable, 0, 7, "Price / 1x1", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 7, panel1x1State, text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 8, "Heat", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 8, inHeatZone ? "Inside" : "Outside", text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 9, "Reaction", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 9, heatReactionText, text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 10, "Last Break", text_color = panelTrendTxt2, bgcolor = panelTrendBg)
+    table.cell(scoreTable, 1, 10, panelLastBreakText, text_color = panelTrendTxt, bgcolor = panelTrendBg)
+
+    table.cell(scoreTable, 0, 11, "Bull Count", text_color = color.new(colBull, 0), bgcolor = panelTrendBgHi)
+    table.cell(scoreTable, 1, 11, str.tostring(bullReactionCount), text_color = color.new(colBull, 0), bgcolor = panelTrendBgHi)
+
+    table.cell(scoreTable, 0, 12, "Bear Count", text_color = color.new(colBear, 0), bgcolor = panelTrendBgHi)
+    table.cell(scoreTable, 1, 12, str.tostring(bearReactionCount), text_color = color.new(colBear, 0), bgcolor = panelTrendBgHi)
+
+    table.cell(scoreTable, 0, 13, "Break Count", text_color = color.new(colNeutral, 0), bgcolor = panelTrendBgHi)
+    table.cell(scoreTable, 1, 13, str.tostring(breakEventCount), text_color = color.new(colNeutral, 0), bgcolor = panelTrendBgHi)
+
+    table.cell(scoreTable, 0, 14, "Reject", text_color = color.new(colBear, 0), bgcolor = panelTrendBgHi)
+    table.cell(scoreTable, 1, 14, panelRejectText, text_color = color.new(colBear, 0), bgcolor = panelTrendBgHi)
+
+    table.cell(scoreTable, 0, 15, "Bias", text_color = biasTextColor, bgcolor = panelTrendBgHi)
+    table.cell(scoreTable, 1, 15, biasText, text_color = biasTextColor, bgcolor = panelTrendBgHi)
+
+//=====================================================
+// ALERTS
+//=====================================================
+alertcondition(bullBreak1x1Down, "Bull 1x1 Break Down", "Bull trend 1x1 Gann line broken downward.")
+alertcondition(bullReclaim1x1, "Bull 1x1 Reclaim", "Bull trend reclaimed 1x1 Gann line.")
+alertcondition(bearBreak1x1Up, "Bear 1x1 Break Up", "Bear trend 1x1 Gann line broken upward.")
+alertcondition(bearReject1x1, "Bear 1x1 Reject", "Bear trend rejected from 1x1 Gann line.")
+alertcondition(scoreClamped >= 4, "Strong Bull Score", "Gann Pressure Matrix PRO v8 strong bull score active.")
+alertcondition(scoreClamped <= -4, "Strong Bear Score", "Gann Pressure Matrix PRO v8 strong bear score active.")
+alertcondition(aggressiveBuy, "Aggressive Buy", "Gann Pressure Matrix PRO v8 aggressive buy signal.")
+alertcondition(aggressiveSell, "Aggressive Sell", "Gann Pressure Matrix PRO v8 aggressive sell signal.")
+alertcondition(reversalWatch, "Reversal Watch", "Gann Pressure Matrix PRO v8 reversal watch signal.")
+alertcondition(trendContinuation, "Trend Continuation", "Gann Pressure Matrix PRO v8 trend continuation signal.")
+//=====================================================
+// FINISH
+//=====================================================

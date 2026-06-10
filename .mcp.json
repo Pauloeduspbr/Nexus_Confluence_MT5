@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "ea-specialist": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "C:\\EA_Projetos\\mcp-ea-specialist",
+        "python",
+        "C:\\EA_Projetos\\mcp-ea-specialist\\server.py"
+      ]
+    }
+  }
+}
